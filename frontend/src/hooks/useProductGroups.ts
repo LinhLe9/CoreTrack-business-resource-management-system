@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import axios from 'axios'
+import api from '@/lib/axios'
+import { Group } from '@/types/product'
 
 export default function useProductGroups() {
-  const [groups, setGroups] = useState<string[]>([])
+  const [groups, setGroups] = useState<Group[]>([])
 
   useEffect(() => {
-    axios.get('/products/product-groups')
+    api.get('/products/product-groups')
       .then(res => setGroups(res.data))
       .catch(err => console.error('Failed to load product groups', err))
   }, [])

@@ -9,6 +9,7 @@ public class AddProductResponse {
     private String name;
     private String description;
     private BigDecimal price;
+    private String currency;
     private String productGroupName; // Product group name for display, instead of just ID
     private String imageUrl;
     private boolean isActive;
@@ -19,13 +20,14 @@ public class AddProductResponse {
     private String updatedBy; 
 
     // Constructor to convert from Entity to DTO
-    public AddProductResponse(String sku, String name, String description, BigDecimal price, 
+    public AddProductResponse(String sku, String name, String description, BigDecimal price, String currency,
                                 String productGroupName, String imageUrl, boolean isActive, List<ProductVariantResponse> productVariants, 
                                 LocalDateTime createdAt, String createdByUsername, LocalDateTime updatedAt, String updatedBy) {
         this.sku = sku;
         this.name = name;
         this.description = description;
         this.price = price;
+        this.currency = currency;
         this.productGroupName = productGroupName;
         this.imageUrl = imageUrl;
         this.isActive = isActive;
@@ -91,5 +93,12 @@ public class AddProductResponse {
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
     }
-    
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
 }

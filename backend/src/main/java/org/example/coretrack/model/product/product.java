@@ -8,10 +8,11 @@ import java.util.List;
 import org.example.coretrack.model.auth.User;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Pattern;
 
 @Entity
-@Table(name = "product")
-public class product {
+@Table(name = "Product")
+public class Product {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -27,21 +28,26 @@ public class product {
     @Column(nullable = false)
     private boolean isActive;
 
+    // store enum in dtb
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private productStatus status;
+    private ProductStatus status;
 
     @Column(precision = 10, scale = 2, nullable = false)
     private BigDecimal price;
 
+    @Column(length = 3, nullable = false)
+    @Pattern(regexp = "^[A-Z]{3}$", message = "Currency must be 3 uppercase letters (ISO 4217)")
+    private String currency;
+
     private String imageUrl;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
-    private List<productVariant> variants = new ArrayList<>();
+    private List<ProductVariant> variants = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "productGroup_id")
-    private productGroup group;
+    private ProductGroup group;
 
     // logging elements
     @ManyToOne(fetch = FetchType.LAZY)
@@ -57,15 +63,17 @@ public class product {
     
 
     // Constructor
-    public product() {
+    public Product() {
     }
 
-    public product(String name, String sku, String description, BigDecimal price, productGroup productGroup, User createdBy) {
+    public Product(String name, String sku, String description, BigDecimal price, 
+                    String currency, ProductGroup productGroup, User createdBy) {
         this.name = name;
         this.sku = sku;
         this.description = description;
-        this.status = productStatus.ACTIVE;
+        this.status = ProductStatus.ACTIVE;
         this.price = price;
+        this.currency = currency;
         this.group = productGroup;
         this.created_by = createdBy;
         this.isActive = true;
@@ -91,11 +99,11 @@ public class product {
         this.name = name; 
     }
 
-    public productGroup getProductGroup() { 
+    public ProductGroup getProductGroup() { 
         return group; 
     } 
     
-    public void setProductGroup(productGroup productGroup) { 
+    public void setProductGroup(ProductGroup productGroup) { 
         this.group = productGroup; 
     }
 
@@ -154,11 +162,11 @@ public class product {
         this.description = description;
     }
 
-    public productStatus getStatus() {
+    public ProductStatus getStatus() {
         return status;
     }
 
-    public void setStatus(productStatus status) {
+    public void setStatus(ProductStatus status) {
         this.status = status;
     }
 
@@ -194,20 +202,27 @@ public class product {
         this.updated_by = updated_by;
     }
 
-    public productGroup getGroup() {
+    public ProductGroup getGroup() {
         return group;
     }
 
-    public void setGroup(productGroup group) {
+    public void setGroup(ProductGroup group) {
         this.group = group;
     }
 
-    public List<productVariant> getVariants() {
+    public List<ProductVariant> getVariants() {
         return variants;
     }
 
-    public void setVariants(List<productVariant> variants) {
+    public void setVariants(List<ProductVariant> variants) {
         this.variants = variants;
     }
-    
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
 }

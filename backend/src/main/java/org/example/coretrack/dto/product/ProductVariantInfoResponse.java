@@ -1,6 +1,6 @@
 package org.example.coretrack.dto.product;
 
-import org.example.coretrack.model.product.productVariant;
+import org.example.coretrack.model.product.ProductVariant;
 
 public class ProductVariantInfoResponse {
     private Long id;
@@ -18,12 +18,12 @@ public class ProductVariantInfoResponse {
         this.imageUrl = imageUrl;
     }
 
-    public ProductVariantInfoResponse(productVariant productVariant){
-        this.id = productVariant.getId();
-        this.sku = productVariant.getSku();
-        this.name = productVariant.getName();
-        this.shortDescription = productVariant.getDescription();
-        this.imageUrl = productVariant.getImageUrl();
+    public ProductVariantInfoResponse(ProductVariant productVariant){
+        this.id = productVariant != null ? productVariant.getId() : null;
+        this.sku = productVariant != null ? productVariant.getSku() : null;
+        this.name = productVariant != null ? productVariant.getName() : null;
+        this.shortDescription = productVariant != null ? productVariant.getDescription() : null;
+        this.imageUrl = productVariant != null ? productVariant.getImageUrl() : null;
     }
     
     // Getters and Setters

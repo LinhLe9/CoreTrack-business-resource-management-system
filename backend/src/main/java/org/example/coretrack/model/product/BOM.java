@@ -9,7 +9,7 @@ import org.example.coretrack.model.auth.User;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "billOfMaterial")
+@Table(name = "BillOfMaterial")
 public class BOM {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -17,7 +17,7 @@ public class BOM {
 
     @OneToOne(fetch = FetchType.LAZY) 
     @JoinColumn(name = "productVariant_id", unique = true, nullable = false)
-    private productVariant productVariant;
+    private ProductVariant productVariant;
 
     @Column(columnDefinition = "TEXT")
     private String description;
@@ -46,7 +46,7 @@ public class BOM {
 
     
 
-    public BOM(productVariant productVariant, String description, User created_by) {
+    public BOM(ProductVariant productVariant, String description, User created_by) {
         this.productVariant = productVariant;
         this.description = description;
         this.isActive = true;
@@ -65,11 +65,11 @@ public class BOM {
         this.id = id;
     }
 
-    public productVariant getProductVariant() {
+    public ProductVariant getProductVariant() {
         return productVariant;
     }
 
-    public void setProductVariant(productVariant productVariant) {
+    public void setProductVariant(ProductVariant productVariant) {
         this.productVariant = productVariant;
     }
 

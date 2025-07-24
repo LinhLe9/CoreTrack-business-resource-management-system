@@ -2,27 +2,33 @@ package org.example.coretrack.service;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.example.coretrack.dto.product.AddProductRequest;
 import org.example.coretrack.dto.product.AddProductResponse;
+import org.example.coretrack.dto.product.AllProductSearchResponse;
 import org.example.coretrack.dto.product.BOMItemRequest;
 import org.example.coretrack.dto.product.BOMItemResponse;
 import org.example.coretrack.dto.product.InventoryResponse;
 import org.example.coretrack.dto.product.ProductDetailResponse;
+import org.example.coretrack.dto.product.ProductGroupResponse;
 import org.example.coretrack.dto.product.ProductVariantInfoResponse;
 import org.example.coretrack.dto.product.ProductVariantInventoryResponse;
+import org.example.coretrack.dto.product.ProductVariantRequest;
 import org.example.coretrack.dto.product.ProductVariantResponse;
 import org.example.coretrack.dto.product.SearchProductResponse;
 import org.example.coretrack.model.auth.User;
 import org.example.coretrack.model.material.Material;
 import org.example.coretrack.model.product.BOM;
 import org.example.coretrack.model.product.BOMItem;
-import org.example.coretrack.model.product.product;
-import org.example.coretrack.model.product.productGroup;
-import org.example.coretrack.model.product.productStatus;
-import org.example.coretrack.model.product.productVariant;
+import org.example.coretrack.model.product.Product;
+import org.example.coretrack.model.product.ProductGroup;
+import org.example.coretrack.model.product.ProductStatus;
+import org.example.coretrack.model.product.ProductVariant;
 import org.example.coretrack.repository.BomItemRepository;
 import org.example.coretrack.repository.BomRepository;
 import org.example.coretrack.repository.MaterialRepository;
@@ -66,20 +72,23 @@ public class ProductServiceImpl implements ProductService{
         
         // 1. Handle Product Group (Main Flow - Step 4, A5)
         // Initialize as null
-        productGroup productGroup = null;
+        ProductGroup productGroup = null;
         if (request.getProductGroupId() != null) {
             // Choose Existing Product Group (A5.1)
-            productGroup = productGroupRepository.findById(request.getProductGroupId())
+            Long ProductGroupId = Long.parseLong(request.getProductGroupId());
+            productGroup = productGroupRepository.findByIdAndIsActiveTrue(ProductGroupId)
                     .orElseThrow(() -> new RuntimeException("Product Group not found with ID: " + request.getProductGroupId()));
         } else if (StringUtils.hasText(request.getNewProductGroupName())) {
             // Create New Product Group (A5.2)
             String newGroupName = request.getNewProductGroupName().trim();
             // E4: Duplicate Group Name
-            if (productGroupRepository.findByName(newGroupName).isPresent()) { 
+            if (productGroupRepository.findByNameAndIsActiveTrue(newGroupName).isPresent()) { 
                     throw new IllegalArgumentException("Group name already exists: " + newGroupName);
                 }
-            productGroup = new productGroup(newGroupName,createdByUser);
+            productGroup = new ProductGroup(newGroupName,createdByUser);
             productGroupRepository.save(productGroup); // Save new group first
+        } else {
+            productGroup = null;
         }
 
         // 2. Handle Product SKU (Main Flow - Step 2, A1, A2)
@@ -95,7 +104,6 @@ public class ProductServiceImpl implements ProductService{
             if (manualSku.length() < 8 || manualSku.length() > 12) {
                  throw new IllegalArgumentException("Manual SKU must be between 8 and 12 characters.");
             }
-            // // You might add regex validation here for "shorten signs for group-product-variant structure"
             // product.setSku(manualSku);
             sku = manualSku;
         } else {
@@ -105,11 +113,12 @@ public class ProductServiceImpl implements ProductService{
         }
     
         // 3. Create Product Entity (Main Flow - Step 2)
-        product product = new product(
+        Product product = new Product(
             request.getName(),
             sku,
             request.getDescription(),
             request.getPrice(),
+            request.getCurrency(),
             productGroup,
             createdByUser 
         );
@@ -119,12 +128,15 @@ public class ProductServiceImpl implements ProductService{
         productRepository.save(product); // Save product to get its ID for relationships
 
         // 4. Define Variant(s) (Main Flow - Step 4)
-        List<productVariant> allProductVariants = new java.util.ArrayList<>();
+        List<ProductVariant> allProductVariants = new java.util.ArrayList<>();
+
         if (request.getVariants() != null && !request.getVariants().isEmpty()) {
             // Product has variants
-            List<productVariant> variants = request.getVariants().stream()
+            AtomicInteger skuCounter = new AtomicInteger(1);
+            List<ProductVariant> variants = request.getVariants().stream()
                 .map(variantRequest -> {
-                    productVariant variant = new productVariant(
+                    int index = skuCounter.getAndIncrement();
+                    ProductVariant variant = new ProductVariant(
                         product, // Link to the base product
                         variantRequest.getName(),
                         null, // SKU will be generated later
@@ -136,16 +148,47 @@ public class ProductServiceImpl implements ProductService{
                         variant.setImageUrl(variantRequest.getImageUrl());
                     }
                     // Generate SKU for variant (e.g., adding "-1", "-2" suffixes)
-                    variant.setSku(generateVariantSku(product.getSku(), product.getVariants().size() + 1));
+                    variant.setSku(generateVariantSku(product.getSku(), index));
                     return variant;
                 }).collect(Collectors.toList());
 
             product.setVariants(variants); // Set variants on the product
             productVariantRepository.saveAll(variants); // Save all variants
             allProductVariants.addAll(variants);
+
+            // loop to add BOM Items
+            for (int i = 0; i < variants.size(); i++){
+                ProductVariant variant = variants.get(i);
+                ProductVariantRequest variantRequest = request.getVariants().get(i);
+
+                if (variantRequest.getBomItems() != null && !variantRequest.getBomItems().isEmpty()) {
+                // Create a new BillOfMaterials for each variant
+                    BOM bom = new BOM(variant, "1.0", createdByUser);
+                    bomRepository.save(bom); // Save the BOM header
+                    List<BOMItemRequest> bomItemRequest = variantRequest.getBomItems();
+                    for (int j = 0; j < bomItemRequest.size(); j++){
+                        Optional<Material> optional = materialRepository.findBySku(bomItemRequest.get(j).getMaterialSku());
+                        if (!optional.isPresent()) {
+                            throw new RuntimeException("Material not found with SKU: " + bomItemRequest.get(j).getMaterialSku());
+                        }
+                        Material material = optional.get();
+                        BOMItem bomItem = new BOMItem(
+                            bom,
+                            material,
+                            bomItemRequest.get(j).getQuantity(),
+                            material.getUom(), // UoM from material
+                            createdByUser
+                        );
+                        bom.getBomItems().add(bomItem);
+
+                    }
+                    bomItemRepository.saveAll(bom.getBomItems());
+                    variant.setBom(bom);
+                }
+            }
         } else {
             // Product has no explicit variants, create a default variant for the base product
-            productVariant defaultVariant = new productVariant(
+            ProductVariant defaultVariant = new ProductVariant(
                 product,
                 product.getName(),
                 product.getSku(), // Base product SKU becomes default variant SKU
@@ -159,36 +202,6 @@ public class ProductServiceImpl implements ProductService{
             productVariantRepository.save(defaultVariant);
             product.getVariants().add(defaultVariant); // Add to product's variants list
             allProductVariants.add(defaultVariant);
-        }
-
-        // 4. Add BOM Items (Main Flow - Step 3) 
-        if (request.getBomItems() != null && !request.getBomItems().isEmpty()) {
-            for (productVariant variant : allProductVariants) {
-                // Create a new BillOfMaterials for each variant
-                BOM bom = new BOM(variant, "1.0", createdByUser);
-                bomRepository.save(bom); // Save the BOM header
-                variant.setBom(bom);
-
-                // Add the same set of BOM items to this BOM
-                for (BOMItemRequest bomItemRequest : request.getBomItems()) {
-                    Material material = materialRepository.findById(bomItemRequest.getMaterialId())
-                            .orElseThrow(() -> new RuntimeException("Material not found with ID: " + bomItemRequest.getMaterialId()));
-
-                    // E3: Insufficient Material Quantity for BOM (Implied/Future) - This check is typically done during production planning/order, not product creation.
-                    // For product creation, we assume the BOM definition is what's required, not current stock.
-                    // If you need this check here, it would involve InventoryService.
-
-                    BOMItem bomItem = new BOMItem(
-                        bom,
-                        material,
-                        bomItemRequest.getQuantity(),
-                        material.getUom(), // UoM from material
-                        createdByUser
-                    );
-                    bom.getBomItems().add(bomItem); // Add to BOM's items list and set bidirectional link
-                }
-                bomItemRepository.saveAll(bom.getBomItems()); // Save all BOM items for this variant's BOM
-            }
         }
         return mapProductToProductResponse(product) ; // Return the fully populated Product entity
     }
@@ -230,7 +243,7 @@ public class ProductServiceImpl implements ProductService{
         return finalVariantSku;
     }
 
-    private AddProductResponse mapProductToProductResponse(product product) {
+    private AddProductResponse mapProductToProductResponse(Product product) {
         List<ProductVariantResponse> variantResponses = product.getVariants() != null ?
                 product.getVariants().stream()
                         .map(variant -> {
@@ -240,11 +253,10 @@ public class ProductServiceImpl implements ProductService{
                                 bomItemResponses = variant.getBom().getBomItems().stream()
                                         .map(item -> new BOMItemResponse(
                                                 item.getId(),
-                                                item.getMaterial().getId(),
+                                                item.getMaterial().getSku(),
                                                 item.getMaterial().getName(),
                                                 item.getQuantity(),
-                                                item.getUom().getDisplayName(),
-                                                item.getNotes()
+                                                item.getUom().getDisplayName()
                                         )).toList();
                             }
                             return new ProductVariantResponse(
@@ -262,6 +274,7 @@ public class ProductServiceImpl implements ProductService{
                 product.getName(),
                 product.getDescription(),
                 product.getPrice(),
+                product.getCurrency(),
                 product.getProductGroup() != null ? product.getProductGroup().getName() : null,
                 product.getImageUrl(),
                 product.isActive(),
@@ -272,6 +285,15 @@ public class ProductServiceImpl implements ProductService{
                 product.getUpdatedBy() != null ? product.getUpdatedBy().getUsername() : null
         );
     }
+
+    /*
+     * To return all available products those were stored in database
+     */
+    @Override
+     public Page<SearchProductResponse> findAllProducts (Pageable pageable){
+        Page<Product> products = productRepository.findAllActive(pageable);
+        return products.map(SearchProductResponse::new);
+     }
 
     /**
      * Search and filter by param.
@@ -288,36 +310,56 @@ public class ProductServiceImpl implements ProductService{
             List<String> statuses,
             Pageable pageable) {
 
-        // Xử lý tham số search: nếu null hoặc rỗng, đặt thành null để không áp dụng điều kiện LIKE
+        // handle search
         String processedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
-        // Xử lý tham số groupMaterials: nếu rỗng hoặc null, đặt thành null để không áp dụng điều kiện IN
-        List<String> processedGroupMaterials = CollectionUtils.isEmpty(groupProducts) ? null : groupProducts;
+        // convert groupProducts fromList<String> to List<Long>
+        List<Long> processedGroupProductIds = null;
+        if (!CollectionUtils.isEmpty(groupProducts)) {
+            processedGroupProductIds = groupProducts.stream()
+                .map(s -> {
+                    try {
+                        return Long.parseLong(s);
+                    } catch (NumberFormatException e) {
+                        System.err.println("Invalid groupProduct id: " + s);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
 
-        // Xử lý tham số statuses: chuyển đổi từ List<String> sang List<productStatus>
-        List<productStatus> processedStatuses = null;
+            if (processedGroupProductIds.isEmpty()) {
+                processedGroupProductIds = null;
+            }
+        }
+
+        // convert status from String -> Enum
+        List<ProductStatus> processedStatuses = null;
         if (!CollectionUtils.isEmpty(statuses)) {
             processedStatuses = statuses.stream()
-                                      .map(s -> {
-                                          try {
-                                              return productStatus.valueOf(s.toUpperCase());
-                                          } catch (IllegalArgumentException e) {
-                                              // Xử lý nếu trạng thái không hợp lệ, có thể bỏ qua hoặc ném lỗi
-                                              // Trong trường hợp này, chúng ta sẽ bỏ qua
-                                              System.err.println("Invalid material status: " + s);
-                                              return null;
-                                          }
-                                      })
-                                      .filter(s -> s != null) // Loại bỏ các trạng thái null (không hợp lệ)
-                                      .collect(Collectors.toList());
-            if (processedStatuses.isEmpty()) { // Nếu tất cả các trạng thái đều không hợp lệ, không lọc theo status
+                .map(s -> {
+                    try {
+                        return ProductStatus.valueOf(s.toUpperCase());
+                    } catch (IllegalArgumentException e) {
+                        System.err.println("Invalid product status: " + s);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+            if (processedStatuses.isEmpty()) {
                 processedStatuses = null;
             }
         }
 
-        Page<product> products = productRepository.findByCriteria(
+        System.out.println("Search: " + processedSearch);
+        System.out.println("GroupProduct IDs: " + processedGroupProductIds);
+        System.out.println("Statuses: " + processedStatuses);
+        // call repository
+        Page<Product> products = productRepository.findByCriteria(
             processedSearch,
-            processedGroupMaterials,
+            processedGroupProductIds, 
             processedStatuses,
             pageable
         );
@@ -330,14 +372,14 @@ public class ProductServiceImpl implements ProductService{
      */
 
     @Override
-    public List<SearchProductResponse> getAllProductsForAutocomplete(String search) {
+    public List<AllProductSearchResponse> getAllProductsForAutocomplete(String search) {
         return productRepository.findBySearchKeyword(search).stream()
-                .map(SearchProductResponse::new)
+                .map(AllProductSearchResponse::new)
                 .collect(Collectors.toList());
     }
 
     /**
-     * Lấy vật liệu theo ID (cho A1: điều hướng đến chi tiết).
+     * get Product by ID.
      */
     // @Override
     // public ProductDetailResponse getProductById(Long id) {
@@ -390,13 +432,13 @@ public class ProductServiceImpl implements ProductService{
 
     @Override
     public ProductDetailResponse getProductById(Long id) {
-    product product = productRepository.findById(id)
+    Product product = productRepository.findByIdWithVariantsAndInventory(id)
             .orElseThrow(() -> new RuntimeException("Product not found with ID: " + id));
 
     List<ProductVariantInventoryResponse> variantInventory = product.getVariants() != null
             ? product.getVariants().stream()
                 .map(variant -> {
-                    ProductVariantInfoResponse variantResponse = new ProductVariantInfoResponse(variant);
+                    ProductVariantInfoResponse variantResponse = variant != null ? new ProductVariantInfoResponse(variant) : null;
                     InventoryResponse inventoryResponse = null;
 
                     if (variant.getProductInventory() != null) {
@@ -412,17 +454,19 @@ public class ProductServiceImpl implements ProductService{
         product.getId(),
         product.getSku(),
         product.getName(),
-        product.getDescription(),
+        product.getDescription() != null ? product.getDescription() : null,
         product.getGroup() != null ? product.getGroup().getName() : null,
         product.getStatus() != null ? product.getStatus().name() : null,
-        product.getPrice(),
-        product.getImageUrl(),
+        product.getPrice() != null ? product.getPrice() : null,
+        product.getImageUrl() != null ? product.getImageUrl() : null,
         variantInventory
     );
-}
+    }
 
     @Override
-    public List<String> getAllGroupName(){
-        return productGroupRepository.findDistinctGroupNames();
+    public List<ProductGroupResponse> getAllGroupName(){
+        return productGroupRepository.findByIsActiveTrueAndNameIsNotNull().stream()
+                .map(ProductGroupResponse::new)
+                .collect(Collectors.toList());
     }
 }

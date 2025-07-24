@@ -17,7 +17,8 @@ public class AddProductRequest {
     private String description;
     private String imageUrl; 
 
-    private Long productGroupId;
+    private String productGroupId;
+
     @Size(max = 100, message = "New Product Group name cannot exceed 100 characters.")
     private String newProductGroupName; 
 
@@ -25,17 +26,13 @@ public class AddProductRequest {
     @NotNull(message = "Price cannot be empty")
     private BigDecimal price;
 
+    private String currency;
+
     @Size(max = 16, message = "SKU cannot exceed 16 characters") // Added size constraint
     private String sku;
 
     // Fields like id, createdAt, createdBy, isActive are not needed in the request
     // as they will be automatically generated/managed by the system.
-
-    // Bill of Material (BOM) Items (Main Flow - Step 3)
-    @NotNull(message = "BOM items cannot be empty. A BOM must be defined.")
-    @Size(min = 1, message = "At least one BOM item is required.")
-    @Valid // Validate each BOM item in the list
-    private List<BOMItemRequest> bomItems;
 
     // Product Variants (Main Flow - Step 4)
     @Valid // Validate each variant in the list
@@ -60,11 +57,11 @@ public class AddProductRequest {
         this.description = description; 
     }
 
-    public Long getProductGroupId() { 
+    public String getProductGroupId() { 
         return productGroupId; 
     }
 
-    public void setProductGroupId(Long productGroupId) { 
+    public void setProductGroupId(String productGroupId) { 
         this.productGroupId = productGroupId; 
     }
 
@@ -100,14 +97,6 @@ public class AddProductRequest {
         this.sku = sku;
     }
 
-    public List<BOMItemRequest> getBomItems() {
-        return bomItems;
-    }
-
-    public void setBomItems(List<BOMItemRequest> bomItems) {
-        this.bomItems = bomItems;
-    }
-
     public List<ProductVariantRequest> getVariants() {
         return variants;
     }
@@ -116,5 +105,11 @@ public class AddProductRequest {
         this.variants = variants;
     }
 
-    
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
 }

@@ -26,7 +26,7 @@ public class SearchMaterialResponse {
         this.imageUrl = imageUrl;
     }
 
-    // Constructor để chuyển đổi từ Entity sang DTO
+    // Constructor to convert from Entity to DTO
     public SearchMaterialResponse(Material material) {
         this.id = material.getId();
         this.sku = material.getSku();

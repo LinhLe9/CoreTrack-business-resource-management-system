@@ -21,7 +21,7 @@ public class MaterialSupplier {
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("supplierId") 
     @JoinColumn(name = "supplier_id") 
-    private supplier supplier;
+    private Supplier supplier;
 
     // import price
     @Column(precision = 10, scale = 2, nullable = false)
@@ -37,6 +37,7 @@ public class MaterialSupplier {
     // minimum number of products
     private Integer minOrderQuantity; 
 
+    // code of material based on the supplier category if have
     @Column(unique = true) 
     private String supplierMaterialCode;
 
@@ -55,7 +56,7 @@ public class MaterialSupplier {
     // Constructors
     public MaterialSupplier() {}
 
-    public MaterialSupplier(Material material, supplier supplier, BigDecimal price, String currency, User createdBy) {
+    public MaterialSupplier(Material material, Supplier supplier, BigDecimal price, String currency, User createdBy) {
         this.material = material;
         this.supplier = supplier;
         this.id = new MaterialSupplierId(material.getId(), supplier.getId()); // Khởi tạo khóa chính tổng hợp
@@ -83,11 +84,11 @@ public class MaterialSupplier {
         this.material = material;
     }
 
-    public supplier getSupplier() {
+    public Supplier getSupplier() {
         return supplier;
     }
 
-    public void setSupplier(supplier supplier) {
+    public void setSupplier(Supplier supplier) {
         this.supplier = supplier;
     }
 

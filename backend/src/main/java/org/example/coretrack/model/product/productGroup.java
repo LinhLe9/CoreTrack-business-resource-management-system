@@ -9,8 +9,8 @@ import org.example.coretrack.model.auth.User;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "productGroup")
-public class productGroup {
+@Table(name = "ProductGroup")
+public class ProductGroup {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -22,7 +22,7 @@ public class productGroup {
 
     // map with product
     @OneToMany(mappedBy = "group", cascade = CascadeType.ALL)
-    List<product> products = new ArrayList<>();
+    List<Product> products = new ArrayList<>();
 
     //logging element
     @ManyToOne(fetch = FetchType.LAZY)
@@ -37,10 +37,10 @@ public class productGroup {
     private LocalDateTime createdAt;
     
     // constructor
-    public productGroup() {
+    public ProductGroup() {
     }
 
-    public productGroup(String name, User created_by) {
+    public ProductGroup(String name, User created_by) {
         this.name = name;
         this.created_by = created_by;
         this.updated_by = created_by;
@@ -97,7 +97,7 @@ public class productGroup {
         this.updatedAt = updatedAt; 
     }
 
-    public boolean isActive() { 
+    public boolean getIsActive() { 
         return isActive; 
     }
 
@@ -105,11 +105,11 @@ public class productGroup {
         isActive = active; 
     }
 
-    public List<product> getProducts() {
+    public List<Product> getProducts() {
         return products;
     }
 
-    public void setProducts(List<product> products) {
+    public void setProducts(List<Product> products) {
         this.products = products;
     }
 }

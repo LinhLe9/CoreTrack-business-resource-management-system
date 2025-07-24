@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import { Roboto } from 'next/font/google';
 import "./globals.css";
 import { Providers } from "./providers";
+import Header from '../components/general/header';
 
 const roboto = Roboto({
   variable: "--font-roboto",
   subsets: ["latin"],
-  weight: ["400", "500", "700"], // tùy bạn cần font đậm hay thường
+  weight: ["400", "500", "700"],
 });
 
 export const metadata: Metadata = {
@@ -21,10 +22,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={roboto.variable}
-      >
-        <Providers>{children}</Providers>
+      <body className={roboto.variable}>
+        <Providers>
+          <Header />
+          {children}
+        </Providers>
       </body>
     </html>
   );

@@ -1,22 +1,42 @@
 // services/productService.ts
 import apiClient from '../lib/axios';
 import { PageResponse } from '../types/PageResponse';
-import { Product, ProductDetailResponse,ProductQueryParams } from '../types/product';
+import { Product, ProductDetailResponse, ProductQueryParams, ProductAutoComplete } from '../types/product';
+import qs from 'qs'; 
 
+
+// to fetch the product after searching + filtering
 export const getProducts = async (
   params: ProductQueryParams
+  
 ): Promise<PageResponse<Product>> => {
-  const response = await apiClient.get('/products', { params });
+  const defaultParams = {
+    page: 0,      
+    size: 10,     
+    search: '',   
+    groupProduct: [], 
+    status: []        
+  };
+  const mergedParams = { ...defaultParams, ...params };
+
+  console.log('Sending params to /products/filter', mergedParams);
+  const response = await apiClient.get('/products/filter', { 
+    params: mergedParams,
+    paramsSerializer: (params) =>
+      qs.stringify(params, { arrayFormat: 'repeat' }) 
+      // result: ?groupProduct=A&groupProduct=B&status=ACTIVE
+  });
   return response.data;
 };
 
-// ✅ Thêm API lấy toàn bộ để dùng cho autocomplete
-export const getAllProductsForAutocomplete = async (): Promise<Product[]> => {
+// to fetch the product for auto complete while searching
+export const getAllProductsForAutocomplete = async (): Promise<ProductAutoComplete[]> => {
   const response = await apiClient.get('/products/all'); 
   return response.data;
 };
 
+// to fetch the detail product page 
 export const getProductById = async (id: number): Promise<ProductDetailResponse> => {
-  const res = await apiClient.get<ProductDetailResponse>(`/product/${id}`);
+  const res = await apiClient.get<ProductDetailResponse>(`/products/${id}`);
   return res.data;
 };

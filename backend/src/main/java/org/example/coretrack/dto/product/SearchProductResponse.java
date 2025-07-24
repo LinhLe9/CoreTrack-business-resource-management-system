@@ -1,6 +1,6 @@
 package org.example.coretrack.dto.product;
 
-import org.example.coretrack.model.product.product;
+import org.example.coretrack.model.product.Product;
 import java.math.BigDecimal;
 
 public class SearchProductResponse {
@@ -27,13 +27,14 @@ public class SearchProductResponse {
         this.imageUrl = imageUrl;
     }
 
-    // Constructor để chuyển đổi từ Entity sang DTO
-    public SearchProductResponse(product product) {
+    // Constructor convert from Entity to DTO
+    public SearchProductResponse(Product product) {
+        this.id = product.getId();
         this.sku = product.getSku();
         this.name = product.getName();
         this.description = product.getDescription();
-        this.groupProduct = product.getGroup().getName();
-        this.status = product.getStatus().name(); 
+        this.groupProduct = (product.getGroup() != null) ? product.getGroup().getName() : null;
+        this.status = (product.getStatus() != null) ? product.getStatus().name(): null;
         this.price = product.getPrice();
         this.imageUrl = product.getImageUrl();
     }

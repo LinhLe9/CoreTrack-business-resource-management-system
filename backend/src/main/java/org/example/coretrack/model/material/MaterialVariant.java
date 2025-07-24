@@ -71,6 +71,21 @@ public class MaterialVariant {
         this.updated_by = created_by;
     }
 
+    public MaterialVariant(String sku, String name, String shortDes, UoM uom,
+                            Material material, User created_by) {
+        this.sku = sku;
+        this.name = name;
+        this.shortDes = shortDes;
+        this.isActive = true;
+        this.status = MaterialStatus.ACTIVE;
+        this.uom = uom;
+        this.material = material;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+        this.created_by = created_by;
+        this.updated_by = created_by;
+    }
+
     public MaterialVariant(){
     }
 

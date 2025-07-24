@@ -5,27 +5,30 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.example.coretrack.model.auth.User;
-import org.example.coretrack.model.product.productVariant;
+import org.example.coretrack.model.product.ProductVariant;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "productInventory")
-public class productInventory {
+@Table(name = "ProductInventory")
+public class ProductInventory {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(targetEntity = productVariant.class, cascade = CascadeType.ALL, orphanRemoval = true,fetch = FetchType.LAZY)
+    @JsonIgnore
+    @OneToOne(targetEntity = ProductVariant.class, cascade = CascadeType.ALL, orphanRemoval = true,fetch = FetchType.LAZY)
     @JoinColumn(name = "productVariant_id")
-    private productVariant productVariant;
+    private ProductVariant productVariant;
 
     private Integer currentStock;
     private Integer minAlertStock;
     private Integer maxStockLevel;
 
     @OneToMany(mappedBy = "productInventory", cascade = CascadeType.ALL)
-    private List<productInventoryLog> logs = new ArrayList<>();
+    private List<ProductInventoryLog> logs = new ArrayList<>();
 
     @Column(nullable = false)
     private boolean isActive;
@@ -42,11 +45,11 @@ public class productInventory {
     @JoinColumn(name = "updated_by_user_id")
     private User updated_by;
 
-    public productInventory() {
+    public ProductInventory() {
     }
 
-    public productInventory(productVariant productVariant, Integer currentStock, Integer minAlertStock, Integer maxStockLevel,
-            List<productInventoryLog> logs, User created_by) {
+    public ProductInventory(ProductVariant productVariant, Integer currentStock, Integer minAlertStock, Integer maxStockLevel,
+            List<ProductInventoryLog> logs, User created_by) {
         this.productVariant = productVariant;
         this.currentStock = currentStock;
         this.minAlertStock = minAlertStock;
@@ -67,11 +70,11 @@ public class productInventory {
         this.id = id;
     }
 
-    public productVariant getProductVariant() {
+    public ProductVariant getProductVariant() {
         return productVariant;
     }
 
-    public void setProductVariant(productVariant productVariant) {
+    public void setProductVariant(ProductVariant productVariant) {
         this.productVariant = productVariant;
     }
 
@@ -99,11 +102,11 @@ public class productInventory {
         this.maxStockLevel = maxStockLevel;
     }
 
-    public List<productInventoryLog> getLogs() {
+    public List<ProductInventoryLog> getLogs() {
         return logs;
     }
 
-    public void setLogs(List<productInventoryLog> logs) {
+    public void setLogs(List<ProductInventoryLog> logs) {
         this.logs = logs;
     }
 

@@ -31,14 +31,14 @@ public class BOMItem {
     @JoinColumn(name = "material_id")
     private Material material;
 
-    private String notes;
-
     // logging fields
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_user_id", nullable = false)
     private User createdBy;
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "updated_by_user_id")
     private User updatedBy;
@@ -96,14 +96,6 @@ public class BOMItem {
 
     public void setMaterial(Material material) {
         this.material = material;
-    }
-
-    public String getNotes() {
-        return notes;
-    }
-
-    public void setNotes(String notes) {
-        this.notes = notes;
     }
 
     public LocalDateTime getCreatedAt() {

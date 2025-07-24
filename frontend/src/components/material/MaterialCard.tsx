@@ -1,28 +1,28 @@
 // components/ProductCard.tsx
 import React from 'react';
 import { Box, Image, Text, Heading, VStack, Tag, TagLabel, Flex } from '@chakra-ui/react';
-import { Product } from '../types/product';
-import NextLink from 'next/link'; // Dùng NextLink để điều hướng nội bộ
+import { Material } from '../../types/material';
+import NextLink from 'next/link';
 
-interface ProductCardProps {
-  product: Product;
+interface MaterialCardProps {
+  material: Material;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
-  const getStatusColor = (status: Product['status']) => {
+const MaterialCard: React.FC<MaterialCardProps> = ({ material }) => {
+  const getStatusColor = (status: Material['status']) => {
     switch (status) {
-      case 'Active': return 'green';
-      case 'Inactive': return 'orange';
-      case 'Discontinued': return 'red';
-      case 'Pending': return 'blue';
+      case 'ACTIVE': return 'green';
+      case 'INACTIVE': return 'orange';
+      case 'DISCONTINUED': return 'red';
+      case 'PENDING': return 'blue';
       default: return 'gray';
     }
   };
 
   return (
-    <NextLink href={`/product/${product.id}`} passHref> {/* Giả định có trang chi tiết */}
+    <NextLink href={`/material/${material.id}`} passHref> 
       <Box
-        as="a" // Để Box có thể hoạt động như một link
+        as="a"
         borderWidth="1px"
         borderRadius="lg"
         overflow="hidden"
@@ -37,8 +37,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         bg="white"
       >
         <Image
-          src={product.imageUrl || 'https://via.placeholder.com/150/EEEEEE/888888?text=Material'}
-          alt={product.name}
+          src={material.imageUrl || '/default-product.jpg'}
+          alt={material.name}
           boxSize="150px"
           objectFit="contain"
           mx="auto"
@@ -46,25 +46,25 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           borderRadius="md"
         />
         <VStack align="flex-start" spacing={1} flexGrow={1} w="full">
-          <Heading as="h3" size="md" noOfLines={2} title={product.name}>
-            {product.name}
+          <Heading as="h3" size="md" noOfLines={2} title={material.name}>
+            {material.name}
           </Heading>
           <Text fontSize="sm" color="gray.600">
-            SKU: <Text as="span" fontWeight="bold">{product.sku}</Text>
+            SKU: <Text as="span" fontWeight="bold">{material.sku}</Text>
           </Text>
-          {product.shortDescription && (
+          {material.shortDes && (
             <Text fontSize="sm" noOfLines={2} color="gray.700">
-              {product.shortDescription}
+              {material.shortDes}
             </Text>
           )}
           <Flex justify="space-between" align="center" width="full" mt={2}>
-            {product.groupProduct && (
+            {material.groupMaterial && (
               <Tag size="sm" colorScheme="purple" borderRadius="full">
-                <TagLabel>{product.groupProduct}</TagLabel>
+                <TagLabel>{material.groupMaterial}</TagLabel>
               </Tag>
             )}
-            <Tag size="sm" colorScheme={getStatusColor(product.status)} borderRadius="full">
-              <TagLabel>{product.status}</TagLabel>
+            <Tag size="sm" colorScheme={getStatusColor(material.status)} borderRadius="full">
+              <TagLabel>{material.status}</TagLabel>
             </Tag>
           </Flex>
         </VStack>
@@ -73,4 +73,4 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   );
 };
 
-export default ProductCard;
+export default MaterialCard;

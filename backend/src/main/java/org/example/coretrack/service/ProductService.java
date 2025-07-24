@@ -4,7 +4,9 @@ import java.util.List;
 
 import org.example.coretrack.dto.product.AddProductRequest;
 import org.example.coretrack.dto.product.AddProductResponse;
+import org.example.coretrack.dto.product.AllProductSearchResponse;
 import org.example.coretrack.dto.product.ProductDetailResponse;
+import org.example.coretrack.dto.product.ProductGroupResponse;
 import org.example.coretrack.dto.product.SearchProductResponse;
 import org.example.coretrack.model.auth.User;
 import org.springframework.data.domain.Page;
@@ -21,11 +23,14 @@ public interface ProductService {
             List<String> statuses,
             Pageable pageable);
 
-    // to return all product
-    List<SearchProductResponse> getAllProductsForAutocomplete(String search);
+    // to return all products
+    Page<SearchProductResponse> findAllProducts (Pageable pageable);
+
+    // to return all product while searching
+    List<AllProductSearchResponse> getAllProductsForAutocomplete(String search);
 
     // to find product by ID
     ProductDetailResponse getProductById(Long id);
 
-    List<String> getAllGroupName();
+    List<ProductGroupResponse> getAllGroupName();
 }

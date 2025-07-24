@@ -1,4 +1,7 @@
-import { useRouter } from 'next/router';
+"use client";
+
+import { useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   Box,
@@ -13,12 +16,12 @@ import {
 } from '@chakra-ui/react';
 import { getProductById } from '@/services/productService';
 import { ProductDetailResponse } from '@/types/product';
-import VariantTable from '@/components/VariantTable'; // Giả sử bạn hiển thị biến thể sản phẩm trong bảng
+import VariantTable from '@/components/product/VariantTable'; // Giả sử bạn hiển thị biến thể sản phẩm trong bảng
 
 const ProductDetailPage = () => {
-  const router = useRouter();
-  const { id } = router.query;
-
+  const params = useParams(); 
+  const id = params?.id;
+  
   const [product, setProduct] = useState<ProductDetailResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +33,7 @@ const ProductDetailPage = () => {
       setLoading(true);
       try {
         const data = await getProductById(Number(id));
-        setProduct(data);
+        setProduct(mapProductResponse(data));
       } catch (err: any) {
         setError('Failed to load product detail.');
         console.error(err);
@@ -75,7 +78,7 @@ const ProductDetailPage = () => {
         <Text><strong>Group:</strong> {product.group}</Text>
         <Text><strong>Description:</strong> {product.description}</Text>
         <Text><strong>Price:</strong> ${product.price.toFixed(2)}</Text>
-        <Badge colorScheme={product.status === 'Active' ? 'green' : 'gray'}>
+        <Badge colorScheme={product.status.toLowerCase() === 'active' ? 'green' : 'gray'}>
           {product.status}
         </Badge>
       </VStack>
@@ -90,5 +93,12 @@ const ProductDetailPage = () => {
     </Box>
   );
 };
+
+const mapProductResponse = (data: any): ProductDetailResponse => ({
+  ...data,
+  group: typeof data.groupProduct === 'object' && data.groupProduct !== null ? data.groupProduct.name : data.groupProduct,
+  variants: data.variantInventory,
+  status: data.status ? data.status.charAt(0) + data.status.slice(1).toLowerCase() : '',
+});
 
 export default ProductDetailPage;

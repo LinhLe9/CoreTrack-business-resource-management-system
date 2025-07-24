@@ -6,8 +6,8 @@ import java.math.BigDecimal;
 
 public class BOMItemRequest {
 
-    @NotNull(message = "Material ID cannot be empty for a BOM item.")
-    private Long materialId; // ID of the selected material
+    @NotNull(message = "Material SKU cannot be empty for a BOM item.")
+    private String materialSku; // ID of the selected material
 
     @NotNull(message = "Quantity cannot be empty for a BOM item.")
     @Positive(message = "Quantity must be a positive number.")
@@ -19,20 +19,22 @@ public class BOMItemRequest {
     public BOMItemRequest() {
     }
 
-    public Long getMaterialId() {
-        return materialId;
-    }
-
-    public void setMaterialId(Long materialId) {
-        this.materialId = materialId;
-    }
-
     public BigDecimal getQuantity() {
         return quantity;
     }
 
     public void setQuantity(BigDecimal quantity) {
         this.quantity = quantity;
+    }
+
+
+    public String getMaterialSku() {
+        return materialSku;
+    }
+
+
+    public void setMaterialSku(String materialSku) {
+        this.materialSku = materialSku;
     }
 }
 

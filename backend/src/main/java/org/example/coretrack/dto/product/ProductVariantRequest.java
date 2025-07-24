@@ -1,4 +1,7 @@
 package org.example.coretrack.dto.product;
+import java.util.List;
+
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -12,8 +15,10 @@ public class ProductVariantRequest {
     private String shortDescription; // Optional
 
     private String imageUrl; // Optional, URL to the variant image
-
     // Variant SKU is system-generated, so not in the request.
+    
+    @Valid // Validate each BOM item in the list
+    private List<BOMItemRequest> bomItems;
 
     // Constructors, Getters, Setters
 
@@ -42,6 +47,14 @@ public class ProductVariantRequest {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    public List<BOMItemRequest> getBomItems() {
+        return bomItems;
+    }
+
+    public void setBomItems(List<BOMItemRequest> bomItems) {
+        this.bomItems = bomItems;
     }
 }
 

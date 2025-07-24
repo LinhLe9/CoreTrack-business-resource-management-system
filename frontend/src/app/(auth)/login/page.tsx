@@ -1,10 +1,9 @@
-import Header from '@/components/publicHeader'
-import LoginForm from '@/components/LoginForm'
+import Header from '@/components/general/publicHeader'
+import LoginForm from '@/components/auth/LoginForm'
 
 export default function LoginPage() {
 return (
     <>
-      <Header />
       <LoginForm />
     </>
     )

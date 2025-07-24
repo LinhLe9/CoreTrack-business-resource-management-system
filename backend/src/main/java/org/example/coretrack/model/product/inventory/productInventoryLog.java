@@ -8,8 +8,8 @@ import org.example.coretrack.model.auth.User;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "productInventoryLog")
-public class productInventoryLog {
+@Table(name = "ProductInventoryLog")
+public class ProductInventoryLog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -19,7 +19,7 @@ public class productInventoryLog {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_inventory_id", nullable = false) 
-    private productInventory productInventory;
+    private ProductInventory productInventory;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false)
@@ -27,7 +27,7 @@ public class productInventoryLog {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "transaction_source_type", nullable = false)
-    private productInventoryTransactionSourceType transactionSourceType;
+    private ProductInventoryTransactionSourceType transactionSourceType;
 
     @Column(precision = 10, scale = 4, nullable = false) 
     private BigDecimal quantity;
@@ -37,7 +37,7 @@ public class productInventoryLog {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "reference_document_type") 
-    private productInventoryReferenceDocumentType referenceDocumentType;
+    private ProductInventoryReferenceDocumentType referenceDocumentType;
 
     @Column(name = "reference_document_id")
     private Long referenceDocumentId;
@@ -54,12 +54,12 @@ public class productInventoryLog {
     @JoinColumn(name = "updated_by_user_id")
     private User updatedBy;
 
-    public productInventoryLog() {}
+    public ProductInventoryLog() {}
 
-    public productInventoryLog(LocalDateTime transactionTimestamp, productInventory productInventory,
-                                InventoryTransactionType transactionType, productInventoryTransactionSourceType transactionSourceType,
+    public ProductInventoryLog(LocalDateTime transactionTimestamp, ProductInventory productInventory,
+                                InventoryTransactionType transactionType, ProductInventoryTransactionSourceType transactionSourceType,
                                 BigDecimal quantity, String note,
-                                productInventoryReferenceDocumentType referenceDocumentType, Long referenceDocumentId, User createdBy) {
+                                ProductInventoryReferenceDocumentType referenceDocumentType, Long referenceDocumentId, User createdBy) {
         this.transactionTimestamp = transactionTimestamp;
         this.productInventory = productInventory;
         this.transactionType = transactionType;
@@ -90,11 +90,11 @@ public class productInventoryLog {
         this.transactionTimestamp = transactionTimestamp;
     }
 
-    public productInventory getProductInventory() {
+    public ProductInventory getProductInventory() {
         return productInventory;
     }
 
-    public void setProductInventory(productInventory productInventory) {
+    public void setProductInventory(ProductInventory productInventory) {
         this.productInventory = productInventory;
     }
 
@@ -106,11 +106,11 @@ public class productInventoryLog {
         this.transactionType = transactionType;
     }
 
-    public productInventoryTransactionSourceType getTransactionSourceType() {
+    public ProductInventoryTransactionSourceType getTransactionSourceType() {
         return transactionSourceType;
     }
 
-    public void setTransactionSourceType(productInventoryTransactionSourceType transactionSourceType) {
+    public void setTransactionSourceType(ProductInventoryTransactionSourceType transactionSourceType) {
         this.transactionSourceType = transactionSourceType;
     }
 
@@ -130,11 +130,11 @@ public class productInventoryLog {
         this.note = note;
     }
 
-    public productInventoryReferenceDocumentType getReferenceDocumentType() {
+    public ProductInventoryReferenceDocumentType getReferenceDocumentType() {
         return referenceDocumentType;
     }
 
-    public void setReferenceDocumentType(productInventoryReferenceDocumentType referenceDocumentType) {
+    public void setReferenceDocumentType(ProductInventoryReferenceDocumentType referenceDocumentType) {
         this.referenceDocumentType = referenceDocumentType;
     }
 

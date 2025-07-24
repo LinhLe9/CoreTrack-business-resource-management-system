@@ -2,6 +2,7 @@ package org.example.coretrack.model.auth;
 
 import jakarta.persistence.*;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
@@ -31,8 +32,6 @@ public class User implements UserDetails {
     private boolean enabled;
 
     // Constructor
-
-
     public User(String username, String email, String password, Role role, boolean enabled) {
         this.username = username;
         this.email = email;
@@ -72,7 +71,7 @@ public class User implements UserDetails {
 
     @Override
     public String getUsername() {
-        return username;
+        return email;
     }
 
     public void setPassword(String password) {
@@ -89,7 +88,7 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of();
+        return List.of(new SimpleGrantedAuthority("ROLE_" + this.role.name()));
     }
 
     @Override

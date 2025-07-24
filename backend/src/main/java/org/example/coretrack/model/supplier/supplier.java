@@ -9,8 +9,8 @@ import org.example.coretrack.model.auth.User;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "supplier")
-public class supplier {
+@Table(name = "Supplier")
+public class Supplier {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -52,10 +52,10 @@ public class supplier {
     @JoinColumn(name = "updated_by_user_id")
     private User updatedBy;
 
-    public supplier() {
+    public Supplier() {
     }
 
-    public supplier(String name, String contactPerson, String email, String phone, String currency, User createdBy) {
+    public Supplier(String name, String contactPerson, String email, String phone, String currency, User createdBy) {
         this.name = name;
         this.contactPerson = contactPerson;
         this.email = email;
@@ -204,5 +204,7 @@ public class supplier {
         this.materialSuppliers = materialSuppliers;
     } 
     
-    
+    public String getFullAddress(){
+        return address + ", " + city + ", " + country;
+    }
 }

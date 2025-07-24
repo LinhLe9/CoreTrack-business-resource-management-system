@@ -1,6 +1,7 @@
 package org.example.coretrack.dto.product;
 
-import org.example.coretrack.model.product.inventory.productInventory;
+import org.example.coretrack.model.material.inventory.MaterialInventory;
+import org.example.coretrack.model.product.inventory.ProductInventory;
 
 public class InventoryResponse {
     private Long id;
@@ -16,13 +17,26 @@ public class InventoryResponse {
         this.maxStockLevel = maxStockLevel;
     }
 
-    public InventoryResponse(productInventory productInventory){
-        this.id = productInventory.getId();
-        this.currentStock = productInventory.getCurrentStock();
-        this.minAlertStock = productInventory.getMinAlertStock();
-        this.maxStockLevel = productInventory.getMaxStockLevel();
+    public InventoryResponse(ProductInventory productInventory){
+        if (productInventory != null) {
+            this.id = productInventory.getId();
+            this.currentStock = productInventory.getCurrentStock();
+            this.minAlertStock = productInventory.getMinAlertStock();
+            this.maxStockLevel = productInventory.getMaxStockLevel();
+        } else {
+            this.id = null;
+            this.currentStock = null;
+            this.minAlertStock = null;
+            this.maxStockLevel = null;
+        }
     }
 
+    public InventoryResponse(MaterialInventory materialInventory){
+        this.id = materialInventory.getId();
+        this.currentStock = materialInventory.getCurrentStock();
+        this.minAlertStock = materialInventory.getMinAlertStock();
+        this.maxStockLevel = materialInventory.getMaxStockLevel();
+    }
     public InventoryResponse(){
     }
 

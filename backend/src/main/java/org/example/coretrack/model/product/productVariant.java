@@ -4,13 +4,15 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import org.example.coretrack.model.auth.User;
-import org.example.coretrack.model.product.inventory.productInventory;
+import org.example.coretrack.model.product.inventory.ProductInventory;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "productVariant")
-public class productVariant {
+@Table(name = "ProductVariant")
+public class ProductVariant {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -33,17 +35,18 @@ public class productVariant {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private productStatus status;
+    private ProductStatus status;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
-    private product product; 
+    private Product product; 
     
     @OneToOne(mappedBy = "productVariant", cascade = CascadeType.ALL)
     private BOM bom;
 
     @OneToOne (mappedBy = "productVariant", fetch = FetchType.LAZY)
-    private productInventory productInventory;
+    private ProductInventory productInventory;
 
     // logging elements
     private LocalDateTime createdAt;
@@ -57,15 +60,16 @@ public class productVariant {
     @JoinColumn(name = "updated_by_user_id")
     private User updated_by;
 
-    public productVariant() {
+    public ProductVariant() {
     }
 
-    public productVariant(product product,String name, String sku, String description, BigDecimal price, User createdBy) {
+    public ProductVariant(Product product,String name, String sku, String description, 
+                            BigDecimal price, User createdBy) {
         this.product = product;
         this.name = name;
         this.sku = sku;
         this.description = description;
-        this.status = productStatus.ACTIVE;
+        this.status = ProductStatus.ACTIVE;
         this.price = price;
         this.created_by = createdBy;
         this.isActive = true;
@@ -164,19 +168,19 @@ public class productVariant {
         this.updated_by = updated_by;
     }
 
-    public productStatus getStatus() {
+    public ProductStatus getStatus() {
         return status;
     }
 
-    public void setStatus(productStatus status) {
+    public void setStatus(ProductStatus status) {
         this.status = status;
     }
 
-    public product getProduct() {
+    public Product getProduct() {
         return product;
     }
 
-    public void setProduct(product product) {
+    public void setProduct(Product product) {
         this.product = product;
     }
 
@@ -188,11 +192,11 @@ public class productVariant {
         this.bom = bom;
     }
 
-    public productInventory getProductInventory() {
+    public ProductInventory getProductInventory() {
         return productInventory;
     }
 
-    public void setProductInventory(productInventory productInventory) {
+    public void setProductInventory(ProductInventory productInventory) {
         this.productInventory = productInventory;
     }
 }

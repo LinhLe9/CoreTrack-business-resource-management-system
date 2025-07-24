@@ -1,6 +1,6 @@
 package org.example.coretrack.model.product.inventory;
 
-public enum productInventoryTransactionSourceType {
+public enum ProductInventoryTransactionSourceType {
     // Inflow Transactions
     PURCHASE_ORDER_RECEIPT("Purchase Order Receipt"),
     PRODUCTION_COMPLETION("Production Completion"),
@@ -18,7 +18,7 @@ public enum productInventoryTransactionSourceType {
 
     private final String displayName;
 
-    productInventoryTransactionSourceType(String displayName) {
+    ProductInventoryTransactionSourceType(String displayName) {
         this.displayName = displayName;
     }
 

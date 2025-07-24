@@ -20,6 +20,8 @@ public class ProductVariantResponse {
         this.bomItems = bomItemResponses;
     }
 
+    public ProductVariantResponse(){}
+
     // Getters and Setters
     public String getSku() { 
         return sku; 

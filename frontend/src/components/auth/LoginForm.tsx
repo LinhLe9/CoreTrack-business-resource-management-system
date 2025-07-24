@@ -21,6 +21,7 @@ export default function LoginForm() {
 
       // save token 
       const token = res.data.token;
+      localStorage.removeItem("token");
       localStorage.setItem("token", token);
 
       // pop up noti

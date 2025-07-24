@@ -1,4 +1,7 @@
-// pages/materials/index.tsx
+//product/page.tsx
+
+'use client';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
@@ -10,26 +13,28 @@ import {
   Flex,
   Button,
   useToast,
+  IconButton,
 } from '@chakra-ui/react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 
-import ProductCard from '../../../components/ProductCard';
-import SearchBar from '../../../components/SearchBar';
-import FilterPanel from '../../../components/FilterPanel';
-import { getProducts,getAllProductsForAutocomplete } from '../../../services/productService'; 
-import { Product, ProductQueryParams } from '../../../types/product';
+import ProductCard from '../../../components/product/ProductCard';
+import SearchBar from '../../../components/product/ProductSearchBar';
+import ProductFilters from '../../../components/product/ProductFilters';
+import { getProducts, getAllProductsForAutocomplete } from '../../../services/productService';
+import { Product, ProductQueryParams, ProductAutoComplete } from '../../../types/product';
 import { PageResponse } from '../../../types/PageResponse';
+import { AddIcon } from '@chakra-ui/icons';
 
 const ProductCatalogPage: React.FC = () => {
   const [pageData, setPageData] = useState<PageResponse<Product> | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [queryParams, setQueryParams] = useState<ProductQueryParams>({});
-  const [allProductsForAutocomplete, setAllProductsForAutocomplete] = useState<Product[]>([]);
+  const [allProductsForAutocomplete, setAllProductsForAutocomplete] = useState<ProductAutoComplete[]>([]);
   const toast = useToast();
   const router = useRouter();
 
-  // Fetch all product for autocomplete
+  // Fetch autocomplete list
   useEffect(() => {
     const fetchAllProducts = async () => {
       try {
@@ -42,7 +47,7 @@ const ProductCatalogPage: React.FC = () => {
     fetchAllProducts();
   }, []);
 
-  // Fetch page data theo filter/search/page
+  // Fetch products applied filter/search
   const fetchProducts = useCallback(async (params: ProductQueryParams) => {
     setLoading(true);
     setError(null);
@@ -51,16 +56,15 @@ const ProductCatalogPage: React.FC = () => {
       setPageData(data);
     } catch (err: any) {
       setError('Failed to fetch products. Please try again.');
-      if (err.response && err.response.status === 400) {
+      if (err.response?.status === 400) {
         toast({
           title: 'Invalid Input',
-          description: err.response.data.message || "Please check your search/filter criteria.",
+          description: err.response.data.message || 'Check your search/filter.',
           status: 'error',
           duration: 5000,
           isClosable: true,
         });
       }
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -73,14 +77,15 @@ const ProductCatalogPage: React.FC = () => {
   const handleSearch = (searchTerm: string) => {
     if (searchTerm.length > 255) {
       toast({
-        title: 'Invalid Search Input',
-        description: 'Search keyword is too long. Max 255 characters allowed.',
+        title: 'Search Too Long',
+        description: 'Max 255 characters allowed.',
         status: 'warning',
         duration: 5000,
         isClosable: true,
       });
       return;
     }
+
     setQueryParams((prev) => ({
       ...prev,
       search: searchTerm || undefined,
@@ -103,49 +108,57 @@ const ProductCatalogPage: React.FC = () => {
     }));
   };
 
-  const handleSelectProductFromSearch = (ProductId: number) => {
-    router.push(`/product/${ProductId}`);
+  const handleSelectProductFromSearch = (productId: number) => {
+    router.push(`/product/${productId}`);
   };
 
   return (
-    <Box p={8} maxWidth="1400px" mx="auto">
+    <Box p={8} maxW="1400px" mx="auto">
       <Heading as="h1" size="xl" textAlign="center" mb={8} color="teal.700">
-        Material Catalog
+        Product Catalog
       </Heading>
 
-      <Flex direction={{ base: 'column', md: 'row' }} justify="space-between" align="flex-start" gap={6} mb={8}>
-        <Box flex={1} minWidth="300px">
-          <SearchBar
-            onSearch={handleSearch}
-            onSelectProduct={handleSelectProductFromSearch}
-            initialSearchTerm={queryParams.search}
-            productsForAutocomplete={allProductsForAutocomplete}
-          />
+      <Flex direction={{ base: 'column', md: 'row' }} gap={6} mb={8} align="flex-start">
+        <Box flex="1" minW="300px">
+          <Flex gap={2} align="center">
+            <SearchBar
+              onSearch={handleSearch}
+              onSelectProduct={handleSelectProductFromSearch}
+              initialSearchTerm={queryParams.search}
+              productsForAutocomplete={allProductsForAutocomplete}
+            />
+            <IconButton
+              icon={<AddIcon />}
+              aria-label="Add new product"
+              colorScheme="teal"
+              onClick={() => router.push('/product/add')}
+              title="Add Product"
+            />
+          </Flex>
         </Box>
+
         <Box>
-          <FilterPanel onFilter={handleFilter} initialFilters={queryParams} />
+          <ProductFilters onFilter={handleFilter} initialFilters={queryParams} />
         </Box>
       </Flex>
 
       {loading && (
-        <Center minHeight="200px">
+        <Center minH="200px">
           <Spinner size="xl" color="blue.500" />
-          <Text ml={4}>Loading materials...</Text>
+          <Text ml={4}>Loading products...</Text>
         </Center>
       )}
 
       {error && !loading && (
-        <Center minHeight="200px">
-          <Text color="red.500" fontSize="lg">
-            {error}
-          </Text>
+        <Center minH="200px">
+          <Text color="red.500" fontSize="lg">{error}</Text>
         </Center>
       )}
 
       {!loading && !error && pageData?.content.length === 0 && (
-        <Center minHeight="200px">
+        <Center minH="200px">
           <Text fontSize="lg" color="gray.600">
-            No matching materials found.
+            No matching products found.
           </Text>
         </Center>
       )}
@@ -153,9 +166,12 @@ const ProductCatalogPage: React.FC = () => {
       {!loading && !error && pageData && pageData.content.length > 0 && (
         <>
           <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing={6}>
-            {pageData.content.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
+            {pageData.content
+              .filter(product => product.id != null)
+              .map((product) => {
+                console.log('ProductCard id:', product.id, product);
+                return <ProductCard key={product.id} product={product} />;
+              })}
           </SimpleGrid>
 
           <Flex justify="center" align="center" mt={8} gap={4}>

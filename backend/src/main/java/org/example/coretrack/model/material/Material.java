@@ -79,6 +79,21 @@ public class Material {
         this.updatedAt = LocalDateTime.now();
     }
 
+    public Material(String sku, String name, String shortDes,
+        MaterialGroup group, User created_by) {
+        this.sku = sku;
+        this.name = name;
+        this.shortDes = shortDes;
+        this.isActive = true;
+        this.status = MaterialStatus.ACTIVE;
+        this.group = group;
+        this.created_by = created_by;
+        this.updated_by = created_by;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+
     public Material(){
     }
 

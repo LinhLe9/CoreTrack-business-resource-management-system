@@ -45,7 +45,45 @@ export interface ProductQueryParams {
   page?: number;
   size?: number;
   sort?: string;
-
-  groupProduct?: string[]; 
-  status?: string[];      
+  groupProduct?: (string | number)[] | string | number;
+  status?: (string | number)[] | string | number;
 }
+
+export interface ProductAutoComplete{
+  id: number;
+  sku: string;
+  name: string;
+  status: string;
+  imageUrl: string;
+  shortDescription?: string;
+}
+
+export type BOMItem = {
+  materialSku: string;
+  quantity: number;
+};
+
+export type Variant = {
+  name: string;
+  shortDescription: string;
+  imageUrl: string;
+  bomItems: BOMItem[];
+};
+
+export type AddProductForm = {
+  name: string;
+  description: string;
+  sku: string;
+  price: number;
+  currency: string;
+  imageUrl: string;
+  productGroupId: string;
+  newProductGroupName: string;
+  variants: Variant[];
+  bomItems : BOMItem[];
+};
+
+export type Group = {
+  id: number;
+  name: string;
+};
