@@ -14,7 +14,10 @@ public enum ProductInventoryTransactionSourceType {
     SUPPLIER_RETURN("Supplier Return"),
     INVENTORY_ADJUSTMENT_DECREASE("Inventory Adjustment Decrease"),
     WAREHOUSE_TRANSFER_OUT("Warehouse Transfer Out"),
-    SCRAP("Product Scrap");
+    SCRAP("Product Scrap"),
+
+    // Set
+    SET_INVENTORY("Set Stock Inventory");
 
     private final String displayName;
 

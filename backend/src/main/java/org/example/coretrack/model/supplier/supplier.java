@@ -20,7 +20,7 @@ public class Supplier {
 
     private String contactPerson ;
 
-    @Column(unique = true)
+    @Column(unique = true, nullable = true)
     private String email;
     private String phone;
     private String address;

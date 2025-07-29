@@ -43,20 +43,46 @@ public class SupplierController {
     public ResponseEntity<AddSupplierResponse> createSupplier(@Valid @RequestBody AddSupplierRequest request) {
         // Get current user information from Spring Security Context
         User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
         AddSupplierResponse response = supplierService.createSupplier(request, currentUser);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     private User getCurrentUserFromSecurityContext() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return null; 
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                System.out.println("Authentication is null or not authenticated");
+                return null; 
+            }
+            
+            System.out.println("Authentication principal: " + authentication.getPrincipal());
+            System.out.println("Authentication principal class: " + authentication.getPrincipal().getClass().getName());
+            
+            if (authentication.getPrincipal() instanceof User) {
+                // Principal is already a User object
+                User user = (User) authentication.getPrincipal();
+                System.out.println("User found directly from principal: " + user.getEmail());
+                return user;
+            } else if (authentication.getPrincipal() instanceof UserDetails) {
+                String username = ((UserDetails) authentication.getPrincipal()).getUsername();
+                System.out.println("Username from UserDetails: " + username);
+                return userRepository.findByUsername(username).orElse(null);
+            } else if (authentication.getPrincipal() instanceof String) {
+                String username = (String) authentication.getPrincipal();
+                System.out.println("Username from String: " + username);
+                return userRepository.findByUsername(username).orElse(null);
+            }
+            
+            System.out.println("Unknown principal type: " + authentication.getPrincipal().getClass().getName());
+            return null;
+        } catch (Exception e) {
+            System.err.println("Error getting current user: " + e.getMessage());
+            e.printStackTrace();
+            return null;
         }
-        if (authentication != null && authentication.getPrincipal() instanceof UserDetails) {
-            String username = ((UserDetails) authentication.getPrincipal()).getUsername();
-            return userRepository.findByUsername(username).orElse(null);
-        }
-        return null;
     }
     
 

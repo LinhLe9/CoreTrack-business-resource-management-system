@@ -1,7 +1,7 @@
 // services/materialService.ts
 import apiClient from '../lib/axios';
 import { PageResponse } from '../types/PageResponse';
-import { Material, ProductDetailResponse, MaterialQueryParams, MaterialAutoComplete } from '../types/material';
+import { Material, ProductDetailResponse, MaterialDetailResponse, UpdateMaterialResponse, MaterialQueryParams, MaterialAutoComplete, MaterialGroup } from '../types/material';
 import qs from 'qs'; 
 
 
@@ -39,4 +39,43 @@ export const getAllMaterialsForAutocomplete = async (): Promise<MaterialAutoComp
 export const getProductById = async (id: number): Promise<ProductDetailResponse> => {
   const res = await apiClient.get<ProductDetailResponse>(`/products/${id}`);
   return res.data;
+};
+
+// to fetch material details by ID
+export const getMaterialById = async (id: number): Promise<MaterialDetailResponse> => {
+  const res = await apiClient.get<MaterialDetailResponse>(`/materials/${id}`);
+  return res.data;
+};
+
+// to update material
+export const updateMaterial = async (id: number, materialData: any): Promise<UpdateMaterialResponse> => {
+  const response = await apiClient.put<UpdateMaterialResponse>(`/materials/${id}`, materialData);
+  return response.data;
+};
+
+// to add new material
+export const addMaterial = async (materialData: any): Promise<any> => {
+  const response = await apiClient.post('/materials/add-material', materialData);
+  return response.data;
+};
+
+// to fetch all group 
+export const getAllMaterialGroup = async (): Promise<MaterialGroup[]> => {
+  const res = await apiClient.get<MaterialGroup[]>('/materials/material-groups');
+  return res.data;
+};
+
+// to get available status transitions for a material
+export const getAvailableStatusTransitions = async (materialId: number): Promise<any> => {
+  const response = await apiClient.get(`/materials/${materialId}/status-transitions`);
+  return response.data;
+};
+
+// to change material status
+export const changeMaterialStatus = async (materialId: number, newStatus: string, reason?: string): Promise<any> => {
+  const response = await apiClient.put(`/materials/${materialId}/status`, {
+    newStatus,
+    reason
+  });
+  return response.data;
 };

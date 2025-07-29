@@ -1,16 +1,18 @@
 package org.example.coretrack.dto.product;
 
+import java.math.BigDecimal;
+
 import org.example.coretrack.model.material.inventory.MaterialInventory;
 import org.example.coretrack.model.product.inventory.ProductInventory;
 
 public class InventoryResponse {
     private Long id;
-    private Integer currentStock;
-    private Integer minAlertStock;
-    private Integer maxStockLevel;
+    private BigDecimal currentStock;
+    private BigDecimal minAlertStock;
+    private BigDecimal maxStockLevel;
 
     
-    public InventoryResponse(Long id, Integer currentStock, Integer minAlertStock, Integer maxStockLevel) {
+    public InventoryResponse(Long id, BigDecimal currentStock, BigDecimal minAlertStock, BigDecimal maxStockLevel) {
         this.id = id;
         this.currentStock = currentStock;
         this.minAlertStock = minAlertStock;
@@ -50,32 +52,32 @@ public class InventoryResponse {
     }
 
 
-    public Integer getCurrentStock() {
+    public BigDecimal getCurrentStock() {
         return currentStock;
     }
 
 
-    public void setCurrentStock(Integer currentStock) {
+    public void setCurrentStock(BigDecimal currentStock) {
         this.currentStock = currentStock;
     }
 
 
-    public Integer getMinAlertStock() {
+    public BigDecimal getMinAlertStock() {
         return minAlertStock;
     }
 
 
-    public void setMinAlertStock(Integer minAlertStock) {
+    public void setMinAlertStock(BigDecimal minAlertStock) {
         this.minAlertStock = minAlertStock;
     }
 
 
-    public Integer getMaxStockLevel() {
+    public BigDecimal getMaxStockLevel() {
         return maxStockLevel;
     }
 
 
-    public void setMaxStockLevel(Integer maxStockLevel) {
+    public void setMaxStockLevel(BigDecimal maxStockLevel) {
         this.maxStockLevel = maxStockLevel;
     }
 }

@@ -4,7 +4,7 @@ export interface Product {
     name: string;
     shortDescription?: string; 
     groupProduct: string; 
-    status: 'Active' | 'Inactive' | 'Discontinued' | 'Pending' | 'Delete'; 
+    status: 'Active' | 'Inactive' | 'Discontinued' | 'Deleted'; 
     price: number;
     imageUrl?: string; 
 }
@@ -17,6 +17,7 @@ export interface ProductDetailResponse {
   group: string;
   status: string;
   price: number;
+  currency: string;
   imageUrl: string;
   variants: ProductVariantInventoryResponse[];
 }
@@ -32,20 +33,30 @@ export interface ProductVariantInfoResponse {
   name: string;
   description: string;
   imageUrl: string;
+  bomItems?: BOMItemResponse[];
+}
+
+export interface BOMItemResponse {
+  id: number;
+  materialId: number;
+  materialName: string;
+  quantity: string; // BigDecimal from backend
+  uom: string;
+  notes?: string;
 }
 
 export interface InventoryResponse {
-  currentStock?: number;
-  minAlertStock?: number;
-  maxStockLevel?: number;
+  currentStock?: string;
+  minAlertStock?: string;
+  maxStockLevel?: string;
 }
 
-export interface ProductQueryParams {
+export interface ProductQueryParams{
   search?: string;
   page?: number;
   size?: number;
   sort?: string;
-  groupProduct?: (string | number)[] | string | number;
+  groupProducts?: (string | number)[] | string | number; // Changed from groupProduct to groupProducts
   status?: (string | number)[] | string | number;
 }
 
@@ -58,9 +69,22 @@ export interface ProductAutoComplete{
   shortDescription?: string;
 }
 
+export interface ProductVariantAutoComplete {
+  variantId: number;
+  productName: string;
+  productSku: string;
+  variantSku: string;
+  variantName: string;
+  productGroup?: string;
+}
+
 export type BOMItem = {
   materialSku: string;
-  quantity: number;
+  materialId?: number;
+  materialName?: string;
+  quantity: string; // BigDecimal from backend
+  uom?: string;
+  notes?: string;
 };
 
 export type Variant = {

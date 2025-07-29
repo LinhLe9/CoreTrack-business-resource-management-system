@@ -1,5 +1,5 @@
 package org.example.coretrack.model.material;
 
 public enum MaterialStatus {
-    ACTIVE, INACTIVE, DISCONTINUED, PENDING, DELETED
+    ACTIVE, INACTIVE, DISCONTINUED, DELETED
 }

@@ -16,7 +16,6 @@ import {
   DrawerHeader,
   DrawerBody,
   useDisclosure,
-  Link as ChakraLink,
 } from "@chakra-ui/react";
 import { ChevronDownIcon, BellIcon, HamburgerIcon } from "@chakra-ui/icons";
 import { FaUserCircle } from "react-icons/fa";
@@ -35,9 +34,9 @@ export default function Header() {
         <Flex align="center" gap={4}>
           {/* Logo */}
           <NextLink href="/" passHref>
-            <ChakraLink display="flex" alignItems="center">
-              <Image src="/coretrack.jpg" alt="Logo" width={120} height={30} priority />
-            </ChakraLink>
+            <Box display="flex" alignItems="center" cursor="pointer">
+              <Image src="/coretrack.png" alt="Logo" width={120} height={30} priority />
+            </Box>
           </NextLink>
 
           {/* Desktop menu */}
@@ -48,13 +47,13 @@ export default function Header() {
                 Resource
               </MenuButton>
               <MenuList>
-                <MenuItem as={NextLink} href="/product" passHref>
+                <MenuItem as="a" href="/product">
                   Product
                 </MenuItem>
-                <MenuItem as={NextLink} href="/material" passHref>
+                <MenuItem as="a" href="/material">
                   Material
                 </MenuItem>
-                <MenuItem as={NextLink} href="/supplier" passHref>
+                <MenuItem as="a" href="/supplier">
                   Supplier
                 </MenuItem>
               </MenuList>
@@ -66,13 +65,13 @@ export default function Header() {
                 Inventory
               </MenuButton>
               <MenuList>
-                <MenuItem as={NextLink} href="/product-inventory" passHref>
+                <MenuItem as="a" href="/product-inventory">
                   Product Inventory
                 </MenuItem>
-                <MenuItem as={NextLink} href="/material-inventory" passHref>
+                <MenuItem as="a" href="/material-inventory">
                   Material Inventory
                 </MenuItem>
-                <MenuItem as={NextLink} href="/alarm" passHref>
+                <MenuItem as="a" href="/alarm">
                   Alarm Management
                 </MenuItem>
               </MenuList>
@@ -84,13 +83,13 @@ export default function Header() {
                 Ticket
               </MenuButton>
               <MenuList>
-                <MenuItem as={NextLink} href="/production" passHref>
+                <MenuItem as="a" href="/production">
                   Production Ticket
                 </MenuItem>
-                <MenuItem as={NextLink} href="/purchasing" passHref>
+                <MenuItem as="a" href="/purchasing">
                   Purchasing Ticket
                 </MenuItem>
-                <MenuItem as={NextLink} href="/sale" passHref>
+                <MenuItem as="a" href="/sale">
                   Sale Invoice
                 </MenuItem>
               </MenuList>
@@ -113,10 +112,10 @@ export default function Header() {
           <IconButton aria-label="Notify" icon={<BellIcon />} variant="ghost" />
 
           <NextLink href="/profile" passHref>
-            <ChakraLink display="flex" alignItems="center" gap={2} color="blue.600" _hover={{ color: "blue.700" }}>
+            <Box display="flex" alignItems="center" gap={2} color="blue.600" _hover={{ color: "blue.700" }} cursor="pointer">
               <FaUserCircle size={20} />
               <Box display={{ base: "none", sm: "block" }}>Student Portal</Box>
-            </ChakraLink>
+            </Box>
           </NextLink>
         </Flex>
       </Flex>
@@ -134,13 +133,13 @@ export default function Header() {
                 Resource
               </MenuButton>
               <MenuList>
-                <MenuItem as={NextLink} href="/product" passHref>
+                <MenuItem as="a" href="/product">
                   Product
                 </MenuItem>
-                <MenuItem as={NextLink} href="/material" passHref>
+                <MenuItem as="a" href="/material">
                   Material
                 </MenuItem>
-                <MenuItem as={NextLink} href="/supplier" passHref>
+                <MenuItem as="a" href="/supplier">
                   Supplier
                 </MenuItem>
               </MenuList>
@@ -152,13 +151,13 @@ export default function Header() {
                 Inventory
               </MenuButton>
               <MenuList>
-                <MenuItem as={NextLink} href="/product-inventory" passHref>
+                <MenuItem as="a" href="/product-inventory">
                   Product Inventory
                 </MenuItem>
-                <MenuItem as={NextLink} href="/material-inventory" passHref>
+                <MenuItem as="a" href="/material-inventory">
                   Material Inventory
                 </MenuItem>
-                <MenuItem as={NextLink} href="/alarm" passHref>
+                <MenuItem as="a" href="/alarm">
                   Alarm Management
                 </MenuItem>
               </MenuList>
@@ -170,13 +169,13 @@ export default function Header() {
                 Ticket
               </MenuButton>
               <MenuList>
-                <MenuItem as={NextLink} href="/production" passHref>
+                <MenuItem as="a" href="/production">
                   Production Ticket
                 </MenuItem>
-                <MenuItem as={NextLink} href="/purchasing" passHref>
+                <MenuItem as="a" href="/purchasing">
                   Purchasing Ticket
                 </MenuItem>
-                <MenuItem as={NextLink} href="/sale" passHref>
+                <MenuItem as="a" href="/sale">
                   Sale Invoice
                 </MenuItem>
               </MenuList>

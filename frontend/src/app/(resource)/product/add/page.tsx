@@ -4,18 +4,20 @@
 import {
   Box, Button, FormControl, FormLabel, Input, Textarea, VStack, Heading, useToast, HStack, 
   IconButton, List, ListItem, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, 
-  ModalCloseButton, useDisclosure, FormHelperText, Select
+  ModalCloseButton, useDisclosure, FormHelperText, Select, Text, Flex
 } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { CldUploadWidget } from 'next-cloudinary';
 import api from '@/lib/axios';
 import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
-import type { CloudinaryUploadWidgetInfo } from 'next-cloudinary';
 import { AddProductForm, BOMItem, Group} from '@/types/product';
 import SearchProductGroup  from '@/components/product/SearchProductGroup'
+import MaterialSearchBar from '@/components/material/MaterialSearchBar';
 import currencyCodes from 'currency-codes';
 import { AxiosError } from 'axios';
+import SupabaseUpload from '@/components/upload/SupabaseUpload';
+import { MaterialAutoComplete } from '@/types/material';
+import { getMaterialById, getAllMaterialsForAutocomplete } from '@/services/materialService';
 
 
 const AddProductPage = () => {
@@ -37,6 +39,7 @@ const AddProductPage = () => {
   const [filteredGroups, setFilteredGroups] = useState<Group[]>([]);
   const [newGroupName, setNewGroupName] = useState('');
   const [groupError, setGroupError] = useState('');
+  const [materialsForAutocomplete, setMaterialsForAutocomplete] = useState<MaterialAutoComplete[]>([]);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const currencyList = currencyCodes.data.filter(c => c.code);
 
@@ -64,6 +67,19 @@ const AddProductPage = () => {
       }
     };
     fetchGroups();
+  }, []);
+
+  // Fetch materials for autocomplete
+  useEffect(() => {
+    const fetchMaterials = async () => {
+      try {
+        const materials = await getAllMaterialsForAutocomplete();
+        setMaterialsForAutocomplete(materials);
+      } catch (error) {
+        console.error('Error fetching materials:', error);
+      }
+    };
+    fetchMaterials();
   }, []);
 
   useEffect(() => {
@@ -128,9 +144,11 @@ const AddProductPage = () => {
     const bomItems = updatedVariants[variantIndex].bomItems || [];
 
     if (field === 'quantity') {
-      bomItems[bomIndex].quantity = Number(value);
-    } else {
+      bomItems[bomIndex].quantity = parseFloat(value).toFixed(2);
+    } else if (field === 'materialSku') {
       bomItems[bomIndex].materialSku = value;
+    } else if (field === 'uom') {
+      bomItems[bomIndex].uom = value;
     }
 
     updatedVariants[variantIndex].bomItems = bomItems;
@@ -161,7 +179,7 @@ const AddProductPage = () => {
   // Add/Remove BOM items for variant
   const addVariantBOMItem = (variantIndex: number) => {
     const updated = [...form.variants];
-    updated[variantIndex].bomItems.push({ materialSku: '', quantity: 1 });
+    updated[variantIndex].bomItems.push({ materialSku: '', quantity: '1.00', uom: '' });
     setForm(prev => ({ ...prev, variants: updated }));
   };
 
@@ -179,20 +197,94 @@ const AddProductPage = () => {
   ) => {
     const updated = [...form.bomItems];
     if (field === 'quantity') {
-      updated[index].quantity = Number(value);
-    } else {
+      updated[index].quantity = parseFloat(value).toFixed(2);
+    } else if (field === 'materialSku') {
       updated[index].materialSku = value;
+    } else if (field === 'uom') {
+      updated[index].uom = value;
     }
     setForm(prev => ({ ...prev, bomItems: updated }));
   };
 
   const addBOMItem = () => {
-    setForm(prev => ({ ...prev, bomItems: [...prev.bomItems, { materialSku: '', quantity: 1 }] }));
+    setForm(prev => ({ ...prev, bomItems: [...prev.bomItems, { materialSku: '', quantity: '1.00', uom: '' }] }));
   };
 
   const removeBOMItem = (index: number) => {
     const updated = form.bomItems.filter((_, i) => i !== index);
     setForm(prev => ({ ...prev, bomItems: updated }));
+  };
+
+  // Handle material selection and auto-fill UOM
+  const handleMaterialSelect = async (materialId: number, bomIndex: number) => {
+    try {
+      // Find material from autocomplete list
+      const material = materialsForAutocomplete.find(m => m.id === materialId);
+      if (!material) return;
+
+      // Get material details to get UOM
+      const materialDetails = await getMaterialById(material.id);
+      
+      // Update BOM item with material SKU and UOM
+      const updated = [...form.bomItems];
+      updated[bomIndex] = {
+        ...updated[bomIndex],
+        materialSku: material.sku,
+        uom: materialDetails.uom || ''
+      };
+      
+      setForm(prev => ({ ...prev, bomItems: updated }));
+    } catch (error) {
+      console.error('Error fetching material details:', error);
+      // Fallback: just update SKU without UOM
+      const material = materialsForAutocomplete.find(m => m.id === materialId);
+      if (material) {
+        const updated = [...form.bomItems];
+        updated[bomIndex] = {
+          ...updated[bomIndex],
+          materialSku: material.sku
+        };
+        setForm(prev => ({ ...prev, bomItems: updated }));
+      }
+    }
+  };
+
+  // Handle variant BOM material selection
+  const handleVariantMaterialSelect = async (materialId: number, variantIndex: number, bomIndex: number) => {
+    try {
+      // Find material from autocomplete list
+      const material = materialsForAutocomplete.find(m => m.id === materialId);
+      if (!material) return;
+
+      // Get material details to get UOM
+      const materialDetails = await getMaterialById(material.id);
+      
+      // Update variant BOM item with material SKU and UOM
+      const updatedVariants = [...form.variants];
+      const bomItems = updatedVariants[variantIndex].bomItems || [];
+      bomItems[bomIndex] = {
+        ...bomItems[bomIndex],
+        materialSku: material.sku,
+        uom: materialDetails.uom || ''
+      };
+      updatedVariants[variantIndex].bomItems = bomItems;
+      
+      setForm(prev => ({ ...prev, variants: updatedVariants }));
+    } catch (error) {
+      console.error('Error fetching material details:', error);
+      // Fallback: just update SKU without UOM
+      const material = materialsForAutocomplete.find(m => m.id === materialId);
+      if (material) {
+        const updatedVariants = [...form.variants];
+        const bomItems = updatedVariants[variantIndex].bomItems || [];
+        bomItems[bomIndex] = {
+          ...bomItems[bomIndex],
+          materialSku: material.sku
+        };
+        updatedVariants[variantIndex].bomItems = bomItems;
+        setForm(prev => ({ ...prev, variants: updatedVariants }));
+      }
+    }
   };
 
   // handle submit form 
@@ -213,7 +305,7 @@ const AddProductPage = () => {
           imageUrl: form.imageUrl,
           bomItems: form.bomItems.map(item => ({
             materialSku: item.materialSku,
-            quantity: item.quantity,
+            quantity: parseFloat(item.quantity),
         })),
       },
     ];
@@ -222,7 +314,7 @@ const AddProductPage = () => {
         ...variant,
         bomItems: variant.bomItems.map(item => ({
           materialSku: item.materialSku,
-          quantity: item.quantity,
+          quantity: parseFloat(item.quantity),
         })),
       }));
     }
@@ -284,90 +376,87 @@ const AddProductPage = () => {
           <FormControl>
             <FormLabel>Product Group</FormLabel>
             <HStack>
-              <Input
-                placeholder="Search existing group"
-                value={groupSearch}
-                onChange={e => {
-                  setGroupSearch(e.target.value);
-                  setForm(prev => ({ ...prev, productGroupId: '', newProductGroupName: '' }));
-                }}
+              <SearchProductGroup
+                onSelect={handleGroupSelect}
               />
               <IconButton aria-label="Add group" icon={<AddIcon />} onClick={onOpen} />
             </HStack>
-            {filteredGroups.length > 0 && (
-              <List bg="white" border="1px solid #ccc" mt={1} maxH="150px" overflowY="auto">
-                {filteredGroups.map(group => (
-                  <ListItem
-                    key={group.id}
-                    px={2}
-                    py={1}
-                    _hover={{ bg: 'gray.100', cursor: 'pointer' }}
-                    onClick={() => handleGroupSelect(group)}
-                  >
-                    {group.name}
-                  </ListItem>
-                ))}
-              </List>
-            )}
           </FormControl>
 
           {/* Upload main product image */}
           <FormControl>
             <FormLabel>Product Image</FormLabel>
+            
+            <SupabaseUpload
+              onUpload={(url) => {
+                setForm(prev => ({
+                  ...prev,
+                  imageUrl: url,
+                }));
+                toast({
+                  title: "Image uploaded",
+                  description: "Image uploaded successfully",
+                  status: "success",
+                  duration: 3000,
+                });
+              }}
+              folder="products"
+              maxSize={5}
+              showPreview={false}
+            />
+            
+            {/* Image Preview and Delete */}
             {form.imageUrl && (
               <Box
                 mt={3}
-                p={3}
-                bg="green.50"
+                p={4}
+                bg="gray.50"
                 border="1px solid"
-                borderColor="green.300"
+                borderColor="gray.200"
                 borderRadius="md"
-                display="flex"
-                alignItems="center"
-                gap={3}
               >
-                <a href={form.imageUrl} target="_blank" rel="noopener noreferrer">
-                  <img src={form.imageUrl} alt="Uploaded" width={60} />
-                </a>
-                <Box>
-                  <Box fontWeight="bold" color="green.700">Upload successful</Box>
-                  <Box fontSize="sm" color="gray.700" isTruncated maxW="200px">{form.imageUrl}</Box>
+                <Flex justify="space-between" align="center" mb={3}>
+                  <Text fontWeight="bold" color="gray.700">Image Preview</Text>
+                  <IconButton
+                    aria-label="Delete image"
+                    icon={<DeleteIcon />}
+                    size="sm"
+                    colorScheme="red"
+                    variant="ghost"
+                    onClick={() => {
+                      setForm(prev => ({ ...prev, imageUrl: '' }));
+                      toast({
+                        title: "Image removed",
+                        description: "Product image has been removed.",
+                        status: "info",
+                        duration: 2000,
+                      });
+                    }}
+                  />
+                </Flex>
+                
+                <Box textAlign="center">
+                  <img 
+                    src={form.imageUrl} 
+                    alt="Product preview" 
+                    style={{ 
+                      maxWidth: '200px', 
+                      maxHeight: '200px', 
+                      objectFit: 'contain',
+                      borderRadius: '8px'
+                    }} 
+                  />
+                </Box>
+                
+                <Box mt={2} fontSize="sm" color="gray.600">
+                  {form.imageUrl.startsWith('data:') ? (
+                    <Text color="green.600">✅ Local file uploaded</Text>
+                  ) : (
+                    <Text color="blue.600">✅ Stored in Supabase</Text>
+                  )}
                 </Box>
               </Box>
             )}
-            <CldUploadWidget
-              uploadPreset={process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET}
-              onUpload={res => {
-                console.log("Upload result:", res);
-                if (res.event === 'success') {
-                  const info = res.info as CloudinaryUploadWidgetInfo;
-                  setForm(prev => ({
-                    ...prev,
-                    imageUrl: info.secure_url,
-                  }));
-
-                  toast({
-                    title: "Image uploaded",
-                    description: "Your product image has been uploaded successfully.",
-                    status: "success",
-                    duration: 3000,
-                    isClosable: true,
-                  });
-                } 
-                if (res.event === 'error') {
-                toast({
-                  title: "Upload failed",
-                  description: "Failed to upload image.",
-                  status: "error",
-                  duration: 3000,
-                  isClosable: true,
-                });
-                console.error("Upload error:", res);
-                }
-              }}
-            >
-              {({ open }) => <Button onClick={() => open()} mt={2}>Upload Image</Button>}
-            </CldUploadWidget>
           </FormControl>
 
            {/* VARIANTS */}
@@ -421,30 +510,73 @@ const AddProductPage = () => {
                   {variant.imageUrl && (
                     <Box
                       mt={3}
-                      p={3}
+                      p={4}
                       bg="green.50"
                       border="1px solid"
                       borderColor="green.300"
                       borderRadius="md"
-                      display="flex"
-                      alignItems="center"
-                      gap={3}
                     >
-                      <a href={variant.imageUrl} target="_blank" rel="noopener noreferrer">
-                        <img src={variant.imageUrl} width={60} alt={`Variant ${index + 1}`} />
-                      </a>
-                      <Box>
-                        <Box fontWeight="bold" color="green.700">Upload successful</Box>
-                        <Box fontSize="sm" color="gray.700" isTruncated maxW="200px">{variant.imageUrl}</Box>
-                      </Box>
+                      <Flex justify="space-between" align="center" mb={3}>
+                        <Text fontWeight="bold" color="green.700">
+                          Variant #{index + 1} Image
+                        </Text>
+                        <IconButton
+                          aria-label="Remove variant image"
+                          icon={<DeleteIcon />}
+                          size="sm"
+                          colorScheme="red"
+                          variant="ghost"
+                          onClick={() => {
+                            handleVariantChange(index, 'imageUrl', '');
+                            toast({
+                              title: "Image removed",
+                              description: `Variant #${index + 1} image has been removed.`,
+                              status: "info",
+                              duration: 2000,
+                              isClosable: true,
+                            });
+                          }}
+                        />
+                      </Flex>
+                      
+                      <Flex align="center" gap={3}>
+                        <Box>
+                          <img 
+                            src={variant.imageUrl} 
+                            width={80} 
+                            height={80} 
+                            alt={`Variant ${index + 1}`}
+                            style={{ 
+                              objectFit: 'contain',
+                              borderRadius: '8px',
+                              border: '1px solid #e2e8f0'
+                            }}
+                          />
+                        </Box>
+                        <Box flex={1}>
+                          <VStack align="start" spacing={1}>
+                            <Text fontSize="sm" fontWeight="medium" color="gray.700">
+                              Image Type: {variant.imageUrl.startsWith('data:') ? 'Local File' : 'Supabase Storage'}
+                            </Text>
+                            <Text fontSize="xs" color="gray.500" isTruncated maxW="300px">
+                              {variant.imageUrl.startsWith('data:') 
+                                ? 'Base64 encoded image data'
+                                : variant.imageUrl
+                              }
+                            </Text>
+                            <Text fontSize="xs" color="green.600">
+                              ✅ Successfully uploaded
+                            </Text>
+                          </VStack>
+                        </Box>
+                      </Flex>
                     </Box>
                   )}
-                  <CldUploadWidget
-                    uploadPreset="my_unsigned_preset"
-                    onUpload={res => {
-                      const info = res.info as CloudinaryUploadWidgetInfo;
-                      handleVariantChange(index, 'imageUrl', info.secure_url);
-                    
+                  
+                  {/* Upload for Variant */}
+                  <SupabaseUpload
+                    onUpload={(url) => {
+                      handleVariantChange(index, 'imageUrl', url);
                       toast({
                         title: "Image uploaded",
                         description: `Variant #${index + 1} image uploaded successfully.`,
@@ -453,40 +585,62 @@ const AddProductPage = () => {
                         isClosable: true,
                       });
                     }}
-                  >
-                    {({ open }) => (
-                      <Button mt={2} size="sm" onClick={() => open()}>
-                        Upload Variant Image
-                      </Button>
-                    )}
-                  </CldUploadWidget>
+                    folder="product-variants"
+                    maxSize={5}
+                    showPreview={false}
+                  />
                 </FormControl>
 
                 {/* BOM Items per variant */}
                 <Box>
                   <Heading size="sm" mb={2}>BOM Items for this variant</Heading>
                   {(variant.bomItems || []).map((item, bomIndex) => (
-                    <HStack key={bomIndex} mb={2}>
-                      <Input
-                        placeholder="Material SKU"
-                        value={item.materialSku}
-                        onChange={e => handleVariantBOMChange(index, bomIndex, 'materialSku', e.target.value)}
-                      />
-                      <Input
-                        type="number"
-                        min={1}
-                        placeholder="Quantity"
-                        value={item.quantity}
-                        onChange={e => handleVariantBOMChange(index, bomIndex, 'quantity', e.target.value)}
-                        width="100px"
-                      />
-                      <IconButton
-                        aria-label="Remove BOM item"
-                        icon={<DeleteIcon />}
-                        size="sm"
-                        onClick={() => removeVariantBOMItem(index, bomIndex)}
-                      />
-                    </HStack>
+                    <Box key={bomIndex} mb={3} p={3} border="1px solid" borderColor="gray.200" borderRadius="md">
+                      <VStack spacing={3} align="stretch">
+                        <FormControl>
+                          <FormLabel fontSize="sm">Material</FormLabel>
+                          <MaterialSearchBar
+                            materialsForAutocomplete={materialsForAutocomplete}
+                            onSelectMaterial={(materialId) => handleVariantMaterialSelect(materialId, index, bomIndex)}
+                            onSearch={() => {}} // Not needed for BOM
+                            initialSearchTerm=""
+                          />
+                        </FormControl>
+                        
+                        <HStack spacing={3}>
+                          <FormControl>
+                            <FormLabel fontSize="sm">Quantity</FormLabel>
+                            <Input
+                              type="number"
+                              min={1}
+                              placeholder="Quantity"
+                                                          value={parseFloat(item.quantity) || 0}
+                            onChange={e => handleVariantBOMChange(index, bomIndex, 'quantity', e.target.value)}
+                            />
+                          </FormControl>
+                          
+                          <FormControl>
+                            <FormLabel fontSize="sm">UOM</FormLabel>
+                            <Input
+                              placeholder="Unit of Measure"
+                              value={item.uom || ''}
+                              onChange={e => handleVariantBOMChange(index, bomIndex, 'uom', e.target.value)}
+                              isReadOnly
+                              bg="gray.50"
+                            />
+                          </FormControl>
+                          
+                          <IconButton
+                            aria-label="Remove BOM item"
+                            icon={<DeleteIcon />}
+                            size="sm"
+                            onClick={() => removeVariantBOMItem(index, bomIndex)}
+                            alignSelf="end"
+                            mt={6}
+                          />
+                        </HStack>
+                      </VStack>
+                    </Box>
                   ))}
                   <Button size="sm" leftIcon={<AddIcon />} onClick={() => addVariantBOMItem(index)}>
                     Add BOM Item
@@ -503,20 +657,51 @@ const AddProductPage = () => {
           <Box w="full">
             <FormLabel>BOM Items</FormLabel>
             {form.bomItems.map((item, index) => (
-              <HStack key={index}>
-                <Input
-                  placeholder="Material SKU"
-                  value={item.materialSku}
-                  onChange={e => handleBOMChange(index, 'materialSku', e.target.value)}
-                />
-                <Input
-                  placeholder="Quantity"
-                  type="number"
-                  value={item.quantity}
-                  onChange={e => handleBOMChange(index, 'quantity', e.target.value)}
-                />
-                <IconButton icon={<DeleteIcon />} onClick={() => removeBOMItem(index)} aria-label="Remove BOM item" />
-              </HStack>
+              <Box key={index} mb={3} p={3} border="1px solid" borderColor="gray.200" borderRadius="md">
+                <VStack spacing={3} align="stretch">
+                  <FormControl>
+                    <FormLabel fontSize="sm">Material</FormLabel>
+                    <MaterialSearchBar
+                      materialsForAutocomplete={materialsForAutocomplete}
+                      onSelectMaterial={(materialId) => handleMaterialSelect(materialId, index)}
+                      onSearch={() => {}} // Not needed for BOM
+                      initialSearchTerm=""
+                    />
+                  </FormControl>
+                  
+                  <HStack spacing={3}>
+                    <FormControl>
+                      <FormLabel fontSize="sm">Quantity</FormLabel>
+                      <Input
+                        type="number"
+                        min={1}
+                        placeholder="Quantity"
+                                                    value={parseFloat(item.quantity) || 0}
+                            onChange={e => handleBOMChange(index, 'quantity', e.target.value)}
+                      />
+                    </FormControl>
+                    
+                    <FormControl>
+                      <FormLabel fontSize="sm">UOM</FormLabel>
+                      <Input
+                        placeholder="Unit of Measure"
+                        value={item.uom || ''}
+                        onChange={e => handleBOMChange(index, 'uom', e.target.value)}
+                        isReadOnly
+                        bg="gray.50"
+                      />
+                    </FormControl>
+                    
+                    <IconButton 
+                      icon={<DeleteIcon />} 
+                      onClick={() => removeBOMItem(index)} 
+                      aria-label="Remove BOM item"
+                      alignSelf="end"
+                      mt={6}
+                    />
+                  </HStack>
+                </VStack>
+              </Box>
             ))}
             <Button mt={2} size="sm" leftIcon={<AddIcon />} onClick={addBOMItem}>Add BOM Item</Button>
           </Box>

@@ -20,17 +20,24 @@ import org.example.coretrack.dto.material.MaterialSupplierResponse;
 import org.example.coretrack.dto.material.MaterialVariantInventoryResponse;
 import org.example.coretrack.dto.material.MaterialVariantResponse;
 import org.example.coretrack.dto.material.SearchMaterialResponse;
+import org.example.coretrack.dto.material.UpdateMaterialRequest;
+import org.example.coretrack.dto.material.UpdateMaterialResponse;
+import org.example.coretrack.dto.material.ChangeMaterialStatusRequest;
+import org.example.coretrack.dto.material.ChangeMaterialStatusResponse;
+import org.example.coretrack.dto.material.MaterialStatusTransitionResponse;
 import org.example.coretrack.dto.product.InventoryResponse;
 import org.example.coretrack.model.auth.User;
 import org.example.coretrack.model.material.Material;
 import org.example.coretrack.model.material.MaterialGroup;
 import org.example.coretrack.model.material.MaterialStatus;
+import org.example.coretrack.model.material.MaterialStatusAuditLog;
 import org.example.coretrack.model.material.MaterialVariant;
 import org.example.coretrack.model.material.UoM;
 import org.example.coretrack.model.supplier.MaterialSupplier;
 import org.example.coretrack.model.supplier.Supplier;
 import org.example.coretrack.repository.MaterialGroupRepository;
 import org.example.coretrack.repository.MaterialRepository;
+import org.example.coretrack.repository.MaterialStatusAuditLogRepository;
 import org.example.coretrack.repository.MaterialSupplierRepository;
 import org.example.coretrack.repository.MaterialVariantRepository;
 import org.example.coretrack.repository.SupplierRepository;
@@ -61,6 +68,12 @@ public class MaterialServiceImpl implements MaterialService{
 
     @Autowired
     private MaterialSupplierRepository materialSupplierRepository;
+
+    @Autowired
+    private MaterialStatusAuditLogRepository materialStatusAuditLogRepository;
+
+    @Autowired
+    private MaterialStatusValidator materialStatusValidator;
 
     @Override
     @Transactional
@@ -211,12 +224,14 @@ public class MaterialServiceImpl implements MaterialService{
                         supplierRequest.getCurrency(),
                         createdByUser
                     );
+                    System.out.println("Created MaterialSupplier: " + materialSupplier.getId() + 
+                                     " for Material: " + material.getId() + 
+                                     " and Supplier: " + supplier.getId());
                     return materialSupplier;
                 }).collect(Collectors.toSet());
 
-            material.setMaterialSuppliers(suppliers); // Set variants on the product
-            materialSupplierRepository.saveAll(suppliers);
-             } // Save all variants
+            material.setMaterialSuppliers(suppliers); // Set suppliers on the material (cascade save)
+             } // Save all suppliers via cascade
         return mapProductToProductResponse(material) ; // Return the fully populated Product entity
     }
 
@@ -340,15 +355,22 @@ public class MaterialServiceImpl implements MaterialService{
         System.out.println("Search: " + processedSearch);
         System.out.println("GroupProduct IDs: " + processedGroupMaterialIds);
         System.out.println("Statuses: " + processedStatuses);
-        // call repository
-        Page<Material> materials = materialRepository.findByCriteria(
-            processedSearch,
-            processedGroupMaterialIds,
-            processedStatuses,
-            pageable
-        );
-
-        return materials.map(SearchMaterialResponse::new);
+        
+        try {
+            // call repository
+            Page<Material> materials = materialRepository.findByCriteria(
+                processedSearch,
+                processedGroupMaterialIds,
+                processedStatuses,
+                pageable
+            );
+            System.out.println("Repository returned " + materials.getTotalElements() + " materials");
+            return materials.map(SearchMaterialResponse::new);
+        } catch (Exception e) {
+            System.err.println("Error in MaterialService.findMaterial: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     @Override
@@ -412,5 +434,189 @@ public class MaterialServiceImpl implements MaterialService{
         return materialGroupRepository.findByIsActiveTrueAndNameIsNotNull().stream()
                 .map(MaterialGroupResponse::new)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    @PreAuthorize("hasRole('OWNER')")
+    public UpdateMaterialResponse updateMaterial(Long id, UpdateMaterialRequest request, User updatedByUser) {
+        // Find existing material
+        Material material = materialRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Material not found with ID: " + id));
+
+        // Update basic fields (excluding SKU)
+        material.setName(request.getName());
+        material.setShortDes(request.getShortDes());
+        material.setUom(UoM.valueOf(request.getUom()));
+        material.setImageUrl(request.getImageUrl());
+        material.setUpdated_by(updatedByUser);
+        material.setUpdatedAt(java.time.LocalDateTime.now());
+
+        // Handle Material Group
+        MaterialGroup materialGroup = null;
+        if (request.getMaterialGroupId() != null) {
+            // Choose Existing Material Group
+            Long materialGroupId = Long.parseLong(request.getMaterialGroupId());
+            materialGroup = materialGroupRepository.findByIdAndIsActiveTrue(materialGroupId)
+                    .orElseThrow(() -> new RuntimeException("Material Group not found with ID: " + request.getMaterialGroupId()));
+        } else if (StringUtils.hasText(request.getNewMaterialGroupName())) {
+            // Create New Material Group
+            String newGroupName = request.getNewMaterialGroupName().trim();
+            if (materialGroupRepository.findByNameAndIsActiveTrue(newGroupName).isPresent()) {
+                throw new IllegalArgumentException("Group name already exists: " + newGroupName);
+            }
+            materialGroup = new MaterialGroup(newGroupName, updatedByUser);
+            materialGroupRepository.save(materialGroup);
+        }
+        material.setGroup(materialGroup);
+
+        // Handle Variants
+        if (request.getVariants() != null && !request.getVariants().isEmpty()) {
+            // Clear existing variants
+            material.getVariants().clear();
+            
+            // Add new variants
+            List<MaterialVariant> variants = request.getVariants().stream()
+                .map(variantRequest -> {
+                    MaterialVariant variant = new MaterialVariant(
+                        generateVariantSku(material.getSku(), material.getVariants().size() + 1),
+                        variantRequest.getName(),
+                        variantRequest.getShortDescription(),
+                        material.getUom(),
+                        variantRequest.getImageUrl(),
+                        material,
+                        updatedByUser
+                    );
+                    return variant;
+                }).collect(Collectors.toList());
+            
+            material.setVariants(variants);
+        }
+
+        // Handle Suppliers
+        if (request.getSuppliers() != null && !request.getSuppliers().isEmpty()) {
+            // Clear existing suppliers
+            material.getMaterialSuppliers().clear();
+            
+            // Add new suppliers
+            Set<MaterialSupplier> suppliers = request.getSuppliers().stream()
+                .map(supplierRequest -> {
+                    Supplier supplier = supplierRepository.findById(supplierRequest.getSupplierId())
+                            .orElseThrow(() -> new RuntimeException("Supplier not found with ID: " + supplierRequest.getSupplierId()));
+                    
+                    MaterialSupplier materialSupplier = new MaterialSupplier(
+                        material,
+                        supplier,
+                        supplierRequest.getPrice(),
+                        supplierRequest.getCurrency(),
+                        updatedByUser
+                    );
+                    
+                    // Set optional fields
+                    if (supplierRequest.getLeadTimeDays() != null) {
+                        materialSupplier.setLeadTimeDays(supplierRequest.getLeadTimeDays());
+                    }
+                    if (supplierRequest.getMinOrderQuantity() != null) {
+                        materialSupplier.setMinOrderQuantity(supplierRequest.getMinOrderQuantity());
+                    }
+                    if (StringUtils.hasText(supplierRequest.getSupplierMaterialCode())) {
+                        materialSupplier.setSupplierMaterialCode(supplierRequest.getSupplierMaterialCode());
+                    }
+                    
+                    return materialSupplier;
+                }).collect(Collectors.toSet());
+            
+            material.setMaterialSuppliers(suppliers);
+        }
+
+        // Save the updated material
+        Material savedMaterial = materialRepository.save(material);
+
+        // Return response
+        return mapMaterialToUpdateResponse(savedMaterial);
+    }
+
+    private UpdateMaterialResponse mapMaterialToUpdateResponse(Material material) {
+        List<MaterialVariantResponse> variantResponses = material.getVariants() != null ?
+                material.getVariants().stream()
+                        .map(variant -> new MaterialVariantResponse(variant)).toList() : List.of();
+        
+        List<MaterialSupplierResponse> supplierResponses = material.getMaterialSuppliers() != null ?
+                material.getMaterialSuppliers().stream()
+                        .map(supplier -> new MaterialSupplierResponse(supplier)).toList() : List.of();
+        
+        return new UpdateMaterialResponse(
+                material.getSku(),
+                material.getName(),
+                material.getShortDes(),
+                material.getGroup() != null ? material.getGroup().getName() : null,
+                material.isActive(),
+                material.getImageUrl(),
+                material.getCreatedAt(),
+                material.getCreated_by() != null ? material.getCreated_by().getUsername() : null,
+                variantResponses,
+                supplierResponses,
+                material.getUpdatedAt(),
+                material.getUpdated_by() != null ? material.getUpdated_by().getUsername() : null
+        );
+    }
+
+    @Override
+    @Transactional
+    @PreAuthorize("hasAnyRole('OWNER', 'WAREHOUSE_STAFF')")
+    public ChangeMaterialStatusResponse changeMaterialStatus(Long materialId, ChangeMaterialStatusRequest request, User changedByUser) {
+        // Step 1: Find the material
+        Material material = materialRepository.findById(materialId)
+                .orElseThrow(() -> new RuntimeException("Material not found with ID: " + materialId));
+
+        // Step 2: Get current status
+        MaterialStatus currentStatus = material.getStatus();
+        MaterialStatus newStatus = request.getNewStatus();
+
+        // Step 3: Validate the status transition (E1: Invalid Status Transition)
+        if (!materialStatusValidator.isValidTransition(currentStatus, newStatus)) {
+            String errorMessage = materialStatusValidator.getInvalidTransitionMessage(currentStatus, newStatus);
+            return new ChangeMaterialStatusResponse(materialId, currentStatus, newStatus, errorMessage, false);
+        }
+
+        // Step 4: Update the material status
+        MaterialStatus previousStatus = material.getStatus();
+        material.setStatus(newStatus);
+        material.setUpdated_by(changedByUser);
+        material.setUpdatedAt(java.time.LocalDateTime.now());
+
+        // Step 5: Save the updated material
+        Material savedMaterial = materialRepository.save(material);
+
+        // Step 6: Create audit log entry
+        MaterialStatusAuditLog auditLog = new MaterialStatusAuditLog(
+            savedMaterial,
+            changedByUser,
+            previousStatus,
+            newStatus,
+            request.getReason()
+        );
+        materialStatusAuditLogRepository.save(auditLog);
+
+        // Step 7: Return success response
+        String successMessage = String.format("Material status successfully changed from '%s' to '%s'", 
+                                           previousStatus, newStatus);
+        return new ChangeMaterialStatusResponse(materialId, previousStatus, newStatus, successMessage, true);
+    }
+
+    @Override
+    public MaterialStatusTransitionResponse getAvailableStatusTransitions(Long materialId) {
+        // Step 1: Find the material
+        Material material = materialRepository.findById(materialId)
+                .orElseThrow(() -> new RuntimeException("Material not found with ID: " + materialId));
+
+        // Step 2: Get current status and available transitions
+        MaterialStatus currentStatus = material.getStatus();
+        Set<MaterialStatus> availableTransitions = materialStatusValidator.getValidTransitions(currentStatus);
+
+        // Step 3: Return response
+        String message = String.format("Available status transitions for material '%s' (current status: %s)", 
+                                     material.getName(), currentStatus);
+        return new MaterialStatusTransitionResponse(materialId, currentStatus, availableTransitions, message);
     }
 }

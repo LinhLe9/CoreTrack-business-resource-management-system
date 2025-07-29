@@ -33,6 +33,7 @@ public class MaterialVariant {
     @Column(nullable = false)
     private UoM uom;
 
+    @Column(length = 10000)
     private String imageUrl;
 
     @ManyToOne(fetch = FetchType.LAZY)

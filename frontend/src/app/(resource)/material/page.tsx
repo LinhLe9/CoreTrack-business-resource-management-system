@@ -113,29 +113,31 @@ const MaterialCatalogPage: React.FC = () => {
   return (
     <Box p={8} maxW="1400px" mx="auto">
       <Heading as="h1" size="xl" textAlign="center" mb={8} color="teal.700">
-        Product Catalog
+        Material Catalog
       </Heading>
 
-      <Flex direction={{ base: 'column', md: 'row' }} gap={6} mb={8} align="flex-start">
-        <Box flex="1" minW="300px">
-          <Flex gap={2} align="center">
-            <SearchBar
-              onSearch={handleSearch}
-              onSelectMaterial={handleSelectMaterialFromSearch}
-              initialSearchTerm={queryParams.search}
-              materialsForAutocomplete={allMaterialsForAutocomplete}
-            />
-            <IconButton
-              icon={<AddIcon />}
-              aria-label="Add new material"
-              colorScheme="teal"
-              onClick={() => router.push('/material/add')}
-              title="Add Material"
-            />
-          </Flex>
-        </Box>
+      {/* Search Bar Row - Centered */}
+      <Flex justify="center" mb={6}>
+        <Flex gap={2} align="center" maxW="600px" w="full">
+          <SearchBar
+            onSearch={handleSearch}
+            onSelectMaterial={handleSelectMaterialFromSearch}
+            initialSearchTerm={queryParams.search}
+            materialsForAutocomplete={allMaterialsForAutocomplete}
+          />
+          <IconButton
+            icon={<AddIcon />}
+            aria-label="Add new material"
+            colorScheme="teal"
+            onClick={() => router.push('/material/add')}
+            title="Add Material"
+          />
+        </Flex>
+      </Flex>
 
-        <Box>
+      {/* Filter Row - Centered */}
+      <Flex justify="center" mb={8}>
+        <Box maxW="800px" w="full">
           <MaterialFilters onFilter={handleFilter} initialFilters={queryParams} />
         </Box>
       </Flex>
@@ -165,7 +167,10 @@ const MaterialCatalogPage: React.FC = () => {
         <>
           <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 4 }} spacing={6}>
             {pageData.content.map((material) => (
-              <MaterialCard key={material.id} material={material} />
+              <MaterialCard 
+                key={material.id} 
+                material={material} 
+              />
             ))}
           </SimpleGrid>
 

@@ -8,6 +8,11 @@ import org.example.coretrack.dto.material.AllMaterialSearchResponse;
 import org.example.coretrack.dto.material.MaterialDetailResponse;
 import org.example.coretrack.dto.material.MaterialGroupResponse;
 import org.example.coretrack.dto.material.SearchMaterialResponse;
+import org.example.coretrack.dto.material.UpdateMaterialRequest;
+import org.example.coretrack.dto.material.UpdateMaterialResponse;
+import org.example.coretrack.dto.material.ChangeMaterialStatusRequest;
+import org.example.coretrack.dto.material.ChangeMaterialStatusResponse;
+import org.example.coretrack.dto.material.MaterialStatusTransitionResponse;
 import org.example.coretrack.model.auth.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,5 +37,14 @@ public interface MaterialService {
     // to rechieve the detailed material info by id
     MaterialDetailResponse getMaterialById(Long id); 
 
+    // to update a material
+    UpdateMaterialResponse updateMaterial(Long id, UpdateMaterialRequest request, User updatedByUser);
+
     List<MaterialGroupResponse> getAllGroupName();
+
+    // to change material status
+    ChangeMaterialStatusResponse changeMaterialStatus(Long materialId, ChangeMaterialStatusRequest request, User changedByUser);
+
+    // to get available status transitions for a material
+    MaterialStatusTransitionResponse getAvailableStatusTransitions(Long materialId);
 }

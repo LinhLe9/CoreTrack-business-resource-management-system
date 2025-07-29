@@ -12,9 +12,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const getStatusColor = (status: Product['status']) => {
     switch (status) {
       case 'Active': return 'green';
-      case 'Inactive': return 'orange';
-      case 'Discontinued': return 'red';
-      case 'Pending': return 'blue';
+      case 'Inactive': return 'yellow';
+      case 'Discontinued': return 'orange';
+      case 'Deleted': return 'red';
       default: return 'gray';
     }
   };
@@ -22,7 +22,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   return (
     <NextLink href={`/product/${product.id}`} passHref> {/* Giả định có trang chi tiết */}
       <Box
-        as="a" // Để Box có thể hoạt động như một link
         borderWidth="1px"
         borderRadius="lg"
         overflow="hidden"

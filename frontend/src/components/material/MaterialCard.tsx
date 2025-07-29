@@ -1,4 +1,4 @@
-// components/ProductCard.tsx
+// components/MaterialCard.tsx
 import React from 'react';
 import { Box, Image, Text, Heading, VStack, Tag, TagLabel, Flex } from '@chakra-ui/react';
 import { Material } from '../../types/material';
@@ -9,12 +9,12 @@ interface MaterialCardProps {
 }
 
 const MaterialCard: React.FC<MaterialCardProps> = ({ material }) => {
-  const getStatusColor = (status: Material['status']) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'ACTIVE': return 'green';
       case 'INACTIVE': return 'orange';
       case 'DISCONTINUED': return 'red';
-      case 'PENDING': return 'blue';
+      case 'DELETED': return 'gray';
       default: return 'gray';
     }
   };
@@ -22,7 +22,6 @@ const MaterialCard: React.FC<MaterialCardProps> = ({ material }) => {
   return (
     <NextLink href={`/material/${material.id}`} passHref> 
       <Box
-        as="a"
         borderWidth="1px"
         borderRadius="lg"
         overflow="hidden"

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Box, Button, FormControl, FormLabel, Input, Heading, VStack, useToast
 } from '@chakra-ui/react';
-import api from '@/lib/axios'; 
+import api, { resetLogoutFlag } from '@/lib/axios'; 
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
@@ -18,6 +18,9 @@ export default function LoginForm() {
     e.preventDefault();
     try {
       const res = await api.post('/auth/login', { email, password });
+
+      // Reset logout flag on successful login
+      resetLogoutFlag();
 
       // save token 
       const token = res.data.token;

@@ -24,7 +24,7 @@ public class AllProductSearchResponse {
         this.imageUrl = imageUrl;
     }
 
-    // Constructor để chuyển đổi từ Entity sang DTO
+    // Constructors
     public AllProductSearchResponse(Product product) {
         this.sku = product.getSku();
         this.name = product.getName();

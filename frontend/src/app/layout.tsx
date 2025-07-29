@@ -3,6 +3,10 @@ import { Roboto } from 'next/font/google';
 import "./globals.css";
 import { Providers } from "./providers";
 import Header from '../components/general/header';
+import ClientOnly from '../components/auth/ClientOnly';
+import SessionExpiredHandler from '../components/auth/SessionExpiredHandler';
+import TokenExpirationChecker from '../components/auth/TokenExpirationChecker';
+import BackendStatus from '../components/general/BackendStatus';
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -24,6 +28,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={roboto.variable}>
         <Providers>
+          <ClientOnly>
+            <SessionExpiredHandler />
+            <TokenExpirationChecker />
+            <BackendStatus />
+          </ClientOnly>
           <Header />
           {children}
         </Providers>

@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { MaterialQueryParams } from '../../types/material';
 import useMaterialGroups from '@/hooks/useMaterialGroups';
 import FilterPanel from '../general/FilterPanel';
-import { Group } from '@/types/material';
+import { MaterialGroup } from '@/types/material';
 
 // Dynamic import Select to disable SSR (fix hydration mismatch issue)
 const Select = dynamic(() => import('react-select'), { ssr: false });
@@ -22,17 +22,17 @@ interface OptionType {
 
 const toArray = (v: any) => Array.isArray(v) ? v : v !== undefined ? [v] : [];
 
-const materialStatuses = ["ACTIVE", "INACTIVE", "DISCONTINUED", "PENDING"];
+const materialStatuses = ["ACTIVE", "INACTIVE", "DISCONTINUED", "DELETED"];
 
 const MaterialFilters: React.FC<MaterialFiltersProps> = ({ onFilter, initialFilters = {} }) => {
-  const groupList = useMaterialGroups();
-  const groupOptions = groupList.map((g: Group) => ({ label: g.name, value: g.id }));
+  const { materialGroups, loading } = useMaterialGroups();
+  const groupOptions = materialGroups.map((g: MaterialGroup) => ({ label: g.name, value: g.id }));
   const statusOptions = materialStatuses.map(s => ({ label: s, value: s }));
 
   const [selectedGroups, setSelectedGroups] = useState<OptionType[]>(
     toArray(initialFilters.groupMaterial).map(id => {
       const numId = Number(id);
-      const found = groupList.find(g => g.id === numId);
+      const found = materialGroups.find(g => g.id === numId);
       return found ? { label: found.name, value: found.id } : { label: String(id), value: numId };
     })
   );

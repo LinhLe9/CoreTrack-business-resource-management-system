@@ -12,12 +12,13 @@ public class ProductDetailResponse {
     private String groupProduct;
     private String status; 
     private BigDecimal price;
+    private String currency;
     private String imageUrl;
 
     private List<ProductVariantInventoryResponse> variantInventory;
 
     public ProductDetailResponse(Long id, String sku, String name, String description, String groupProduct,
-            String status, BigDecimal price, String imageUrl, List<ProductVariantInventoryResponse> variantInventory) {
+            String status, BigDecimal price, String currency, String imageUrl, List<ProductVariantInventoryResponse> variantInventory) {
         this.id = id;
         this.sku = sku;
         this.name = name;
@@ -25,6 +26,7 @@ public class ProductDetailResponse {
         this.groupProduct = groupProduct;
         this.status = status;
         this.price = price;
+        this.currency = currency;
         this.imageUrl = imageUrl;
         this.variantInventory = variantInventory;
     }
@@ -85,5 +87,13 @@ public class ProductDetailResponse {
     }
     public void setVariantInventory(List<ProductVariantInventoryResponse> variantInventory) {
         this.variantInventory = variantInventory;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
     }
 }

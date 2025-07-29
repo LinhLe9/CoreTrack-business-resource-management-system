@@ -1,5 +1,6 @@
 package org.example.coretrack.model.product.inventory;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,12 +24,18 @@ public class ProductInventory {
     @JoinColumn(name = "productVariant_id")
     private ProductVariant productVariant;
 
-    private Integer currentStock;
-    private Integer minAlertStock;
-    private Integer maxStockLevel;
+    private BigDecimal currentStock;
+    private BigDecimal minAlertStock;
+    private BigDecimal maxStockLevel;
+
+    private BigDecimal futureStock;
+    private BigDecimal allocatedStock;
 
     @OneToMany(mappedBy = "productInventory", cascade = CascadeType.ALL)
     private List<ProductInventoryLog> logs = new ArrayList<>();
+
+    @Column 
+    private InventoryStatus inventoryStatus;
 
     @Column(nullable = false)
     private boolean isActive;
@@ -48,14 +55,17 @@ public class ProductInventory {
     public ProductInventory() {
     }
 
-    public ProductInventory(ProductVariant productVariant, Integer currentStock, Integer minAlertStock, Integer maxStockLevel,
-            List<ProductInventoryLog> logs, User created_by) {
+    public ProductInventory(ProductVariant productVariant, BigDecimal currentStock, 
+                            BigDecimal minAlertStock, BigDecimal maxStockLevel,
+                            List<ProductInventoryLog> logs, InventoryStatus inventoryStatus,
+                            User created_by) {
         this.productVariant = productVariant;
         this.currentStock = currentStock;
         this.minAlertStock = minAlertStock;
         this.isActive = true;
         this.maxStockLevel =maxStockLevel;
         this.logs = logs;
+        this.inventoryStatus = inventoryStatus;
         this.created_by = created_by;
         this.updated_by = created_by;
         this.createdAt = LocalDateTime.now();
@@ -78,27 +88,27 @@ public class ProductInventory {
         this.productVariant = productVariant;
     }
 
-    public Integer getCurrentStock() {
+    public BigDecimal getCurrentStock() {
         return currentStock;
     }
 
-    public void setCurrentStock(Integer currentStock) {
+    public void setCurrentStock(BigDecimal currentStock) {
         this.currentStock = currentStock;
     }
 
-    public Integer getMinAlertStock() {
+    public BigDecimal getMinAlertStock() {
         return minAlertStock;
     }
 
-    public void setMinAlertStock(Integer minAlertStock) {
+    public void setMinAlertStock(BigDecimal minAlertStock) {
         this.minAlertStock = minAlertStock;
     }
 
-    public Integer getMaxStockLevel() {
+    public BigDecimal getMaxStockLevel() {
         return maxStockLevel;
     }
 
-    public void setMaxStockLevel(Integer maxStockLevel) {
+    public void setMaxStockLevel(BigDecimal maxStockLevel) {
         this.maxStockLevel = maxStockLevel;
     }
 
@@ -148,5 +158,31 @@ public class ProductInventory {
 
     public void setUpdated_by(User updated_by) {
         this.updated_by = updated_by;
+    }
+
+    public InventoryStatus getInventoryStatus() {
+        return inventoryStatus;
+    }
+
+    public void setInventoryStatus(InventoryStatus inventoryStatus) {
+        this.inventoryStatus = inventoryStatus;
+    }
+
+    public BigDecimal getFutureStock() {
+        return futureStock;
+    }
+
+    public void setFutureStock(BigDecimal futureStock) {
+        this.futureStock = futureStock;
+    }
+
+    public BigDecimal getAllocatedStock() {
+        return allocatedStock;
+    }
+
+    public void setAllocatedStock(BigDecimal allocatedStock) {
+        this.allocatedStock = allocatedStock;
     } 
+
+    
 }

@@ -94,6 +94,7 @@ const ProductCatalogPage: React.FC = () => {
   };
 
   const handleFilter = (filters: Omit<ProductQueryParams, 'search' | 'page' | 'size' | 'sort'>) => {
+    console.log('Applying filters:', filters); // Debug log
     setQueryParams((prev) => ({
       ...prev,
       ...filters,
@@ -118,28 +119,26 @@ const ProductCatalogPage: React.FC = () => {
         Product Catalog
       </Heading>
 
-      <Flex direction={{ base: 'column', md: 'row' }} gap={6} mb={8} align="flex-start">
-        <Box flex="1" minW="300px">
-          <Flex gap={2} align="center">
-            <SearchBar
-              onSearch={handleSearch}
-              onSelectProduct={handleSelectProductFromSearch}
-              initialSearchTerm={queryParams.search}
-              productsForAutocomplete={allProductsForAutocomplete}
-            />
-            <IconButton
-              icon={<AddIcon />}
-              aria-label="Add new product"
-              colorScheme="teal"
-              onClick={() => router.push('/product/add')}
-              title="Add Product"
-            />
-          </Flex>
-        </Box>
+      <Flex direction="column" gap={4} mb={8}>
+        {/* Line 1: Search bar and Add button */}
+        <Flex justify="center" gap={2} align="center" direction={{ base: 'column', md: 'row' }}>
+          <SearchBar
+            onSearch={handleSearch}
+            onSelectProduct={handleSelectProductFromSearch}
+            initialSearchTerm={queryParams.search}
+            productsForAutocomplete={allProductsForAutocomplete}
+          />
+          <IconButton
+            icon={<AddIcon />}
+            aria-label="Add new product"
+            colorScheme="teal"
+            onClick={() => router.push('/product/add')}
+            title="Add Product"
+          />
+        </Flex>
 
-        <Box>
-          <ProductFilters onFilter={handleFilter} initialFilters={queryParams} />
-        </Box>
+        {/* Line 2: Filters */}
+        <ProductFilters onFilter={handleFilter} initialFilters={queryParams} />
       </Flex>
 
       {loading && (

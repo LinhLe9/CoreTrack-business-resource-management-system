@@ -1,4 +1,4 @@
-// components/SearchBar.tsx
+// components/product/ProductSearchBar.tsx
 import React, { useState } from 'react';
 import Select from 'react-select';
 import {
@@ -68,8 +68,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
   );
 
   return (
-    <Flex gap={2}>
-      <Box flex="1">
+    <Flex gap={2} align="center">
+      <Box width="400px" minWidth="300px" maxWidth="600px">
         <Select
           options={options}
           placeholder="Search by name, SKU, or description"

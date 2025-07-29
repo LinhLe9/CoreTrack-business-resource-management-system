@@ -1,6 +1,6 @@
-import { Input, List, ListItem, Box } from '@chakra-ui/react';
+import { Input, List, ListItem, Box, Text } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/axios';
 
 import {Group} from '@/types/product'
 
@@ -12,11 +12,24 @@ export default function SearchProductGroup({
   const [allGroups, setAllGroups] = useState<Group[]>([]);
   const [query, setQuery] = useState('');
   const [filtered, setFiltered] = useState<Group[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
     const fetchGroups = async () => {
-      const res = await axios.get('/api/product-groups'); // trả về all groups
-      setAllGroups(res.data);
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await api.get('/products/product-groups'); 
+        setAllGroups(res.data);
+      } catch (err: any) {
+        console.error('Error fetching product groups:', err);
+        setError(err.response?.data?.message || 'Failed to load product groups');
+        // Don't set groups to empty array to preserve previous data
+      } finally {
+        setLoading(false);
+      }
     };
     fetchGroups();
   }, []);
@@ -29,11 +42,22 @@ export default function SearchProductGroup({
   return (
     <Box position="relative">
       <Input
-        placeholder="Search group..."
+        placeholder="Click to search groups..."
         value={query}
         onChange={e => setQuery(e.target.value)}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => {
+          // Delay hiding to allow click on dropdown items
+          setTimeout(() => setIsFocused(false), 200);
+        }}
+        isDisabled={loading}
       />
-      {filtered.length > 0 && (
+      {error && (
+        <Text fontSize="sm" color="red.500" mt={1}>
+          {error}
+        </Text>
+      )}
+      {isFocused && filtered.length > 0 && (
         <List
           position="absolute"
           bg="white"
@@ -42,6 +66,7 @@ export default function SearchProductGroup({
           zIndex="10"
           maxH="200px"
           overflowY="auto"
+          boxShadow="md"
         >
           {filtered.map(group => (
             <ListItem
@@ -52,6 +77,7 @@ export default function SearchProductGroup({
               onClick={() => {
                 onSelect(group);
                 setQuery(group.name);
+                setIsFocused(false);
               }}
             >
               {group.name}

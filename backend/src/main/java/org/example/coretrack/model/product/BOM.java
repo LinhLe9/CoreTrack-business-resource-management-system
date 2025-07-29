@@ -45,7 +45,6 @@ public class BOM {
     }
 
     
-
     public BOM(ProductVariant productVariant, String description, User created_by) {
         this.productVariant = productVariant;
         this.description = description;

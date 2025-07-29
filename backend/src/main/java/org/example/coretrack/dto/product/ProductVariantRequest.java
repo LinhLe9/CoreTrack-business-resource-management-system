@@ -23,6 +23,7 @@ public class ProductVariantRequest {
     // Constructors, Getters, Setters
 
     public ProductVariantRequest() {
+
     }
 
     public String getName() {
@@ -57,4 +58,5 @@ public class ProductVariantRequest {
         this.bomItems = bomItems;
     }
 }
+
 

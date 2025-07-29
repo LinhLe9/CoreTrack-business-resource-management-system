@@ -37,6 +37,10 @@ public class AddProductRequest {
     // Product Variants (Main Flow - Step 4)
     @Valid // Validate each variant in the list
     private List<ProductVariantRequest> variants; // Optional, product might not have variants
+    
+    // BOM Items for default variant (when no explicit variants are provided)
+    @Valid
+    private List<BOMItemRequest> bomItems;
 
     // Constructors, Getters and Setters
     public AddProductRequest() {}
@@ -111,5 +115,13 @@ public class AddProductRequest {
 
     public void setCurrency(String currency) {
         this.currency = currency;
+    }
+    
+    public List<BOMItemRequest> getBomItems() {
+        return bomItems;
+    }
+    
+    public void setBomItems(List<BOMItemRequest> bomItems) {
+        this.bomItems = bomItems;
     }
 }

@@ -5,7 +5,9 @@ import org.example.coretrack.model.supplier.Supplier;
 public class AllSupplierSearchResponse {
     private Long id;
     private String name;
-    private String contactPerson ;
+    private String contactPerson;
+    private String email;
+    private String phone;
     private String address;
     private String country;
     private Boolean isActive;
@@ -27,6 +29,8 @@ public class AllSupplierSearchResponse {
         this.id = supplier.getId();
         this.name = supplier.getName();
         this.contactPerson = supplier.getContactPerson();
+        this.email = supplier.getEmail();
+        this.phone = supplier.getPhone();
         this.address = supplier.getAddress() + ", " + supplier.getCity();
         this.country = supplier.getCountry();
         this.isActive = supplier.getIsActive();
@@ -80,5 +84,19 @@ public class AllSupplierSearchResponse {
         this.isActive = isActive;
     }
 
-    
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
 }

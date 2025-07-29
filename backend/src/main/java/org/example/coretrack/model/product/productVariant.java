@@ -28,6 +28,7 @@ public class ProductVariant {
     @Column(precision = 10, scale = 2, nullable = false)
     private BigDecimal price;
 
+    @Column(length = 10000)
     private String imageUrl;
 
     @Column(nullable = false)

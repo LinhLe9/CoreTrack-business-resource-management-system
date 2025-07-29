@@ -71,20 +71,35 @@ public class SupplierServiceImpl implements SupplierService{
 
     @Override
     public AddSupplierResponse createSupplier(AddSupplierRequest addSupplierRequest, User createdByUser){
-        if (supplierRepository.findByPhone(addSupplierRequest.getPhone()).isPresent()) { 
-                    throw new IllegalArgumentException("Phone number already exists: " + addSupplierRequest.getPhone());
-        } else {
-            Supplier newSupplier  = new Supplier(
-                addSupplierRequest.getName(),
-                addSupplierRequest.getContactPerson(),
-                addSupplierRequest.getEmail(),
-                addSupplierRequest.getPhone(),
-                addSupplierRequest.getCurrency(),
-                createdByUser
-            );
-            supplierRepository.save(newSupplier);
-        return new AddSupplierResponse(newSupplier);
+        // Check if createdByUser is null
+        if (createdByUser == null) {
+            throw new IllegalArgumentException("User information is required to create supplier");
         }
+        
+        // Only check phone uniqueness if phone is provided
+        if (addSupplierRequest.getPhone() != null && !addSupplierRequest.getPhone().trim().isEmpty()) {
+            if (supplierRepository.findByPhone(addSupplierRequest.getPhone()).isPresent()) { 
+                throw new IllegalArgumentException("Phone number already exists: " + addSupplierRequest.getPhone());
+            }
+        }
+        
+        Supplier newSupplier = new Supplier(
+            addSupplierRequest.getName(),
+            addSupplierRequest.getContactPerson(),
+            addSupplierRequest.getEmail(),
+            addSupplierRequest.getPhone(),
+            addSupplierRequest.getCurrency(),
+            createdByUser
+        );
+        
+        // Set additional fields
+        newSupplier.setAddress(addSupplierRequest.getAddress());
+        newSupplier.setCity(addSupplierRequest.getCity());
+        newSupplier.setCountry(addSupplierRequest.getCountry());
+        newSupplier.setWebsite(addSupplierRequest.getWebsite());
+        
+        supplierRepository.save(newSupplier);
+        return new AddSupplierResponse(newSupplier);
     }
 
     @Override

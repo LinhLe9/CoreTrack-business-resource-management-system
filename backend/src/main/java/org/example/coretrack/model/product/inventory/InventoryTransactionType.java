@@ -2,7 +2,8 @@ package org.example.coretrack.model.product.inventory;
 
 public enum InventoryTransactionType {
     IN("import"),  
-    OUT("export"); 
+    OUT("export"), 
+    SET("set exact stock");
 
     private final String displayName;
 

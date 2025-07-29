@@ -31,10 +31,10 @@ public class SearchMaterialResponse {
         this.id = material.getId();
         this.sku = material.getSku();
         this.name = material.getName();
-        this.groupMaterial = material.getGroup().getName();
-        this.status = material.getStatus().name(); 
-        this.uom = material.getUom().name();
-        this.imageUrl = material.getImageUrl();
+        this.groupMaterial = material.getGroup() != null ? material.getGroup().getName() : null;
+        this.status = material.getStatus() != null ? material.getStatus().name() : null; 
+        this.uom = material.getUom() != null ? material.getUom().name() : null;
+        this.imageUrl = material.getImageUrl(); 
     }
 
     public Long getId() {

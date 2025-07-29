@@ -13,12 +13,17 @@ import {
   VStack,
   Divider,
   Badge,
+  Button,
+  Flex,
+  HStack,
 } from '@chakra-ui/react';
 import { getProductById } from '@/services/productService';
 import { ProductDetailResponse } from '@/types/product';
-import VariantTable from '@/components/product/VariantTable'; // Giả sử bạn hiển thị biến thể sản phẩm trong bảng
+import VariantTable from '@/components/product/VariantTable';
+import ProductStatusMenu from '@/components/product/ProductStatusMenu'; 
 
 const ProductDetailPage = () => {
+  const router = useRouter();
   const params = useParams(); 
   const id = params?.id;
   
@@ -26,24 +31,39 @@ const ProductDetailPage = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const refreshProduct = async () => {
+    if (!id) return;
+    setLoading(true);
+    try {
+      const data = await getProductById(Number(id));
+      setProduct(mapProductResponse(data));
+    } catch (err: any) {
+      setError('Failed to load product detail.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!id) return;
-
-    const fetchProduct = async () => {
-      setLoading(true);
-      try {
-        const data = await getProductById(Number(id));
-        setProduct(mapProductResponse(data));
-      } catch (err: any) {
-        setError('Failed to load product detail.');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProduct();
+    refreshProduct();
   }, [id]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ACTIVE':
+        return 'green';
+      case 'INACTIVE':
+        return 'yellow';
+      case 'DISCONTINUED':
+        return 'orange';
+      case 'DELETED':
+        return 'red';
+      default:
+        return 'gray';
+    }
+  };
 
   if (loading) {
     return (
@@ -65,23 +85,38 @@ const ProductDetailPage = () => {
 
   return (
     <Box maxW="900px" mx="auto" p={6}>
-      <Heading as="h2" size="xl" mb={4}>
-        {product.name}
-      </Heading>
+      <Flex justify="space-between" align="center" mb={4}>
+        <Heading as="h2" size="xl">
+          {product.name}
+        </Heading>
+        <ProductStatusMenu 
+          productId={Number(id)}
+          currentStatus={product.status}
+          onStatusChange={refreshProduct}
+        />
+      </Flex>
 
-      <VStack align="start" spacing={4}>
+      <HStack align="start" spacing={6} mb={6}>
+        <VStack align="start" spacing={4} flex={1}>
+          <Text><strong>SKU:</strong> {product.sku}</Text>
+          <Text><strong>Group:</strong> {product.group}</Text>
+          <Text><strong>Description:</strong> {product.description}</Text>
+          <Text><strong>Price:</strong> ${product.price.toFixed(2)}</Text>
+          <Badge colorScheme={getStatusColor(product.status)}>
+            {product.status}
+          </Badge>
+        </VStack>
+        
         {product.imageUrl && (
-          <Image src={product.imageUrl} alt={product.name} boxSize="300px" objectFit="cover" borderRadius="md" />
+          <Image 
+            src={product.imageUrl} 
+            alt={product.name} 
+            boxSize="300px" 
+            objectFit="cover" 
+            borderRadius="md" 
+          />
         )}
-
-        <Text><strong>SKU:</strong> {product.sku}</Text>
-        <Text><strong>Group:</strong> {product.group}</Text>
-        <Text><strong>Description:</strong> {product.description}</Text>
-        <Text><strong>Price:</strong> ${product.price.toFixed(2)}</Text>
-        <Badge colorScheme={product.status.toLowerCase() === 'active' ? 'green' : 'gray'}>
-          {product.status}
-        </Badge>
-      </VStack>
+      </HStack>
 
       <Divider my={6} />
 
@@ -90,6 +125,19 @@ const ProductDetailPage = () => {
       </Heading>
 
       <VariantTable variants={product.variants} />
+
+      <Divider my={6} />
+
+      {/* Edit Button */}
+      <Box textAlign="center">
+        <Button 
+          colorScheme="blue" 
+          size="lg"
+          onClick={() => router.push(`/product/${id}/edit`)}
+        >
+          Edit Product
+        </Button>
+      </Box>
     </Box>
   );
 };
@@ -98,7 +146,7 @@ const mapProductResponse = (data: any): ProductDetailResponse => ({
   ...data,
   group: typeof data.groupProduct === 'object' && data.groupProduct !== null ? data.groupProduct.name : data.groupProduct,
   variants: data.variantInventory,
-  status: data.status ? data.status.charAt(0) + data.status.slice(1).toLowerCase() : '',
+  status: data.status || '',
 });
 
 export default ProductDetailPage;

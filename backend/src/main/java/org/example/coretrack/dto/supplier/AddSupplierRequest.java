@@ -1,8 +1,6 @@
 package org.example.coretrack.dto.supplier;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public class AddSupplierRequest {
@@ -12,13 +10,8 @@ public class AddSupplierRequest {
 
     private String contactPerson ;
 
-    @Email(message = "Invalid Email")
+    // Optional fields - no validation needed since frontend handles it
     private String email;
-
-    @Pattern(
-        regexp = "^\\+?[0-9 .-]{7,15}$", 
-        message = "Invalid phone number"
-    ) 
     private String phone;
 
     @Size(max = 500, message = "Address cannot exceed 500 characters")
@@ -30,10 +23,7 @@ public class AddSupplierRequest {
     @Size(max = 100, message = "Country cannot exceed 100 characters")
     private String country;
     
-    @Pattern(
-        regexp = "^(https?://)?([\\w.-]+)+(:\\d+)?(/([\\w/_.]*)?)?$",
-        message = "Invalid website URL"
-    )
+    // Optional field - no validation needed
     private String website;
 
     @Size(min = 3, max = 3, message = "Currency must be 3 characters")

@@ -9,6 +9,12 @@ import org.example.coretrack.dto.product.AllProductSearchResponse;
 import org.example.coretrack.dto.product.ProductDetailResponse;
 import org.example.coretrack.dto.product.ProductGroupResponse;
 import org.example.coretrack.dto.product.SearchProductResponse;
+import org.example.coretrack.dto.product.UpdateProductRequest;
+import org.example.coretrack.dto.product.UpdateProductResponse;
+import org.example.coretrack.dto.product.ChangeProductStatusRequest;
+import org.example.coretrack.dto.product.ChangeProductStatusResponse;
+import org.example.coretrack.dto.product.ProductStatusTransitionResponse;
+import org.example.coretrack.dto.product.ProductVariantAutoCompleteResponse;
 import org.example.coretrack.model.auth.User;
 import org.example.coretrack.repository.UserRepository;
 import org.example.coretrack.service.ProductService;
@@ -52,16 +58,22 @@ public class ProductController {
         if (authentication != null && authentication.getPrincipal() instanceof UserDetails) {
             String principalName = ((UserDetails) authentication.getPrincipal()).getUsername();
 
-            // Thử tìm theo username
             Optional<User> userOpt = userRepository.findByUsername(principalName);
             if (userOpt.isPresent()) {
                 return userOpt.get();
             }
 
-            // Nếu không tìm thấy, thử tìm theo email (phòng trường hợp getUsername() trả về email)
             return userRepository.findByEmail(principalName).orElse(null);
         }
         return null;
+    }
+    
+    /**
+     * Test endpoint to check if the API is working
+     */
+    @GetMapping("/test")
+    public ResponseEntity<String> test() {
+        return ResponseEntity.ok("Product API is working!");
     }
     
     /**
@@ -111,6 +123,23 @@ public class ProductController {
     }
 
     /**
+     * Endpoint to get all product variants for autocomplete
+     */
+    @GetMapping("/variants/autocomplete")
+    public ResponseEntity<List<ProductVariantAutoCompleteResponse>> getProductVariantsForAutocomplete(
+            @RequestParam(required = false) String search) { 
+
+        // Validation E1: Invalid Search Keyword/Format
+        if (search != null && search.length() > 255) { // maximum 255 characters
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
+        }
+
+        List<ProductVariantAutoCompleteResponse> variants = productService.getAllProductVariantsForAutocomplete(search);
+
+        return ResponseEntity.ok(variants);
+    }
+
+    /**
      * Endpoint for product detail by ID (A1)
      */
     @GetMapping("/{id}")
@@ -136,5 +165,46 @@ public class ProductController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                                 .build(); // hoặc .body(null)
         }
+    }
+
+    /**
+     * Endpoint for updating product information (excluding SKU)
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<UpdateProductResponse> updateProduct(@PathVariable Long id, @Valid @RequestBody UpdateProductRequest request) {
+        // Get current user information from Spring Security Context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+        UpdateProductResponse response = productService.updateProduct(id, request, currentUser);
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('OWNER', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<ChangeProductStatusResponse> changeProductStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody ChangeProductStatusRequest request) {
+        // Get current user information from Spring Security Context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+        ChangeProductStatusResponse response = productService.changeProductStatus(id, request, currentUser);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/status-transitions")
+    @PreAuthorize("hasAnyRole('OWNER', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<ProductStatusTransitionResponse> getAvailableStatusTransitions(@PathVariable Long id) {
+        // Get current user information from Spring Security Context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+        ProductStatusTransitionResponse response = productService.getAvailableStatusTransitions(id);
+        return ResponseEntity.ok(response);
     }
 }

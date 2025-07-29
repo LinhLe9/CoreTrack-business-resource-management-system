@@ -40,6 +40,7 @@ public class Product {
     @Pattern(regexp = "^[A-Z]{3}$", message = "Currency must be 3 uppercase letters (ISO 4217)")
     private String currency;
 
+    @Column(length = 10000)
     private String imageUrl;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)

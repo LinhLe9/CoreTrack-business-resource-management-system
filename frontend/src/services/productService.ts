@@ -1,7 +1,7 @@
 // services/productService.ts
 import apiClient from '../lib/axios';
 import { PageResponse } from '../types/PageResponse';
-import { Product, ProductDetailResponse, ProductQueryParams, ProductAutoComplete } from '../types/product';
+import { Product, ProductDetailResponse, ProductQueryParams, ProductAutoComplete, ProductVariantAutoComplete } from '../types/product';
 import qs from 'qs'; 
 
 
@@ -31,7 +31,13 @@ export const getProducts = async (
 
 // to fetch the product for auto complete while searching
 export const getAllProductsForAutocomplete = async (): Promise<ProductAutoComplete[]> => {
-  const response = await apiClient.get('/products/all'); 
+  const response = await apiClient.get('/products/all');
+  return response.data;
+};
+
+export const getAllProductVariantsForAutocomplete = async (search?: string): Promise<ProductVariantAutoComplete[]> => {
+  const params = search ? `?search=${encodeURIComponent(search)}` : '';
+  const response = await apiClient.get(`/products/variants/autocomplete${params}`);
   return response.data;
 };
 
@@ -39,4 +45,45 @@ export const getAllProductsForAutocomplete = async (): Promise<ProductAutoComple
 export const getProductById = async (id: number): Promise<ProductDetailResponse> => {
   const res = await apiClient.get<ProductDetailResponse>(`/products/${id}`);
   return res.data;
+};
+
+// to update product
+export const updateProduct = async (id: number, data: any): Promise<any> => {
+  try {
+    const response = await apiClient.put(`/products/${id}`, data);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// to get all product groups
+export const getAllProductGroups = async (): Promise<any[]> => {
+  try {
+    const response = await apiClient.get('/products/product-groups');
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getAvailableStatusTransitions = async (productId: number): Promise<any> => {
+  try {
+    const response = await apiClient.get(`/products/${productId}/status-transitions`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const changeProductStatus = async (productId: number, newStatus: string, reason?: string): Promise<any> => {
+  try {
+    const response = await apiClient.put(`/products/${productId}/status`, {
+      newStatus,
+      reason
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
 };

@@ -5,9 +5,15 @@ import java.util.List;
 import org.example.coretrack.dto.product.AddProductRequest;
 import org.example.coretrack.dto.product.AddProductResponse;
 import org.example.coretrack.dto.product.AllProductSearchResponse;
+import org.example.coretrack.dto.product.ChangeProductStatusRequest;
+import org.example.coretrack.dto.product.ChangeProductStatusResponse;
 import org.example.coretrack.dto.product.ProductDetailResponse;
 import org.example.coretrack.dto.product.ProductGroupResponse;
+import org.example.coretrack.dto.product.ProductStatusTransitionResponse;
+import org.example.coretrack.dto.product.ProductVariantAutoCompleteResponse;
 import org.example.coretrack.dto.product.SearchProductResponse;
+import org.example.coretrack.dto.product.UpdateProductRequest;
+import org.example.coretrack.dto.product.UpdateProductResponse;
 import org.example.coretrack.model.auth.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,4 +39,13 @@ public interface ProductService {
     ProductDetailResponse getProductById(Long id);
 
     List<ProductGroupResponse> getAllGroupName();
+
+    // to update a product
+    UpdateProductResponse updateProduct(Long id, UpdateProductRequest request, User updatedByUser);
+    
+    ChangeProductStatusResponse changeProductStatus(Long productId, ChangeProductStatusRequest request, User changedByUser);
+    ProductStatusTransitionResponse getAvailableStatusTransitions(Long productId);
+    
+    // to return all product variants for autocomplete
+    List<ProductVariantAutoCompleteResponse> getAllProductVariantsForAutocomplete(String search);
 }
