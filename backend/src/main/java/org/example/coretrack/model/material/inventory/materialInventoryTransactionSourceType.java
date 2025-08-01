@@ -12,7 +12,10 @@ public enum materialInventoryTransactionSourceType {
     SUPPLIER_RETURN("Material Supplier Return"),
     MATERIAL_ADJUSTMENT_DECREASE("Material Adjustment Decrease"),
     MATERIAL_WAREHOUSE_TRANSFER_OUT("Material Warehouse Transfer Out"),
-    SCRAP("Material Scrap");
+    SCRAP("Material Scrap"),
+
+    // Set
+    SET_INVENTORY("Set Stock Inventory");
 
     private final String displayName;
 

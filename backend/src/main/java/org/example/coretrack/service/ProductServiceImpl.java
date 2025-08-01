@@ -826,4 +826,32 @@ public class ProductServiceImpl implements ProductService{
                 ))
                 .collect(Collectors.toList());
     }
+
+    public List<BOMItemResponse> getBomItem (Long id, Long variantId){
+        Product product = productRepository.findById(id)
+                        .orElseThrow(() -> new RuntimeException("Product not found with ID: " + id));
+        ProductVariant variant = productVariantRepository.findById(variantId)
+                        .orElseThrow(() -> new RuntimeException("Product Variant not found with ID: " + variantId));
+        // Verify the variant belongs to the product
+        if (!variant.getProduct().getId().equals(id)) {
+            throw new RuntimeException("Product Variant does not belong to the specified Product");
+        }
+        
+        List<BOMItemResponse> response = new ArrayList<>();
+        if(variant.getBom().getBomItems() != null && !variant.getBom().getBomItems().isEmpty()){
+            List<BOMItem> bomItem = variant.getBom().getBomItems();
+            
+            for (BOMItem item : bomItem){
+                BOMItemResponse itemResponse = new BOMItemResponse(
+                    item.getId(),
+                    item.getMaterial().getSku(),
+                    item.getMaterial().getName(),
+                    item.getQuantity(),
+                    item.getUom().name()
+                );
+                response.add(itemResponse);
+            } 
+        }
+        return response;
+    }
 }

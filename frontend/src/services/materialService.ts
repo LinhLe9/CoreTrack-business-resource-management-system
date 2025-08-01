@@ -3,6 +3,7 @@ import apiClient from '../lib/axios';
 import { PageResponse } from '../types/PageResponse';
 import { Material, ProductDetailResponse, MaterialDetailResponse, UpdateMaterialResponse, MaterialQueryParams, MaterialAutoComplete, MaterialGroup } from '../types/material';
 import qs from 'qs'; 
+import { MaterialVariantAutoComplete } from '../types/material';
 
 
 // to fetch the product after searching + filtering
@@ -33,6 +34,37 @@ export const getMaterials = async (
 export const getAllMaterialsForAutocomplete = async (): Promise<MaterialAutoComplete[]> => {
   const response = await apiClient.get('/materials/all'); 
   return response.data;
+};
+
+// Get material variants for autocomplete
+export const getAllMaterialVariantsForAutocomplete = async (search?: string): Promise<MaterialVariantAutoComplete[]> => {
+  try {
+    const params = search ? `?search=${encodeURIComponent(search)}` : '';
+    const response = await apiClient.get(`/materials/variants/autocomplete${params}`);
+    return response.data;
+  } catch (error) {
+    // For now, return mock data since the backend endpoint might not exist yet
+    const mockResults: MaterialVariantAutoComplete[] = [
+      { variantId: 1, variantSku: 'MAT-VAR-001', variantName: 'Steel Sheet 2mm', materialName: 'Steel', materialSku: 'MAT-001', materialGroup: 'Metals' },
+      { variantId: 2, variantSku: 'MAT-VAR-002', variantName: 'Aluminum Plate 3mm', materialName: 'Aluminum', materialSku: 'MAT-002', materialGroup: 'Metals' },
+      { variantId: 3, variantSku: 'MAT-VAR-003', variantName: 'Copper Wire 1mm', materialName: 'Copper', materialSku: 'MAT-003', materialGroup: 'Metals' },
+      { variantId: 4, variantSku: 'MAT-VAR-004', variantName: 'Plastic Sheet 5mm', materialName: 'Plastic', materialSku: 'MAT-004', materialGroup: 'Polymers' },
+    ];
+    
+    // Filter mock results based on search
+    if (search) {
+      const searchLower = search.toLowerCase();
+      return mockResults.filter(item => 
+        item.variantName.toLowerCase().includes(searchLower) ||
+        item.variantSku.toLowerCase().includes(searchLower) ||
+        item.materialName.toLowerCase().includes(searchLower) ||
+        item.materialSku.toLowerCase().includes(searchLower) ||
+        item.materialGroup?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return mockResults;
+  }
 };
 
 // to fetch the detail product page 

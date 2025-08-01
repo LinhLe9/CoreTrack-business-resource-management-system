@@ -1,6 +1,5 @@
 package org.example.coretrack.dto.product;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.Valid;
 import java.util.List;

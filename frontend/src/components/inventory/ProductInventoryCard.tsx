@@ -5,13 +5,13 @@ import {
   IconButton, useDisclosure, Checkbox 
 } from '@chakra-ui/react';
 import { AddIcon, MinusIcon } from '@chakra-ui/icons';
-import { SearchProductInventoryResponse } from '../../types/productInventory';
+import { SearchInventoryResponse } from '../../types/productInventory';
 import NextLink from 'next/link';
 import { formatBigDecimal } from '../../lib/utils';
 import StockTransactionModal from './StockTransactionModal';
 
 interface ProductInventoryCardProps {
-  productInventory: SearchProductInventoryResponse;
+  productInventory: SearchInventoryResponse;
   onStockUpdate?: () => void;
   isSelectionMode?: boolean;
   isSelected?: boolean;
@@ -80,8 +80,8 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
       >
 
 
-        <Flex gap={4} align="stretch" direction={{ base: "column", lg: "row" }}>
-          {/* Selection Checkbox - Left side, centered vertically */}
+        <Flex gap={4} align="stretch" direction={{ base: "row", lg: "row" }}>
+          {/* Column 1: Selection Checkbox */}
           {isSelectionMode && (
             <Box display="flex" alignItems="center" justifyContent="center" flexShrink={0}>
               <Checkbox
@@ -93,13 +93,13 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
             </Box>
           )}
 
-          {/* Column 1: Image */}
+          {/* Column 2: Image */}
           <Box flexShrink={0} alignSelf={{ base: "center", lg: "flex-start" }}>
             {productInventory.imageUrl ? (
               <Image
                 src={productInventory.imageUrl}
                 alt={productInventory.name}
-                boxSize={{ base: "120px", lg: "100px" }}
+                boxSize={{ base: "80px", lg: "100px" }}
                 objectFit="cover"
                 borderRadius="md"
                 fallbackSrc="/default-product.jpg"
@@ -108,7 +108,7 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
               />
             ) : (
               <Box
-                boxSize={{ base: "120px", lg: "100px" }}
+                boxSize={{ base: "80px", lg: "100px" }}
                 bg="gray.100"
                 borderRadius="md"
                 display="flex"
@@ -122,7 +122,7 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
             )}
           </Box>
 
-          {/* Column 2: Information */}
+          {/* Column 3: Information */}
           <Box flex={1} minW={0}>
             <VStack align="stretch" spacing={1}>
               {/* Product Name - Large font */}
@@ -136,7 +136,7 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
               </Text>
 
               {/* Product Group Tag */}
-              {productInventory.groupProduct && (
+              {productInventory.group && (
                 <Tag 
                   size="sm" 
                   variant="outline" 
@@ -146,7 +146,7 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
                   bg="transparent"
                   borderColor="gray.300"
                 >
-                  <TagLabel>{productInventory.groupProduct}</TagLabel>
+                  <TagLabel>{productInventory.group}</TagLabel>
                 </Tag>
               )}
 
@@ -182,7 +182,7 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
             </VStack>
           </Box>
 
-          {/* Column 3: Action Buttons */}
+          {/* Column 4: Action Buttons - Vertical layout */}
           {!isSelectionMode && (
             <Box flexShrink={0} display="flex" flexDirection="column" gap={2} alignSelf={{ base: "center", lg: "flex-start" }}>
               <IconButton

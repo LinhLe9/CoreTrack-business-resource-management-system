@@ -4,17 +4,17 @@ import java.util.List;
 
 public class TransactionEnumsResponse {
     private List<InventoryEnumsResponse.EnumValue> inventoryTransactionTypes;
-    private List<InventoryEnumsResponse.EnumValue> productInventoryReferenceDocumentTypes;
-    private List<InventoryEnumsResponse.EnumValue> productInventoryTransactionSourceTypes;
+    private List<InventoryEnumsResponse.EnumValue> inventoryReferenceDocumentTypes;
+    private List<InventoryEnumsResponse.EnumValue> inventoryTransactionSourceTypes;
 
     public TransactionEnumsResponse() {}
 
     public TransactionEnumsResponse(List<InventoryEnumsResponse.EnumValue> inventoryTransactionTypes,
-            List<InventoryEnumsResponse.EnumValue> productInventoryReferenceDocumentTypes,
-            List<InventoryEnumsResponse.EnumValue> productInventoryTransactionSourceTypes) {
+            List<InventoryEnumsResponse.EnumValue> inventoryReferenceDocumentTypes,
+            List<InventoryEnumsResponse.EnumValue> inventoryTransactionSourceTypes) {
         this.inventoryTransactionTypes = inventoryTransactionTypes;
-        this.productInventoryReferenceDocumentTypes = productInventoryReferenceDocumentTypes;
-        this.productInventoryTransactionSourceTypes = productInventoryTransactionSourceTypes;
+        this.inventoryReferenceDocumentTypes = inventoryReferenceDocumentTypes;
+        this.inventoryTransactionSourceTypes = inventoryTransactionSourceTypes;
     }
 
     public List<InventoryEnumsResponse.EnumValue> getInventoryTransactionTypes() {
@@ -25,19 +25,19 @@ public class TransactionEnumsResponse {
         this.inventoryTransactionTypes = inventoryTransactionTypes;
     }
 
-    public List<InventoryEnumsResponse.EnumValue> getProductInventoryReferenceDocumentTypes() {
-        return productInventoryReferenceDocumentTypes;
+    public List<InventoryEnumsResponse.EnumValue> getInventoryReferenceDocumentTypes() {
+        return inventoryReferenceDocumentTypes;
     }
 
-    public void setProductInventoryReferenceDocumentTypes(List<InventoryEnumsResponse.EnumValue> productInventoryReferenceDocumentTypes) {
-        this.productInventoryReferenceDocumentTypes = productInventoryReferenceDocumentTypes;
+    public void setInventoryReferenceDocumentTypes(List<InventoryEnumsResponse.EnumValue> inventoryReferenceDocumentTypes) {
+        this.inventoryReferenceDocumentTypes = inventoryReferenceDocumentTypes;
     }
 
-    public List<InventoryEnumsResponse.EnumValue> getProductInventoryTransactionSourceTypes() {
-        return productInventoryTransactionSourceTypes;
+    public List<InventoryEnumsResponse.EnumValue> getInventoryTransactionSourceTypes() {
+        return inventoryTransactionSourceTypes;
     }
 
-    public void setProductInventoryTransactionSourceTypes(List<InventoryEnumsResponse.EnumValue> productInventoryTransactionSourceTypes) {
-        this.productInventoryTransactionSourceTypes = productInventoryTransactionSourceTypes;
+    public void setInventoryTransactionSourceTypes(List<InventoryEnumsResponse.EnumValue> inventoryTransactionSourceTypes) {
+        this.inventoryTransactionSourceTypes = inventoryTransactionSourceTypes;
     }
 } 

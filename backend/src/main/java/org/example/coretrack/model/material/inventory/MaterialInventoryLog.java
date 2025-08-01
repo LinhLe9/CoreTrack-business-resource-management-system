@@ -33,6 +33,12 @@ public class MaterialInventoryLog {
     @Column(precision = 10, scale = 4, nullable = false) 
     private BigDecimal quantity;
 
+    @Column(precision = 10, scale = 4, nullable = false)
+    private BigDecimal beforeQuantity;
+
+    @Column(precision = 10, scale = 4, nullable = false)
+    private BigDecimal afterQuantity;
+    
     @Column(columnDefinition = "TEXT")
     private String note;
 
@@ -60,13 +66,15 @@ public class MaterialInventoryLog {
 
     public MaterialInventoryLog(LocalDateTime transactionTimestamp, MaterialInventory materialInventory,
                                 InventoryTransactionType transactionType, materialInventoryTransactionSourceType transactionSourceType,
-                                BigDecimal quantity, String note,
+                                BigDecimal quantity, BigDecimal beforeQuantity, BigDecimal afterQuantity, String note,
                                 materialInventoryReferenceDocumentType referenceDocumentType, Long referenceDocumentId, User createdBy) {
         this.transactionTimestamp = transactionTimestamp;
         this.materialInventory = materialInventory;
         this.transactionType = transactionType;
         this.transactionSourceType = transactionSourceType;
         this.quantity = quantity;
+        this.beforeQuantity = beforeQuantity;
+        this.afterQuantity = afterQuantity;
         this.note = note;
         this.referenceDocumentType = referenceDocumentType;
         this.referenceDocumentId = referenceDocumentId;
@@ -178,5 +186,21 @@ public class MaterialInventoryLog {
 
     public void setUpdatedBy(User updatedBy) {
         this.updatedBy = updatedBy;
+    }
+
+    public BigDecimal getBeforeQuantity() {
+        return beforeQuantity;
+    }
+
+    public void setBeforeQuantity(BigDecimal beforeQuantity) {
+        this.beforeQuantity = beforeQuantity;
+    }
+
+    public BigDecimal getAfterQuantity() {
+        return afterQuantity;
+    }
+
+    public void setAfterQuantity(BigDecimal afterQuantity) {
+        this.afterQuantity = afterQuantity;
     }
 }

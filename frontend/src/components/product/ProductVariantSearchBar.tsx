@@ -31,6 +31,7 @@ const ProductVariantSearchBar: React.FC<SearchBarProps> = ({
   productVariantsForAutocomplete,
 }) => {
   const [selectedOption, setSelectedOption] = useState<OptionType | null>(null);
+  const [inputValue, setInputValue] = useState('');
 
   const options: OptionType[] = productVariantsForAutocomplete.map((variant) => ({
     value: variant.variantId,
@@ -52,9 +53,18 @@ const ProductVariantSearchBar: React.FC<SearchBarProps> = ({
     }
   };
 
+  const handleInputChange = (newValue: string) => {
+    setInputValue(newValue);
+    if (newValue.length >= 2) {
+      onSearch(newValue);
+    }
+  };
+
   const handleSearch = () => {
     if (selectedOption) {
       onSearch(selectedOption.label);
+    } else if (inputValue) {
+      onSearch(inputValue);
     }
   };
 
@@ -87,6 +97,8 @@ const ProductVariantSearchBar: React.FC<SearchBarProps> = ({
           onChange={handleChange}
           value={selectedOption}
           isClearable
+          isSearchable
+          menuIsOpen={productVariantsForAutocomplete.length > 0}
           components={{ SingleValue: customSingleValue, Option: customOption }}
           filterOption={(option, inputValue) => {
             const nameMatch = option.label.toLowerCase().includes(inputValue.toLowerCase());
@@ -97,6 +109,7 @@ const ProductVariantSearchBar: React.FC<SearchBarProps> = ({
 
             return nameMatch || productSkuMatch || variantSkuMatch || variantNameMatch || groupMatch;
           }}
+          onInputChange={handleInputChange}
         />
       </Box>
       <Button colorScheme="blue" onClick={handleSearch}>Search</Button>

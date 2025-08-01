@@ -144,7 +144,7 @@ const ProductDetailPage = () => {
 
 const mapProductResponse = (data: any): ProductDetailResponse => ({
   ...data,
-  group: typeof data.groupProduct === 'object' && data.groupProduct !== null ? data.groupProduct.name : data.groupProduct,
+  group: typeof data.group === 'object' && data.group !== null ? data.group.name : data.group,
   variants: data.variantInventory,
   status: data.status || '',
 });

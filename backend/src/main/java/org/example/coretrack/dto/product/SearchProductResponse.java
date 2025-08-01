@@ -8,7 +8,7 @@ public class SearchProductResponse {
     private String sku;
     private String name;
     private String description;
-    private String groupProduct;
+    private String group;
     private String status; 
     private BigDecimal price;
     private String imageUrl;
@@ -16,12 +16,12 @@ public class SearchProductResponse {
     // Constructors
     public SearchProductResponse() {}
 
-    public SearchProductResponse(Long id, String sku, String name, String description, String groupProduct, String status, BigDecimal price, String imageUrl) {
+    public SearchProductResponse(Long id, String sku, String name, String description, String group, String status, BigDecimal price, String imageUrl) {
         this.id = id;
         this.sku = sku;
         this.name = name;
         this.description = description;
-        this.groupProduct = groupProduct;
+        this.group = group;
         this.status = status;
         this.price = price;
         this.imageUrl = imageUrl;
@@ -33,7 +33,7 @@ public class SearchProductResponse {
         this.sku = product.getSku();
         this.name = product.getName();
         this.description = product.getDescription();
-        this.groupProduct = (product.getGroup() != null) ? product.getGroup().getName() : null;
+        this.group = (product.getGroup() != null) ? product.getGroup().getName() : null;
         this.status = (product.getStatus() != null) ? product.getStatus().name(): null;
         this.price = product.getPrice();
         this.imageUrl = product.getImageUrl();
@@ -71,12 +71,12 @@ public class SearchProductResponse {
         this.description = description;
     }
 
-    public String getGroupProduct() {
-        return groupProduct;
+    public String getGroup() {
+        return group;
     }
 
-    public void setGroupProduct(String groupProduct) {
-        this.groupProduct = groupProduct;
+    public void setGroup(String group) {
+        this.group = group;
     }
 
     public String getStatus() {
@@ -102,7 +102,4 @@ public class SearchProductResponse {
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
     }
-
-    // Getters and Setters
-    
 }

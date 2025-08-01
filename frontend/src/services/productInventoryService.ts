@@ -14,7 +14,7 @@ import {
   EnumValue,
   InventoryEnumsResponse,
   TransactionEnumsResponse,
-  AllSearchProductInventoryResponse
+  AllSearchInventoryResponse
 } from '../types/productInventory';
 
 export const createProductInventory = async (
@@ -187,7 +187,7 @@ export const getProductInventoryFilter = async (params: any): Promise<any> => {
   return response.data;
 };
 
-export const getAllProductInventoryForAutocomplete = async (search?: string): Promise<AllSearchProductInventoryResponse[]> => {
+export const getAllProductInventoryForAutocomplete = async (search?: string): Promise<AllSearchInventoryResponse[]> => {
   const params = search ? `?search=${encodeURIComponent(search)}` : '';
   const response = await apiClient.get(`/product-inventory/autocomplete${params}`);
   return response.data;

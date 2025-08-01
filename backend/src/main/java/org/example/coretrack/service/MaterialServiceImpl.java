@@ -10,6 +10,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.Map;
 
 import org.example.coretrack.dto.material.AddMaterialRequest;
 import org.example.coretrack.dto.material.AddMaterialResponse;
@@ -26,6 +27,8 @@ import org.example.coretrack.dto.material.ChangeMaterialStatusRequest;
 import org.example.coretrack.dto.material.ChangeMaterialStatusResponse;
 import org.example.coretrack.dto.material.MaterialStatusTransitionResponse;
 import org.example.coretrack.dto.product.InventoryResponse;
+import org.example.coretrack.dto.material.MaterialVariantAutoCompleteResponse;
+import org.example.coretrack.dto.material.UpdateMaterialVariantRequest;
 import org.example.coretrack.model.auth.User;
 import org.example.coretrack.model.material.Material;
 import org.example.coretrack.model.material.MaterialGroup;
@@ -34,6 +37,7 @@ import org.example.coretrack.model.material.MaterialStatusAuditLog;
 import org.example.coretrack.model.material.MaterialVariant;
 import org.example.coretrack.model.material.UoM;
 import org.example.coretrack.model.supplier.MaterialSupplier;
+import org.example.coretrack.model.supplier.MaterialSupplierId;
 import org.example.coretrack.model.supplier.Supplier;
 import org.example.coretrack.repository.MaterialGroupRepository;
 import org.example.coretrack.repository.MaterialRepository;
@@ -41,6 +45,8 @@ import org.example.coretrack.repository.MaterialStatusAuditLogRepository;
 import org.example.coretrack.repository.MaterialSupplierRepository;
 import org.example.coretrack.repository.MaterialVariantRepository;
 import org.example.coretrack.repository.SupplierRepository;
+import org.example.coretrack.repository.MaterialInventoryRepository;
+import org.example.coretrack.repository.MaterialInventoryLogRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -74,6 +80,12 @@ public class MaterialServiceImpl implements MaterialService{
 
     @Autowired
     private MaterialStatusValidator materialStatusValidator;
+
+    @Autowired
+    private MaterialInventoryRepository materialInventoryRepository;
+
+    @Autowired
+    private MaterialInventoryLogRepository materialInventoryLogRepository;
 
     @Override
     @Transactional
@@ -197,7 +209,7 @@ public class MaterialServiceImpl implements MaterialService{
         // 4. Define Supplier(s) (Main Flow - Step 5)
         if (request.getSuppliers() != null && !request.getSuppliers().isEmpty()) {
             
-            // Material has suppliers
+            // Material has suppliers - now material has ID
             Set<MaterialSupplier> suppliers = request.getSuppliers().stream()
                 .map(supplierRequest -> {
                     Supplier supplier = supplierRepository.findById(supplierRequest.getSupplierId())
@@ -224,15 +236,24 @@ public class MaterialServiceImpl implements MaterialService{
                         supplierRequest.getCurrency(),
                         createdByUser
                     );
+                    
+                    // Set the ID manually since we have the IDs now
+                    materialSupplier.setId(new MaterialSupplierId(material.getId(), supplier.getId()));
+                    
                     System.out.println("Created MaterialSupplier: " + materialSupplier.getId() + 
                                      " for Material: " + material.getId() + 
                                      " and Supplier: " + supplier.getId());
                     return materialSupplier;
                 }).collect(Collectors.toSet());
 
-            material.setMaterialSuppliers(suppliers); // Set suppliers on the material (cascade save)
-             } // Save all suppliers via cascade
-        return mapProductToProductResponse(material) ; // Return the fully populated Product entity
+            // Save MaterialSupplier entities directly without affecting the material's collection
+            materialSupplierRepository.saveAll(suppliers);
+        }
+        
+        // Save the material entity to persist all relationships
+        materialRepository.save(material);
+        
+        return mapProductToProductResponse(material);
     }
 
     // --- Helper methods for SKU generation ---
@@ -249,25 +270,34 @@ public class MaterialServiceImpl implements MaterialService{
     }
 
     private String generateVariantSku(String baseMaterialSku, int variantIndex) {
-        // This is two layer to ensure that SKU of variant is unique in case 
-        // some error happen while a lot of modify/ delete happened
-        // Example: adding "-1", "-2" suffixes (Main Flow - Step 4)
+        // Ensure base SKU is not too long (max 12 chars for base material SKU)
+        if (baseMaterialSku.length() > 12) {
+            baseMaterialSku = baseMaterialSku.substring(0, 12);
+        }
+        
+        // Create variant SKU with sequential suffix (-1, -2, -3...)
         String suffix = "-" + variantIndex;
         String variantSku = baseMaterialSku + suffix;
+        
+        // If still too long, truncate
+        if (variantSku.length() > 16) {
+            variantSku = variantSku.substring(0, 16);
+        }
 
-        // Ensure uniqueness for variant SKU as well
-        String finalVariantSku;
+        // Ensure uniqueness for variant SKU
+        String finalVariantSku = variantSku;
         int attempt = 0;
-        Random random = new Random(); // Initialize Random for unique part
+        Random random = new Random();
+        
         do {
-            finalVariantSku = variantSku;
-            if (attempt > 0) { // Add a unique identifier if initial SKU is not unique
-                // Generate a 4-digit random number for unique part
-                String uniquePart = "-" + (1000 + random.nextInt(9000)); // Generates number between 1000 and 9999
-                finalVariantSku += uniquePart; // No length truncation here
+            if (attempt > 0) {
+                // Add a unique identifier if initial SKU is not unique
+                // Use shorter unique part to stay within 16 char limit
+                String uniquePart = "-" + (10 + random.nextInt(90)); // 2-digit number
+                finalVariantSku = variantSku.substring(0, Math.min(variantSku.length(), 13)) + uniquePart;
             }
             attempt++;
-        } while (materialVariantRepository.findBySku(finalVariantSku).isPresent());
+        } while (materialVariantRepository.findBySku(finalVariantSku).isPresent() && attempt < 10);
 
         return finalVariantSku;
     }
@@ -276,9 +306,12 @@ public class MaterialServiceImpl implements MaterialService{
         List<MaterialVariantResponse> variantResponses = material.getVariants() != null ?
                 material.getVariants().stream()
                         .map(variant -> new MaterialVariantResponse(variant)).toList() : List.of();
-        List<MaterialSupplierResponse> supplierResponses = material.getMaterialSuppliers() != null ?
-                material.getMaterialSuppliers().stream()
-                        .map(supplier -> new MaterialSupplierResponse(supplier)).toList() : List.of();
+        
+        List<MaterialSupplierResponse> supplierResponses = materialSupplierRepository.findByMaterial(material)
+                .stream()
+                .map(supplier -> new MaterialSupplierResponse(supplier))
+                .toList();
+        
         return new AddMaterialResponse(
                 material.getSku(),
                 material.getName(),
@@ -381,6 +414,30 @@ public class MaterialServiceImpl implements MaterialService{
     }
 
     @Override
+    public List<MaterialVariantAutoCompleteResponse> getAllMaterialVariantsForAutocomplete(String search) {
+        List<MaterialVariant> variants;
+        
+        if (search == null || search.trim().isEmpty()) {
+            // Return all active material variants when search is empty
+            variants = materialVariantRepository.findByIsActiveTrue();
+        } else {
+            // Search with keyword
+            variants = materialVariantRepository.findBySearchKeyword(search);
+        }
+        
+        return variants.stream()
+                .map(variant -> new MaterialVariantAutoCompleteResponse(
+                    variant.getId(),
+                    variant.getMaterial().getName(),
+                    variant.getMaterial().getSku(),
+                    variant.getSku(),
+                    variant.getName(),
+                    variant.getMaterial().getGroup() != null ? variant.getMaterial().getGroup().getName() : null
+                ))
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public Page<SearchMaterialResponse> findAllMaterials (Pageable pageable){
         Page<Material> materials = materialRepository.findAllActive(pageable);
         return materials.map(SearchMaterialResponse::new);
@@ -471,15 +528,71 @@ public class MaterialServiceImpl implements MaterialService{
         material.setGroup(materialGroup);
 
         // Handle Variants
-        if (request.getVariants() != null && !request.getVariants().isEmpty()) {
-            // Clear existing variants
-            material.getVariants().clear();
+        if (request.getVariants() != null) {
+            // Get existing variants
+            List<MaterialVariant> existingVariants = materialVariantRepository.findByMaterial(material);
+            System.out.println("Existing variants count: " + existingVariants.size());
+            System.out.println("Request variants count: " + request.getVariants().size());
             
-            // Add new variants
-            List<MaterialVariant> variants = request.getVariants().stream()
-                .map(variantRequest -> {
-                    MaterialVariant variant = new MaterialVariant(
-                        generateVariantSku(material.getSku(), material.getVariants().size() + 1),
+            // Create maps for easy lookup
+            Map<String, MaterialVariant> existingVariantsBySku = existingVariants.stream()
+                .collect(Collectors.toMap(MaterialVariant::getSku, variant -> variant));
+            
+            Map<String, UpdateMaterialVariantRequest> requestVariantsBySku = request.getVariants().stream()
+                .filter(v -> v.isExistingVariant())
+                .collect(Collectors.toMap(UpdateMaterialVariantRequest::getSku, variant -> variant));
+            
+            // 1. Delete variants that are not in the request (removed by user)
+            Set<String> existingSkus = existingVariantsBySku.keySet();
+            Set<String> requestSkus = requestVariantsBySku.keySet();
+            Set<String> skusToDelete = existingSkus.stream()
+                .filter(sku -> !requestSkus.contains(sku))
+                .collect(Collectors.toSet());
+            
+            for (String skuToDelete : skusToDelete) {
+                MaterialVariant variantToDelete = existingVariantsBySku.get(skuToDelete);
+                System.out.println("Deleting variant with SKU: " + skuToDelete);
+                
+                // Delete material_inventory_log first
+                materialInventoryLogRepository.deleteByMaterialInventory(
+                    materialInventoryRepository.findByMaterialVariant_Id(variantToDelete.getId()).orElse(null)
+                );
+                // Delete material_inventory
+                materialInventoryRepository.deleteByMaterialVariant(variantToDelete);
+                // Delete material_variant
+                materialVariantRepository.delete(variantToDelete);
+            }
+            
+            // 2. Update existing variants
+            for (UpdateMaterialVariantRequest variantRequest : request.getVariants()) {
+                if (variantRequest.isExistingVariant()) {
+                    MaterialVariant existingVariant = existingVariantsBySku.get(variantRequest.getSku());
+                    if (existingVariant != null) {
+                        System.out.println("Updating existing variant with SKU: " + variantRequest.getSku());
+                        existingVariant.setName(variantRequest.getName());
+                        existingVariant.setShortDes(variantRequest.getShortDescription());
+                        existingVariant.setImageUrl(variantRequest.getImageUrl());
+                        existingVariant.setUpdated_by(updatedByUser);
+                        existingVariant.setUpdatedAt(java.time.LocalDateTime.now());
+                        materialVariantRepository.save(existingVariant);
+                    }
+                }
+            }
+            
+            // 3. Create new variants
+            List<MaterialVariant> newVariants = new ArrayList<>();
+            int newVariantIndex = existingVariants.size() + 1;
+            
+            for (UpdateMaterialVariantRequest variantRequest : request.getVariants()) {
+                if (variantRequest.isNewVariant()) {
+                    System.out.println("Creating new variant: " + variantRequest.getName());
+                    
+                    // Generate SKU for new variant
+                    String sku = generateVariantSku(material.getSku(), newVariantIndex);
+                    System.out.println("Generated SKU for new variant: " + sku);
+                    
+                    MaterialVariant newVariant = new MaterialVariant(
+                        sku,
                         variantRequest.getName(),
                         variantRequest.getShortDescription(),
                         material.getUom(),
@@ -487,16 +600,22 @@ public class MaterialServiceImpl implements MaterialService{
                         material,
                         updatedByUser
                     );
-                    return variant;
-                }).collect(Collectors.toList());
+                    newVariants.add(newVariant);
+                    newVariantIndex++;
+                }
+            }
             
-            material.setVariants(variants);
+            // Save new variants
+            if (!newVariants.isEmpty()) {
+                materialVariantRepository.saveAll(newVariants);
+            }
         }
 
         // Handle Suppliers
         if (request.getSuppliers() != null && !request.getSuppliers().isEmpty()) {
-            // Clear existing suppliers
-            material.getMaterialSuppliers().clear();
+            // Clear existing suppliers from database
+            List<MaterialSupplier> existingSuppliers = materialSupplierRepository.findByMaterial(material);
+            materialSupplierRepository.deleteAll(existingSuppliers);
             
             // Add new suppliers
             Set<MaterialSupplier> suppliers = request.getSuppliers().stream()
@@ -512,6 +631,9 @@ public class MaterialServiceImpl implements MaterialService{
                         updatedByUser
                     );
                     
+                    // Set the ID manually
+                    materialSupplier.setId(new MaterialSupplierId(material.getId(), supplier.getId()));
+                    
                     // Set optional fields
                     if (supplierRequest.getLeadTimeDays() != null) {
                         materialSupplier.setLeadTimeDays(supplierRequest.getLeadTimeDays());
@@ -526,7 +648,8 @@ public class MaterialServiceImpl implements MaterialService{
                     return materialSupplier;
                 }).collect(Collectors.toSet());
             
-            material.setMaterialSuppliers(suppliers);
+            // Save suppliers directly
+            materialSupplierRepository.saveAll(suppliers);
         }
 
         // Save the updated material
@@ -541,9 +664,11 @@ public class MaterialServiceImpl implements MaterialService{
                 material.getVariants().stream()
                         .map(variant -> new MaterialVariantResponse(variant)).toList() : List.of();
         
-        List<MaterialSupplierResponse> supplierResponses = material.getMaterialSuppliers() != null ?
-                material.getMaterialSuppliers().stream()
-                        .map(supplier -> new MaterialSupplierResponse(supplier)).toList() : List.of();
+        // Fetch suppliers from database instead of relying on material's collection
+        List<MaterialSupplierResponse> supplierResponses = materialSupplierRepository.findByMaterial(material)
+                .stream()
+                .map(supplier -> new MaterialSupplierResponse(supplier))
+                .toList();
         
         return new UpdateMaterialResponse(
                 material.getSku(),

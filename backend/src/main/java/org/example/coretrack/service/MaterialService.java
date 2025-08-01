@@ -13,6 +13,7 @@ import org.example.coretrack.dto.material.UpdateMaterialResponse;
 import org.example.coretrack.dto.material.ChangeMaterialStatusRequest;
 import org.example.coretrack.dto.material.ChangeMaterialStatusResponse;
 import org.example.coretrack.dto.material.MaterialStatusTransitionResponse;
+import org.example.coretrack.dto.material.MaterialVariantAutoCompleteResponse;
 import org.example.coretrack.model.auth.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,6 +28,9 @@ public interface MaterialService {
 
     // to return all products matching with search
     List<AllMaterialSearchResponse> getAllMaterialsForAutocomplete(String search);
+    
+    // to return all material variants for autocomplete
+    List<MaterialVariantAutoCompleteResponse> getAllMaterialVariantsForAutocomplete(String search);
     
     // to return all product
     Page<SearchMaterialResponse> findAllMaterials (Pageable pageable);

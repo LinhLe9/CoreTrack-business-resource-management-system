@@ -1,7 +1,7 @@
 // services/productService.ts
 import apiClient from '../lib/axios';
 import { PageResponse } from '../types/PageResponse';
-import { Product, ProductDetailResponse, ProductQueryParams, ProductAutoComplete, ProductVariantAutoComplete } from '../types/product';
+import { Product, ProductDetailResponse, ProductQueryParams, ProductAutoComplete, ProductVariantAutoComplete, BOMItemResponse } from '../types/product';
 import qs from 'qs'; 
 
 
@@ -82,6 +82,16 @@ export const changeProductStatus = async (productId: number, newStatus: string, 
       newStatus,
       reason
     });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// to get BOM items for a specific product variant
+export const getBomItem = async (productId: number, variantId: number): Promise<BOMItemResponse[]> => {
+  try {
+    const response = await apiClient.get<BOMItemResponse[]>(`/products/${productId}/variant/${variantId}`);
     return response.data;
   } catch (error) {
     throw error;

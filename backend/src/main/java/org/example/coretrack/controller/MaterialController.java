@@ -14,6 +14,7 @@ import org.example.coretrack.dto.material.ChangeMaterialStatusRequest;
 import org.example.coretrack.dto.material.ChangeMaterialStatusResponse;
 import org.example.coretrack.dto.material.MaterialStatusTransitionResponse;
 import org.example.coretrack.dto.material.UoMResponse;
+import org.example.coretrack.dto.material.MaterialVariantAutoCompleteResponse;
 import org.example.coretrack.model.auth.User;
 import org.example.coretrack.model.material.UoM;
 import org.example.coretrack.repository.UserRepository;
@@ -149,16 +150,15 @@ public class MaterialController {
     @GetMapping("/all")
     public ResponseEntity<List<AllMaterialSearchResponse>> getMaterials(
             @RequestParam(required = false) String search) { 
-
-        // Validation E1: Invalid Search Keyword/Format
-        if (search != null && search.length() > 255) { // maximum 255 characters
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
-        }
-
         List<AllMaterialSearchResponse> materials = materialService.getAllMaterialsForAutocomplete(search);
-
-        // A2: No matching results - frontend solves
         return ResponseEntity.ok(materials);
+    }
+
+    @GetMapping("/variants/autocomplete")
+    public ResponseEntity<List<MaterialVariantAutoCompleteResponse>> getAllMaterialVariantsForAutocomplete(
+            @RequestParam(required = false) String search) { 
+        List<MaterialVariantAutoCompleteResponse> variants = materialService.getAllMaterialVariantsForAutocomplete(search);
+        return ResponseEntity.ok(variants);
     }
 
     /**

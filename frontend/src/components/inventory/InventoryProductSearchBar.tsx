@@ -7,13 +7,13 @@ import {
   Button,
   Flex,
 } from '@chakra-ui/react';
-import { AllSearchProductInventoryResponse } from '../../types/productInventory';
+import { AllSearchInventoryResponse } from '../../types/productInventory';
 
 interface SearchBarProps {
   onSearch: (searchTerm: string) => void;
   onSelectProductInventory?: (variantId: number) => void;
   initialSearchTerm?: string;
-  productInventoryForAutocomplete: AllSearchProductInventoryResponse[];
+  productInventoryForAutocomplete: AllSearchInventoryResponse[];
   onSearchInputChange?: (inputValue: string) => void;
 }
 

@@ -1,22 +1,20 @@
 package org.example.coretrack.dto.product.inventory;
 
 import java.util.List;
-import java.util.Map;
-
 public class InventoryEnumsResponse {
     private List<EnumValue> inventoryStatuses;
     private List<EnumValue> inventoryTransactionTypes;
-    private List<EnumValue> productInventoryReferenceDocumentTypes;
-    private List<EnumValue> productInventoryTransactionSourceTypes;
+    private List<EnumValue> inventoryReferenceDocumentTypes;
+    private List<EnumValue> inventoryTransactionSourceTypes;
 
     public InventoryEnumsResponse() {}
 
     public InventoryEnumsResponse(List<EnumValue> inventoryStatuses, List<EnumValue> inventoryTransactionTypes,
-            List<EnumValue> productInventoryReferenceDocumentTypes, List<EnumValue> productInventoryTransactionSourceTypes) {
+            List<EnumValue> inventoryReferenceDocumentTypes, List<EnumValue> inventoryTransactionSourceTypes) {
         this.inventoryStatuses = inventoryStatuses;
         this.inventoryTransactionTypes = inventoryTransactionTypes;
-        this.productInventoryReferenceDocumentTypes = productInventoryReferenceDocumentTypes;
-        this.productInventoryTransactionSourceTypes = productInventoryTransactionSourceTypes;
+        this.inventoryReferenceDocumentTypes = inventoryReferenceDocumentTypes;
+        this.inventoryTransactionSourceTypes = inventoryTransactionSourceTypes;
     }
 
     public List<EnumValue> getInventoryStatuses() {
@@ -35,20 +33,20 @@ public class InventoryEnumsResponse {
         this.inventoryTransactionTypes = inventoryTransactionTypes;
     }
 
-    public List<EnumValue> getProductInventoryReferenceDocumentTypes() {
-        return productInventoryReferenceDocumentTypes;
+    public List<EnumValue> getInventoryReferenceDocumentTypes() {
+        return inventoryReferenceDocumentTypes;
     }
 
-    public void setProductInventoryReferenceDocumentTypes(List<EnumValue> productInventoryReferenceDocumentTypes) {
-        this.productInventoryReferenceDocumentTypes = productInventoryReferenceDocumentTypes;
+    public void setInventoryReferenceDocumentTypes(List<EnumValue> inventoryReferenceDocumentTypes) {
+        this.inventoryReferenceDocumentTypes = inventoryReferenceDocumentTypes;
     }
 
-    public List<EnumValue> getProductInventoryTransactionSourceTypes() {
-        return productInventoryTransactionSourceTypes;
+    public List<EnumValue> getInventoryTransactionSourceTypes() {
+        return inventoryTransactionSourceTypes;
     }
 
-    public void setProductInventoryTransactionSourceTypes(List<EnumValue> productInventoryTransactionSourceTypes) {
-        this.productInventoryTransactionSourceTypes = productInventoryTransactionSourceTypes;
+    public void setInventoryTransactionSourceTypes(List<EnumValue> inventoryTransactionSourceTypes) {
+        this.inventoryTransactionSourceTypes = inventoryTransactionSourceTypes;
     }
 
     public static class EnumValue {

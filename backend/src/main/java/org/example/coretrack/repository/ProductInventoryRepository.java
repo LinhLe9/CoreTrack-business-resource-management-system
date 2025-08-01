@@ -3,8 +3,8 @@ package org.example.coretrack.repository;
 import java.util.List;
 import java.util.Optional;
 
-import org.example.coretrack.dto.product.inventory.AllSearchProductInventoryResponse;
-import org.example.coretrack.dto.product.inventory.SearchProductInventoryResponse;
+import org.example.coretrack.dto.product.inventory.AllSearchInventoryResponse;
+import org.example.coretrack.dto.product.inventory.SearchInventoryResponse;
 import org.example.coretrack.model.product.inventory.InventoryStatus;
 import org.example.coretrack.model.product.inventory.ProductInventory;
 import org.springframework.data.domain.Page;
@@ -17,7 +17,7 @@ public interface ProductInventoryRepository extends JpaRepository<ProductInvento
     Optional<ProductInventory> findByProductVariant_Id(Long variantId);
 
     @Query("""
-    SELECT new org.example.coretrack.dto.product.inventory.SearchProductInventoryResponse(
+    SELECT new org.example.coretrack.dto.product.inventory.SearchInventoryResponse(
         pv.id,
         pv.sku,
         pv.name,
@@ -40,7 +40,7 @@ public interface ProductInventoryRepository extends JpaRepository<ProductInvento
       AND p.status <> org.example.coretrack.model.product.ProductStatus.DELETED
       AND p.isActive = true
     """)
-    Page<SearchProductInventoryResponse> searchInventoryByCriteria(
+    Page<SearchInventoryResponse> searchInventoryByCriteria(
         @Param("search") String search,
         @Param("groupProducts") List<Long> groupProducts,
         @Param("inventoryStatus") List<InventoryStatus> inventoryStatus,
@@ -48,7 +48,7 @@ public interface ProductInventoryRepository extends JpaRepository<ProductInvento
     );
 
     @Query("""
-    SELECT new org.example.coretrack.dto.product.inventory.AllSearchProductInventoryResponse(
+    SELECT new org.example.coretrack.dto.product.inventory.AllSearchInventoryResponse(
         pv.id,
         pv.sku,
         pv.name,
@@ -66,7 +66,7 @@ public interface ProductInventoryRepository extends JpaRepository<ProductInvento
       AND p.status <> org.example.coretrack.model.product.ProductStatus.DELETED
       AND p.isActive = true
     """)
-    List<AllSearchProductInventoryResponse> searchInventory(
+    List<AllSearchInventoryResponse> searchInventory(
         @Param("search") String search
     );
 }

@@ -238,7 +238,7 @@ const BulkStockTransactionModal: React.FC<BulkStockTransactionModalProps> = ({
                   placeholder="Select reference type"
                   isDisabled={enumsLoading}
                 >
-                  {transactionEnums?.productInventoryReferenceDocumentTypes?.map((type) => (
+                  {transactionEnums?.inventoryReferenceDocumentTypes?.map((type: any) => (
                     <option key={type.value} value={type.value}>
                       {type.displayName}
                     </option>
@@ -265,7 +265,7 @@ const BulkStockTransactionModal: React.FC<BulkStockTransactionModalProps> = ({
                 placeholder="Select transaction source"
                 isDisabled={enumsLoading}
               >
-                {transactionEnums?.productInventoryTransactionSourceTypes?.map((type) => (
+                {transactionEnums?.inventoryTransactionSourceTypes?.map((type: any) => (
                   <option key={type.value} value={type.value}>
                     {type.displayName}
                   </option>

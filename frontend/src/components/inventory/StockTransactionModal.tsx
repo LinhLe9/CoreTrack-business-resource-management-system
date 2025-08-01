@@ -206,7 +206,7 @@ const StockTransactionModal: React.FC<StockTransactionModalProps> = ({
                   placeholder="Select source"
                   isDisabled={enumsLoading}
                 >
-                  {transactionEnums?.productInventoryTransactionSourceTypes?.map((source) => (
+                  {transactionEnums?.inventoryTransactionSourceTypes?.map((source: any) => (
                     <option key={source.value} value={source.value}>
                       {source.displayName}
                     </option>
@@ -224,7 +224,7 @@ const StockTransactionModal: React.FC<StockTransactionModalProps> = ({
                   placeholder="Select reference type"
                   isDisabled={enumsLoading}
                 >
-                  {transactionEnums?.productInventoryReferenceDocumentTypes?.map((refType) => (
+                  {transactionEnums?.inventoryReferenceDocumentTypes?.map((refType: any) => (
                     <option key={refType.value} value={refType.value}>
                       {refType.displayName}
                     </option>

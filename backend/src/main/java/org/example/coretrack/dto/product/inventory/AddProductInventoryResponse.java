@@ -21,6 +21,8 @@ public class AddProductInventoryResponse {
         this.minAlertStock = minAlertStock;
         this.maxStockLevel = maxStockLevel;
         this.productStatus = productStatus;
+
+        
         this.inventoryStatus = inventoryStatus;
     }
 

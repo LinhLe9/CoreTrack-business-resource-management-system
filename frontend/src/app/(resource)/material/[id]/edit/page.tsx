@@ -97,7 +97,7 @@ const EditMaterialPage: React.FC = () => {
   // Fetch material data
   useEffect(() => {
     const fetchMaterial = async () => {
-      if (!id) return;
+      if (!id || allGroups.length === 0) return;
       
       try {
         setIsLoading(true);
@@ -110,9 +110,11 @@ const EditMaterialPage: React.FC = () => {
           sku: materialData.sku,
           uom: materialData.uom || '',
           imageUrl: materialData.imageUrl || '',
-          materialGroupId: '',
+          materialGroupId: allGroups.find(g => g.name === materialData.groupMaterial)?.id?.toString() || '',
           newMaterialGroupName: '',
           variants: materialData.variants?.map(v => ({
+            id: v.materialVariantResponse.id,
+            sku: v.materialVariantResponse.sku,
             name: v.materialVariantResponse.name,
             shortDescription: v.materialVariantResponse.shortDescription,
             imageUrl: v.materialVariantResponse.imageUrl
@@ -141,7 +143,7 @@ const EditMaterialPage: React.FC = () => {
     };
 
     fetchMaterial();
-  }, [id, toast]);
+  }, [id, allGroups, toast]);
 
   // Fetch all suppliers for autocomplete
   useEffect(() => {
@@ -285,6 +287,8 @@ const EditMaterialPage: React.FC = () => {
     setForm(prev => ({
       ...prev,
       variants: [...prev.variants, {
+        id: undefined,
+        sku: undefined, // null for new variants
         name: '',
         shortDescription: '',
         imageUrl: ''
@@ -351,6 +355,8 @@ const EditMaterialPage: React.FC = () => {
         materialGroupId: form.materialGroupId || null,
         newMaterialGroupName: form.newMaterialGroupName || null,
         variants: form.variants.map(variant => ({
+          id: variant.id,
+          sku: variant.sku, // null for new variants, existing SKU for updates
           name: variant.name,
           shortDescription: variant.shortDescription,
           imageUrl: variant.imageUrl

@@ -57,9 +57,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             </Text>
           )}
           <Flex justify="space-between" align="center" width="full" mt={2}>
-            {product.groupProduct && (
+            {product.group && (
               <Tag size="sm" colorScheme="purple" borderRadius="full">
-                <TagLabel>{product.groupProduct}</TagLabel>
+                <TagLabel>{product.group}</TagLabel>
               </Tag>
             )}
             <Tag size="sm" colorScheme={getStatusColor(product.status)} borderRadius="full">

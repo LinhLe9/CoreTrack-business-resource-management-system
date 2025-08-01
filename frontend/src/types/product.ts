@@ -3,7 +3,7 @@ export interface Product {
     sku: string;
     name: string;
     shortDescription?: string; 
-    groupProduct: string; 
+    group: string; 
     status: 'Active' | 'Inactive' | 'Discontinued' | 'Deleted'; 
     price: number;
     imageUrl?: string; 
@@ -38,7 +38,7 @@ export interface ProductVariantInfoResponse {
 
 export interface BOMItemResponse {
   id: number;
-  materialId: number;
+  materialSku: string; // Changed from materialId to materialSku to match backend
   materialName: string;
   quantity: string; // BigDecimal from backend
   uom: string;

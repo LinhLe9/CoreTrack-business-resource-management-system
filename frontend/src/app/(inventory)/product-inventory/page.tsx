@@ -26,15 +26,15 @@ import InventoryProductFilters from '../../../components/inventory/InventoryProd
 import ProductInventoryCard from '../../../components/inventory/ProductInventoryCard';
 import BulkStockTransactionModal from '../../../components/inventory/BulkStockTransactionModal';
 import { getProductInventoryFilter, getAllProductInventoryForAutocomplete } from '../../../services/productInventoryService';
-import { SearchProductInventoryResponse, ProductInventoryAutoComplete, ProductInventoryQueryParams, ProductInventoryFilterParams, AllSearchProductInventoryResponse } from '../../../types/productInventory';
+import { SearchInventoryResponse, ProductInventoryAutoComplete, ProductInventoryQueryParams, ProductInventoryFilterParams, AllSearchInventoryResponse } from '../../../types/productInventory';
 import { PageResponse } from '../../../types/PageResponse';
 
 const ProductInventoryPage: React.FC = () => {
-  const [pageData, setPageData] = useState<PageResponse<SearchProductInventoryResponse> | null>(null);
+  const [pageData, setPageData] = useState<PageResponse<SearchInventoryResponse> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [queryParams, setQueryParams] = useState<ProductInventoryQueryParams>({});
-  const [allProductInventoryForAutocomplete, setAllProductInventoryForAutocomplete] = useState<AllSearchProductInventoryResponse[]>([]);
+  const [allProductInventoryForAutocomplete, setAllProductInventoryForAutocomplete] = useState<AllSearchInventoryResponse[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   
   // Bulk operations state

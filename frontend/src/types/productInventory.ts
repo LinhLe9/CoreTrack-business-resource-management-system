@@ -1,8 +1,8 @@
-export interface SearchProductInventoryResponse {
+export interface SearchInventoryResponse {
   id: number;
   sku: string;
   name: string;
-  groupProduct: string;
+  group: string;
   inventoryStatus: string; // Will be enum value from backend
   currentStock: string; // BigDecimal as string
   minAlertStock: string; // BigDecimal as string
@@ -18,7 +18,7 @@ export interface ProductInventoryAutoComplete {
   variantName: string;
 }
 
-export interface AllSearchProductInventoryResponse {
+export interface AllSearchInventoryResponse {
   id: number;
   sku: string;
   name: string;
@@ -103,14 +103,14 @@ export interface EnumValue {
 export interface InventoryEnumsResponse {
   inventoryStatuses: EnumValue[];
   inventoryTransactionTypes: EnumValue[];
-  productInventoryReferenceDocumentTypes: EnumValue[];
-  productInventoryTransactionSourceTypes: EnumValue[];
+  inventoryReferenceDocumentTypes: EnumValue[];
+  inventoryTransactionSourceTypes: EnumValue[];
 }
 
 export interface TransactionEnumsResponse {
   inventoryTransactionTypes: EnumValue[];
-  productInventoryReferenceDocumentTypes: EnumValue[];
-  productInventoryTransactionSourceTypes: EnumValue[];
+  inventoryReferenceDocumentTypes: EnumValue[];
+  inventoryTransactionSourceTypes: EnumValue[];
 }
 
 export interface AddProductInventoryRequest {

@@ -3,23 +3,23 @@ package org.example.coretrack.dto.product.inventory;
 import java.math.BigDecimal;
 import org.example.coretrack.model.product.inventory.InventoryStatus;
 
-public class SearchProductInventoryResponse {
+public class SearchInventoryResponse {
     private Long id;
     private String sku;
     private String name;
-    private String groupProduct;
+    private String group;
     private InventoryStatus inventoryStatus; 
     private BigDecimal currentStock;
     private BigDecimal minAlertStock;
     private BigDecimal maxStockLevel;
     private String imageUrl;
 
-    public SearchProductInventoryResponse(Long id, String sku, String name, String groupProduct, InventoryStatus inventoryStatus,
+    public SearchInventoryResponse(Long id, String sku, String name, String group, InventoryStatus inventoryStatus,
             BigDecimal currentStock, BigDecimal minAlertStock, BigDecimal maxStockLevel, String imageUrl) {
         this.id = id;
         this.sku = sku;
         this.name = name;
-        this.groupProduct = groupProduct;
+        this.group = group;
         this.inventoryStatus = inventoryStatus;
         this.currentStock = currentStock;
         this.minAlertStock = minAlertStock;
@@ -27,7 +27,7 @@ public class SearchProductInventoryResponse {
         this.imageUrl = imageUrl;
     }
 
-    public SearchProductInventoryResponse(){}
+    public SearchInventoryResponse(){}
 
     public Long getId() {
         return id;
@@ -47,11 +47,11 @@ public class SearchProductInventoryResponse {
     public void setName(String name) {
         this.name = name;
     }
-    public String getGroupProduct() {
-        return groupProduct;
+    public String getGroup() {
+        return group;
     }
-    public void setGroupProduct(String groupProduct) {
-        this.groupProduct = groupProduct;
+    public void setGroup(String group) {
+        this.group = group;
     }
     public InventoryStatus getInventoryStatus() {
         return inventoryStatus;

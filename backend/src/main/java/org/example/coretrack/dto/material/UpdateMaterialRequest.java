@@ -20,7 +20,7 @@ public class UpdateMaterialRequest {
     private String materialGroupId;
     private String newMaterialGroupName;
 
-    private List<MaterialVariantRequest> variants;
+    private List<UpdateMaterialVariantRequest> variants;
     private List<MaterialSupplierRequest> suppliers;
 
     // Constructors
@@ -28,7 +28,7 @@ public class UpdateMaterialRequest {
 
     public UpdateMaterialRequest(String name, String shortDes, String uom, String imageUrl,
                                String materialGroupId, String newMaterialGroupName,
-                               List<MaterialVariantRequest> variants, List<MaterialSupplierRequest> suppliers) {
+                               List<UpdateMaterialVariantRequest> variants, List<MaterialSupplierRequest> suppliers) {
         this.name = name;
         this.shortDes = shortDes;
         this.uom = uom;
@@ -88,11 +88,11 @@ public class UpdateMaterialRequest {
         this.newMaterialGroupName = newMaterialGroupName;
     }
 
-    public List<MaterialVariantRequest> getVariants() {
+    public List<UpdateMaterialVariantRequest> getVariants() {
         return variants;
     }
 
-    public void setVariants(List<MaterialVariantRequest> variants) {
+    public void setVariants(List<UpdateMaterialVariantRequest> variants) {
         this.variants = variants;
     }
 

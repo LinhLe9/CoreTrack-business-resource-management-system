@@ -3,7 +3,7 @@ package org.example.coretrack.dto.product.inventory;
 import java.math.BigDecimal;
 import org.example.coretrack.model.product.inventory.InventoryStatus;
 
-public class AllSearchProductInventoryResponse {
+public class AllSearchInventoryResponse {
     private Long id;
     private String sku;
     private String name;
@@ -11,9 +11,9 @@ public class AllSearchProductInventoryResponse {
     private BigDecimal currentStock;
     private String imageUrl;
     
-    public AllSearchProductInventoryResponse() {}
+    public AllSearchInventoryResponse() {}
     
-    public AllSearchProductInventoryResponse(Long id, String sku, String name, InventoryStatus inventoryStatus,
+    public AllSearchInventoryResponse(Long id, String sku, String name, InventoryStatus inventoryStatus,
             BigDecimal currentStock, String imageUrl) {
         this.id = id;
         this.sku = sku;

@@ -5,6 +5,7 @@ import java.util.List;
 import org.example.coretrack.dto.product.AddProductRequest;
 import org.example.coretrack.dto.product.AddProductResponse;
 import org.example.coretrack.dto.product.AllProductSearchResponse;
+import org.example.coretrack.dto.product.BOMItemResponse;
 import org.example.coretrack.dto.product.ChangeProductStatusRequest;
 import org.example.coretrack.dto.product.ChangeProductStatusResponse;
 import org.example.coretrack.dto.product.ProductDetailResponse;
@@ -48,4 +49,7 @@ public interface ProductService {
     
     // to return all product variants for autocomplete
     List<ProductVariantAutoCompleteResponse> getAllProductVariantsForAutocomplete(String search);
+
+    // to return BomItem
+    List<BOMItemResponse> getBomItem(Long id, Long variantId);
 }

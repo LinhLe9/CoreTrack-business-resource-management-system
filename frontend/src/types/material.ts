@@ -123,6 +123,8 @@ export type Supplier = {
 };
 
 export type Variant = {
+  id?: number; // For existing variants
+  sku?: string; // null for new variants, existing SKU for updates
   name: string;
   shortDescription: string;
   imageUrl: string;
@@ -143,4 +145,13 @@ export type AddMaterialForm = {
 export type MaterialGroup = {
   id: number;
   name: string;
+}
+
+export interface MaterialVariantAutoComplete {
+  variantId: number;
+  materialName: string;
+  materialSku: string;
+  variantSku: string;
+  variantName: string;
+  materialGroup?: string;
 }

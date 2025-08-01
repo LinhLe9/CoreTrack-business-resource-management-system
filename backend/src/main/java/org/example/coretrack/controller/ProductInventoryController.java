@@ -5,10 +5,10 @@ import java.util.Optional;
 
 import org.example.coretrack.dto.product.inventory.AddProductInventoryRequest;
 import org.example.coretrack.dto.product.inventory.AddProductInventoryResponse;
-import org.example.coretrack.dto.product.inventory.AllSearchProductInventoryResponse;
+import org.example.coretrack.dto.product.inventory.AllSearchInventoryResponse;
 import org.example.coretrack.dto.product.inventory.InventoryTransactionResponse;
 import org.example.coretrack.dto.product.inventory.ProductInventoryDetailResponse;
-import org.example.coretrack.dto.product.inventory.SearchProductInventoryResponse;
+import org.example.coretrack.dto.product.inventory.SearchInventoryResponse;
 import org.example.coretrack.dto.product.inventory.StockModifyRequest;
 import org.example.coretrack.dto.product.inventory.StockSetRequest;
 import org.example.coretrack.dto.product.inventory.BulkStockModifyRequest;
@@ -127,7 +127,7 @@ public class ProductInventoryController {
      * Endpoint when user search + filter the data
      */
     @GetMapping ("/filter")
-    public ResponseEntity<Page<SearchProductInventoryResponse>> getProducts(
+    public ResponseEntity<Page<SearchInventoryResponse>> getProducts(
             @RequestParam(required = false) String search,
             @RequestParam(name = "groupProducts",required = false) List<String> groupProducts, 
             @RequestParam(name = "inventoryStatus", required = false) List<String> inventoryStatus,
@@ -138,7 +138,7 @@ public class ProductInventoryController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
         }
 
-        Page<SearchProductInventoryResponse> productInventory = productInventoryService.findProduct(search, groupProducts, inventoryStatus, pageable);
+        Page<SearchInventoryResponse> productInventory = productInventoryService.findProduct(search, groupProducts, inventoryStatus, pageable);
 
         // A2: No matching results - frontend solves
         return ResponseEntity.ok(productInventory);
@@ -148,13 +148,13 @@ public class ProductInventoryController {
      * Endpoint to autocomplete when user search on search bar
      */
     @GetMapping("/autocomplete")
-    public ResponseEntity<List<AllSearchProductInventoryResponse>> getAutoComplete(
+    public ResponseEntity<List<AllSearchInventoryResponse>> getAutoComplete(
         @RequestParam(required = false) String search) {
             if (search != null && search.length() > 255) { // maximum 255 characters
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
         }
 
-        List<AllSearchProductInventoryResponse> productInventory = productInventoryService.getAllForAutocomplete(search);
+        List<AllSearchInventoryResponse> productInventory = productInventoryService.getAllForAutocomplete(search);
 
         // A2: No matching results - frontend solves
         return ResponseEntity.ok(productInventory);
@@ -255,7 +255,5 @@ public class ProductInventoryController {
         TransactionEnumsResponse response = productInventoryService.getTransactionEnums();
         return ResponseEntity.ok(response);
     }
-
-
 }
 

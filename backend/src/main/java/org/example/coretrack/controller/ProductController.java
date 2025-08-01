@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.example.coretrack.dto.product.AddProductRequest;
 import org.example.coretrack.dto.product.AddProductResponse;
 import org.example.coretrack.dto.product.AllProductSearchResponse;
+import org.example.coretrack.dto.product.BOMItemResponse;
 import org.example.coretrack.dto.product.ProductDetailResponse;
 import org.example.coretrack.dto.product.ProductGroupResponse;
 import org.example.coretrack.dto.product.SearchProductResponse;
@@ -205,6 +206,15 @@ public class ProductController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
         }
         ProductStatusTransitionResponse response = productService.getAvailableStatusTransitions(id);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/variant/{variantId}")
+    public ResponseEntity<List<BOMItemResponse>> getBomItem (
+        @PathVariable Long id,
+        @PathVariable Long variantId
+    ){
+        List<BOMItemResponse> response = productService.getBomItem(id, variantId);
         return ResponseEntity.ok(response);
     }
 }

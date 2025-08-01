@@ -3,6 +3,7 @@ package org.example.coretrack.dto.product.inventory;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import org.example.coretrack.model.material.inventory.MaterialInventoryLog;
 import org.example.coretrack.model.product.inventory.ProductInventoryLog;
 
 public class InventoryTransactionResponse {
@@ -47,6 +48,21 @@ public class InventoryTransactionResponse {
         this.previousStock = log.getBeforeQuantity();
         this.newStock = log.getAfterQuantity();
         this.note = log.getNote();
+        this.referenceDocumentType = log.getReferenceDocumentType() != null ? log.getReferenceDocumentType().getDisplayName() : null;
+        this.referenceDocumentId = log.getReferenceDocumentId();
+        this.createdAt = log.getCreatedAt();
+        this.createdBy = log.getCreatedBy() != null ? log.getCreatedBy().getUsername() : null;
+        this.user_role = log.getCreatedBy() != null && log.getCreatedBy().getRole() != null ? log.getCreatedBy().getRole().toString() : null;
+    }
+
+    public InventoryTransactionResponse(MaterialInventoryLog log){
+        this.id = log.getId();
+        this.transactionType = log.getTransactionType() != null ? log.getTransactionType().getDisplayName() : null;
+        this.transactionSource = log.getTransactionSourceType() != null ? log.getTransactionSourceType().getDisplayName() : null;
+        this.quantity = log.getQuantity();
+        this.note = log.getNote();
+        this.previousStock = log.getBeforeQuantity();
+        this.newStock = log.getAfterQuantity();
         this.referenceDocumentType = log.getReferenceDocumentType() != null ? log.getReferenceDocumentType().getDisplayName() : null;
         this.referenceDocumentId = log.getReferenceDocumentId();
         this.createdAt = log.getCreatedAt();

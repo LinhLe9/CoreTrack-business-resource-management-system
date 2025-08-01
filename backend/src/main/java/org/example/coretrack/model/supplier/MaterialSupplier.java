@@ -59,7 +59,10 @@ public class MaterialSupplier {
     public MaterialSupplier(Material material, Supplier supplier, BigDecimal price, String currency, User createdBy) {
         this.material = material;
         this.supplier = supplier;
-        this.id = new MaterialSupplierId(material.getId(), supplier.getId()); // Khởi tạo khóa chính tổng hợp
+        // Only create ID if both material and supplier have IDs
+        if (material.getId() != null && supplier.getId() != null) {
+            this.id = new MaterialSupplierId(material.getId(), supplier.getId());
+        }
         this.price = price;
         this.currency = currency;
         this.createdBy = createdBy;

@@ -29,7 +29,7 @@ public class Material {
     @Column(nullable = false)
     private boolean isActive;
 
-    @Enumerated
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private MaterialStatus status;
 
@@ -48,7 +48,7 @@ public class Material {
     @JoinColumn(name = "materialGroup_id")
     private MaterialGroup group;
 
-    @OneToMany(mappedBy = "material", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "material")
     private Set<MaterialSupplier> materialSuppliers = new HashSet<>();
 
     // logging elements
