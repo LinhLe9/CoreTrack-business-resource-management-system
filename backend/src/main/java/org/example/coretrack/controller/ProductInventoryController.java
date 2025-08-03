@@ -255,5 +255,28 @@ public class ProductInventoryController {
         TransactionEnumsResponse response = productInventoryService.getTransactionEnums();
         return ResponseEntity.ok(response);
     }
+
+
+    /*
+     * Endpoint when user search + filter the data
+     */
+    @GetMapping ("/alarm/filter")
+    public ResponseEntity<Page<SearchInventoryResponse>> getAlarmProducts(
+            @RequestParam(required = false) String search,
+            @RequestParam(name = "groupProducts",required = false) List<String> groupProducts, 
+            @RequestParam(name = "status", required = false) List<String> status,
+            @RequestParam(required = false, defaultValue = "false") boolean sortByOldest,
+            @PageableDefault(page = 0, size = 20) Pageable pageable) { 
+
+        // Validation E1: Invalid Search Keyword/Format
+        if (search != null && search.length() > 255) { // maximum 255 characters
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
+        }
+
+        Page<SearchInventoryResponse> productInventory = productInventoryService.getAlarmProduct(search, groupProducts, status, sortByOldest, pageable);
+
+        // A2: No matching results - frontend solves
+        return ResponseEntity.ok(productInventory);
+    }
 }
 

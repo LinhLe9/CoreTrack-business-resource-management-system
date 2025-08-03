@@ -2,9 +2,6 @@ package org.example.coretrack.dto.productionTicket;
 
 import java.util.List;
 
-import org.example.coretrack.model.productionTicket.ProductionTicketDetailStatus;
-import org.example.coretrack.model.productionTicket.ProductionTicketStatus;
-
 public class ProductionTicketStatusesResponse {
     private List<StatusInfo> productionTicketStatuses;
     private List<StatusInfo> productionTicketDetailStatuses;

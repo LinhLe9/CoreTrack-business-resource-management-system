@@ -3,6 +3,7 @@ package org.example.coretrack.controller;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Optional;
 
 import org.example.coretrack.dto.productionTicket.BulkCreateProductionTicketRequest;
 import org.example.coretrack.dto.productionTicket.BulkCreateProductionTicketResponse;
@@ -16,6 +17,8 @@ import org.example.coretrack.dto.productionTicket.StatusTransitionRule;
 import org.example.coretrack.dto.productionTicket.UpdateDetailStatusRequest;
 import org.example.coretrack.model.auth.User;
 import org.example.coretrack.model.productionTicket.ProductionTicket;
+import org.example.coretrack.model.productionTicket.ProductionTicketDetail;
+import org.example.coretrack.repository.ProductionTicketDetailRepository;
 import org.example.coretrack.service.ProductionTicketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -34,6 +37,9 @@ public class ProductionTicketController {
 
     @Autowired
     private ProductionTicketService productionTicketService;
+
+    @Autowired
+    private ProductionTicketDetailRepository productionTicketDetailRepository;
 
     @PostMapping("/create")
     @PreAuthorize("hasAnyRole('OWNER')")
@@ -101,7 +107,7 @@ public class ProductionTicketController {
     }
 
     @GetMapping("/status-rules")
-    @PreAuthorize("hasAnyRole('OWNER', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("permitAll")
     public ResponseEntity<List<StatusTransitionRule>> getStatusTransitionRules() {
         try {
             List<StatusTransitionRule> rules = productionTicketService.getStatusTransitionRules();
@@ -184,6 +190,61 @@ public class ProductionTicketController {
     @GetMapping("/test")
     public ResponseEntity<String> testEndpoint() {
         return ResponseEntity.ok("Production Ticket Controller is working!");
+    }
+
+    @GetMapping("/test-detail/{detailId}")
+    @PreAuthorize("permitAll")
+    public ResponseEntity<String> testDetailEndpoint(@PathVariable Long detailId) {
+        try {
+            boolean exists = productionTicketDetailRepository.findByIdAndIsActive(detailId, true).isPresent();
+            return ResponseEntity.ok("Detail " + detailId + " exists: " + exists);
+        } catch (Exception e) {
+            return ResponseEntity.ok("Error checking detail " + detailId + ": " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/test-all-details")
+    @PreAuthorize("permitAll")
+    public ResponseEntity<String> testAllDetailsEndpoint() {
+        try {
+            List<ProductionTicketDetail> allDetails = productionTicketDetailRepository.findByIsActive(true);
+            StringBuilder result = new StringBuilder();
+            result.append("All active production ticket details:\n");
+            for (ProductionTicketDetail detail : allDetails) {
+                result.append("ID: ").append(detail.getId())
+                      .append(", Ticket ID: ").append(detail.getProductionTicket().getId())
+                      .append(", Product Variant: ").append(detail.getProductVariant().getSku())
+                      .append(", isActive: ").append(detail.isActive())
+                      .append("\n");
+            }
+            return ResponseEntity.ok(result.toString());
+        } catch (Exception e) {
+            return ResponseEntity.ok("Error getting all details: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/test-detail-by-id/{detailId}")
+    @PreAuthorize("permitAll")
+    public ResponseEntity<String> testDetailByIdEndpoint(@PathVariable Long detailId) {
+        try {
+            // Try to find by ID only (without isActive filter)
+            Optional<ProductionTicketDetail> detailOpt = productionTicketDetailRepository.findById(detailId);
+            if (detailOpt.isPresent()) {
+                ProductionTicketDetail detail = detailOpt.get();
+                StringBuilder result = new StringBuilder();
+                result.append("Detail found by ID ").append(detailId).append(":\n");
+                result.append("ID: ").append(detail.getId()).append("\n");
+                result.append("Ticket ID: ").append(detail.getProductionTicket().getId()).append("\n");
+                result.append("Product Variant: ").append(detail.getProductVariant().getSku()).append("\n");
+                result.append("isActive: ").append(detail.isActive()).append("\n");
+                result.append("Status: ").append(detail.getStatus()).append("\n");
+                return ResponseEntity.ok(result.toString());
+            } else {
+                return ResponseEntity.ok("Detail with ID " + detailId + " not found");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.ok("Error checking detail " + detailId + ": " + e.getMessage());
+        }
     }
 
     @GetMapping("/test-cascade/{id}")
@@ -408,7 +469,7 @@ public class ProductionTicketController {
             response.put("productVariantBomRequest_structure", Map.of(
                 "productVariantSku", "String - SKU of the product variant",
                 "quantity", "Integer - Quantity to produce",
-                "expectedCompleteDate", "LocalDateTime - Expected completion date",
+                "expectedCompleteDate", "LocalDate - Expected completion date (YYYY-MM-DD format)",
                 "boms", "List<BomItemProductionTicketRequest> - BOM items for this specific variant (optional)"
             ));
             response.put("example_request", Map.of(
@@ -417,19 +478,19 @@ public class ProductionTicketController {
                     Map.of(
                         "productVariantSku", "PROD-001",
                         "quantity", 10,
-                        "expectedCompleteDate", "2024-01-15T10:00:00",
+                        "expectedCompleteDate", "2024-01-15",
                         "boms", List.of(Map.of("materialVariantSku", "MAT-001", "plannedQuantity", 5, "actualQuantity", 0))
                     ),
                     Map.of(
                         "productVariantSku", "PROD-002",
                         "quantity", 20,
-                        "expectedCompleteDate", "2024-01-20T10:00:00",
+                        "expectedCompleteDate", "2024-01-20",
                         "boms", List.of(Map.of("materialVariantSku", "MAT-002", "plannedQuantity", 8, "actualQuantity", 0))
                     ),
                     Map.of(
                         "productVariantSku", "PROD-003",
                         "quantity", 15,
-                        "expectedCompleteDate", "2024-01-25T10:00:00",
+                        "expectedCompleteDate", "2024-01-25",
                         "boms", List.of(Map.of("materialVariantSku", "MAT-003", "plannedQuantity", 6, "actualQuantity", 0))
                     )
                 )

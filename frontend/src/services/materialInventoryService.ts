@@ -27,7 +27,7 @@ import {
   StockModifyRequest,
   BulkStockSetRequest as MaterialBulkStockSetRequest,
   BulkStockModifyRequest as MaterialBulkStockModifyRequest,
-  BulkInventoryTransactionResponse as MaterialBulkInventoryTransactionResponse,
+  MaterialBulkInventoryTransactionResponse,
   BulkMInitInventoryRequest,
   BulkMInitInventoryResponse
 } from '../types/materialInventory';

@@ -4,6 +4,7 @@ import { PageResponse } from '../types/PageResponse';
 import { Material, ProductDetailResponse, MaterialDetailResponse, UpdateMaterialResponse, MaterialQueryParams, MaterialAutoComplete, MaterialGroup } from '../types/material';
 import qs from 'qs'; 
 import { MaterialVariantAutoComplete } from '../types/material';
+import { MaterialSupplierResponse } from '../types/material';
 
 
 // to fetch the product after searching + filtering
@@ -43,27 +44,8 @@ export const getAllMaterialVariantsForAutocomplete = async (search?: string): Pr
     const response = await apiClient.get(`/materials/variants/autocomplete${params}`);
     return response.data;
   } catch (error) {
-    // For now, return mock data since the backend endpoint might not exist yet
-    const mockResults: MaterialVariantAutoComplete[] = [
-      { variantId: 1, variantSku: 'MAT-VAR-001', variantName: 'Steel Sheet 2mm', materialName: 'Steel', materialSku: 'MAT-001', materialGroup: 'Metals' },
-      { variantId: 2, variantSku: 'MAT-VAR-002', variantName: 'Aluminum Plate 3mm', materialName: 'Aluminum', materialSku: 'MAT-002', materialGroup: 'Metals' },
-      { variantId: 3, variantSku: 'MAT-VAR-003', variantName: 'Copper Wire 1mm', materialName: 'Copper', materialSku: 'MAT-003', materialGroup: 'Metals' },
-      { variantId: 4, variantSku: 'MAT-VAR-004', variantName: 'Plastic Sheet 5mm', materialName: 'Plastic', materialSku: 'MAT-004', materialGroup: 'Polymers' },
-    ];
-    
-    // Filter mock results based on search
-    if (search) {
-      const searchLower = search.toLowerCase();
-      return mockResults.filter(item => 
-        item.variantName.toLowerCase().includes(searchLower) ||
-        item.variantSku.toLowerCase().includes(searchLower) ||
-        item.materialName.toLowerCase().includes(searchLower) ||
-        item.materialSku.toLowerCase().includes(searchLower) ||
-        item.materialGroup?.toLowerCase().includes(searchLower)
-      );
-    }
-    
-    return mockResults;
+    console.error('Error fetching material variants for autocomplete:', error);
+    throw error;
   }
 };
 
@@ -109,5 +91,11 @@ export const changeMaterialStatus = async (materialId: number, newStatus: string
     newStatus,
     reason
   });
+  return response.data;
+};
+
+// Get suppliers by material variant SKU
+export const getSuppliersByMaterialVariantSku = async (materialVariantSku: string): Promise<MaterialSupplierResponse[]> => {
+  const response = await apiClient.get(`/materials/variants/${materialVariantSku}/suppliers`);
   return response.data;
 };

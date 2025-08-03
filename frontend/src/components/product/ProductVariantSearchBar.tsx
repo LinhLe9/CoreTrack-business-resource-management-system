@@ -9,10 +9,12 @@ import {
 import { ProductVariantAutoComplete } from '../../types/product';
 
 interface SearchBarProps {
-  onSearch: (searchTerm: string) => void;
+  onSearch?: (searchTerm: string) => void;
   onSelectProductVariant?: (variantId: number) => void;
+  onSelectProductVariantObject?: (variant: ProductVariantAutoComplete) => void;
   initialSearchTerm?: string;
   productVariantsForAutocomplete: ProductVariantAutoComplete[];
+  selectedProductVariant?: ProductVariantAutoComplete | null;
 }
 
 interface OptionType {
@@ -22,16 +24,20 @@ interface OptionType {
   variantSku: string;
   variantName: string;
   productGroup?: string;
+  data: ProductVariantAutoComplete;
 }
 
 const ProductVariantSearchBar: React.FC<SearchBarProps> = ({
   onSearch,
   onSelectProductVariant,
+  onSelectProductVariantObject,
   initialSearchTerm = '',
   productVariantsForAutocomplete,
+  selectedProductVariant,
 }) => {
   const [selectedOption, setSelectedOption] = useState<OptionType | null>(null);
   const [inputValue, setInputValue] = useState('');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const options: OptionType[] = productVariantsForAutocomplete.map((variant) => ({
     value: variant.variantId,
@@ -40,14 +46,18 @@ const ProductVariantSearchBar: React.FC<SearchBarProps> = ({
     variantSku: variant.variantSku,
     variantName: variant.variantName,
     productGroup: variant.productGroup,
+    data: variant,
   }));
 
   const handleChange = (option: OptionType | null) => {
     setSelectedOption(option);
+    setIsMenuOpen(false); // Close menu when option is selected
     if (option) {
-      if (onSelectProductVariant) {
+      if (onSelectProductVariantObject) {
+        onSelectProductVariantObject(option.data);
+      } else if (onSelectProductVariant) {
         onSelectProductVariant(option.value);
-      } else {
+      } else if (onSearch) {
         onSearch(option.label); // fallback search
       }
     }
@@ -55,15 +65,18 @@ const ProductVariantSearchBar: React.FC<SearchBarProps> = ({
 
   const handleInputChange = (newValue: string) => {
     setInputValue(newValue);
-    if (newValue.length >= 2) {
+    if (newValue.length >= 2 && onSearch) {
       onSearch(newValue);
+      setIsMenuOpen(true); // Open menu when user types
+    } else {
+      setIsMenuOpen(false); // Close menu when input is too short
     }
   };
 
   const handleSearch = () => {
-    if (selectedOption) {
+    if (selectedOption && onSearch) {
       onSearch(selectedOption.label);
-    } else if (inputValue) {
+    } else if (inputValue && onSearch) {
       onSearch(inputValue);
     }
   };
@@ -97,22 +110,26 @@ const ProductVariantSearchBar: React.FC<SearchBarProps> = ({
           onChange={handleChange}
           value={selectedOption}
           isClearable
-          isSearchable
-          menuIsOpen={productVariantsForAutocomplete.length > 0}
           components={{ SingleValue: customSingleValue, Option: customOption }}
           filterOption={(option, inputValue) => {
-            const nameMatch = option.label.toLowerCase().includes(inputValue.toLowerCase());
-            const productSkuMatch = option.data.productSku.toLowerCase().includes(inputValue.toLowerCase());
-            const variantSkuMatch = option.data.variantSku.toLowerCase().includes(inputValue.toLowerCase());
-            const variantNameMatch = option.data.variantName.toLowerCase().includes(inputValue.toLowerCase());
-            const groupMatch = option.data.productGroup?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+            if (!option || !option.data) return false;
+            
+            const nameMatch = option.label?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+            const skuMatch = option.data.productSku?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+            const variantSkuMatch = option.data.variantSku?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+            const variantNameMatch = option.data.variantName?.toLowerCase().includes(inputValue.toLowerCase()) || false;
 
-            return nameMatch || productSkuMatch || variantSkuMatch || variantNameMatch || groupMatch;
+            return nameMatch || skuMatch || variantSkuMatch || variantNameMatch;
           }}
           onInputChange={handleInputChange}
+          menuIsOpen={isMenuOpen}
+          onMenuOpen={() => setIsMenuOpen(true)}
+          onMenuClose={() => setIsMenuOpen(false)}
         />
       </Box>
-      <Button colorScheme="blue" onClick={handleSearch}>Search</Button>
+      {onSearch && (
+        <Button colorScheme="blue" onClick={handleSearch}>Search</Button>
+      )}
     </Flex>
   );
 };

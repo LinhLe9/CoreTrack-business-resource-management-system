@@ -96,6 +96,29 @@ export interface ProductionTicket {
   ticketDetail: ProductionTicketDetail[];
 }
 
+export interface ProductionTicketStatusLogResponse {
+  id: number;
+  productionTicketId: number;
+  productionTicketName: string;
+  new_status: string;
+  old_status: string;
+  note: string;
+  updatedAt: string;
+  updatedByName: string;
+  updatedByRole: string;
+}
+
+export interface ProductionTicketDetailStatusLogResponse {
+  id: number;
+  productionTicketDetailId: number;
+  new_status: string;
+  old_status: string;
+  note: string;
+  updatedAt: string;
+  updatedByName: string;
+  updatedByRole: string;
+}
+
 export interface ProductionTicketResponse {
   id: number;
   name: string;
@@ -108,6 +131,7 @@ export interface ProductionTicketResponse {
   updatedBy: string;
   updatedByRole: string;
   detail: ProductTicketDetailShortResponse[];
+  logs: ProductionTicketStatusLogResponse[];
 }
 
 export interface ProductionTicketCardResponse {
@@ -124,18 +148,19 @@ export interface ProductionTicketCardResponse {
 
 export interface ProductionTicketDetailResponse {
   id: number;
-  productVariant: ProductVariant;
+  productVariantSku: string;
   quantity: number;
   status: string;
   expected_complete_date: string;
   completed_date?: string;
   createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-  createdByRole: string;
-  updatedBy: string;
-  updatedByRole: string;
-  bomItem: BomItemProductionTicketResponse[];
+  lastUpdatedAt: string;
+  createdBy_name: string;
+  createdBy_role: string;
+  lastUpdatedAt_name: string;
+  lastUpdatedAt_role: string;
+  boms: BomItemProductionTicketResponse[];
+  logs: ProductionTicketDetailStatusLogResponse[];
 }
 
 // Create Production Ticket Types
@@ -165,7 +190,7 @@ export interface CreateProductionTicketResponse {
 export interface ProductVariantBomRequest {
   productVariantSku: string;
   quantity: number;
-  expectedCompleteDate: string;
+  expectedCompleteDate: string; // YYYY-MM-DD date string (e.g., "2025-08-08")
   boms?: BomItemProductionTicketRequest[];
 }
 

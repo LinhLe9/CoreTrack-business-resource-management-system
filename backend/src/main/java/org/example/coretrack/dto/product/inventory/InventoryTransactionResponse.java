@@ -16,6 +16,7 @@ public class InventoryTransactionResponse {
     private String referenceDocumentType;
     private Long referenceDocumentId;
     private String transactionSource;
+    private String stockType;
     private LocalDateTime createdAt;
     private String createdBy;
     private String user_role;
@@ -25,7 +26,7 @@ public class InventoryTransactionResponse {
     public InventoryTransactionResponse(Long id, String transactionType, String transactionSource,
                                     BigDecimal quantity, BigDecimal previousStock, BigDecimal newStock, 
                                     String note, String referenceDocumentType, Long referenceDocumentId,
-                                    LocalDateTime createdAt, String createdBy, String user_role) {
+                                    String stockType, LocalDateTime createdAt, String createdBy, String user_role) {
         this.id = id;
         this.transactionType = transactionType;
         this.quantity = quantity;
@@ -35,6 +36,7 @@ public class InventoryTransactionResponse {
         this.referenceDocumentType = referenceDocumentType;
         this.referenceDocumentId = referenceDocumentId;
         this.transactionSource = transactionSource;
+        this.stockType = stockType;
         this.createdAt = createdAt;
         this.createdBy = createdBy;
         this.user_role = user_role;
@@ -50,6 +52,7 @@ public class InventoryTransactionResponse {
         this.note = log.getNote();
         this.referenceDocumentType = log.getReferenceDocumentType() != null ? log.getReferenceDocumentType().getDisplayName() : null;
         this.referenceDocumentId = log.getReferenceDocumentId();
+        this.stockType = log.getStockType() != null ? log.getStockType().getDisplayName() : null;
         this.createdAt = log.getCreatedAt();
         this.createdBy = log.getCreatedBy() != null ? log.getCreatedBy().getUsername() : null;
         this.user_role = log.getCreatedBy() != null && log.getCreatedBy().getRole() != null ? log.getCreatedBy().getRole().toString() : null;
@@ -65,6 +68,7 @@ public class InventoryTransactionResponse {
         this.newStock = log.getAfterQuantity();
         this.referenceDocumentType = log.getReferenceDocumentType() != null ? log.getReferenceDocumentType().getDisplayName() : null;
         this.referenceDocumentId = log.getReferenceDocumentId();
+        this.stockType = log.getStockType() != null ? log.getStockType().getDisplayName() : null;
         this.createdAt = log.getCreatedAt();
         this.createdBy = log.getCreatedBy() != null ? log.getCreatedBy().getUsername() : null;
         this.user_role = log.getCreatedBy() != null && log.getCreatedBy().getRole() != null ? log.getCreatedBy().getRole().toString() : null;
@@ -156,6 +160,14 @@ public class InventoryTransactionResponse {
 
     public void setCreatedBy(String createdBy) {
         this.createdBy = createdBy;
+    }
+
+    public String getStockType() {
+        return stockType;
+    }
+
+    public void setStockType(String stockType) {
+        this.stockType = stockType;
     }
 
     public String getUser_role() {

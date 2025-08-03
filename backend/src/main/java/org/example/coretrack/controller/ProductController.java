@@ -73,6 +73,7 @@ public class ProductController {
      * Test endpoint to check if the API is working
      */
     @GetMapping("/test")
+    @PreAuthorize("permitAll")
     public ResponseEntity<String> test() {
         return ResponseEntity.ok("Product API is working!");
     }

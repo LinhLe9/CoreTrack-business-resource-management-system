@@ -1,3 +1,5 @@
+import { InventoryTransactionResponse, BulkInventoryTransactionResponse } from './inventory';
+
 export interface MaterialInventoryQueryParams {
   search?: string;
   groupMaterials?: string[];
@@ -52,7 +54,7 @@ export interface MaterialInventoryDetailResponse {
   inventoryStatus: string;
   materialStatus: string;
   imageUrl?: string;
-  transactions: any[]; // InventoryTransactionResponse[]
+  transactions: InventoryTransactionResponse[];
 }
 
 // Stock Operation Types
@@ -96,13 +98,7 @@ export interface BulkTransactionError {
   reason: string;
 }
 
-export interface BulkInventoryTransactionResponse {
-  successfulTransactions: any[]; // InventoryTransactionResponse[]
-  failedTransactions: BulkTransactionError[];
-  totalProcessed: number;
-  successCount: number;
-  failureCount: number;
-}
+export type MaterialBulkInventoryTransactionResponse = BulkInventoryTransactionResponse;
 
 // Bulk Init Types
 export interface BulkMInitInventoryRequest {

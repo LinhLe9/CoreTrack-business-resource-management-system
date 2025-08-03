@@ -2,6 +2,7 @@ package org.example.coretrack.controller;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.example.coretrack.dto.material.Inventory.AddMaterialInventoryRequest;
 import org.example.coretrack.dto.material.Inventory.AddMaterialInventoryResponse;
@@ -236,5 +237,35 @@ public class MaterialInventoryController {
     public ResponseEntity<TransactionEnumsResponse> getTransactionEnums() {
         TransactionEnumsResponse response = materialInventoryService.getTransactionEnums();
         return ResponseEntity.ok(response);
+    }
+
+    /*
+     * Endpoint when user search + filter the data for material alarms
+     */
+    @GetMapping("/alarm/filter")
+    public ResponseEntity<Page<SearchInventoryResponse>> getAlarmMaterials(
+            @RequestParam(required = false) String search,
+            @RequestParam(name = "groupMaterials", required = false) List<String> groupMaterials, 
+            @RequestParam(name = "status", required = false) List<String> status,
+            @RequestParam(required = false, defaultValue = "false") boolean sortByOldest,
+            @PageableDefault(page = 0, size = 20) Pageable pageable) { 
+
+        // Validation E1: Invalid Search Keyword/Format
+        if (search != null && search.length() > 255) { // maximum 255 characters
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
+        }
+
+        // Convert groupMaterials from String to Long for repository
+        List<Long> groupMaterialIds = null;
+        if (groupMaterials != null && !groupMaterials.isEmpty()) {
+            groupMaterialIds = groupMaterials.stream()
+                .map(Long::valueOf)
+                .collect(Collectors.toList());
+        }
+
+        Page<SearchInventoryResponse> materialInventory = materialInventoryService.getAlarmMaterial(search, groupMaterialIds, status, sortByOldest, pageable);
+
+        // A2: No matching results - frontend solves
+        return ResponseEntity.ok(materialInventory);
     }
 }

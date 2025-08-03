@@ -27,6 +27,16 @@ public class MaterialSupplierResponse {
     public MaterialSupplierResponse(){}
 
     public MaterialSupplierResponse(MaterialSupplier ms){
+        // Handle null MaterialSupplier
+        if (ms == null) {
+            throw new IllegalArgumentException("MaterialSupplier cannot be null");
+        }
+        
+        // Handle null Supplier
+        if (ms.getSupplier() == null) {
+            throw new IllegalArgumentException("Supplier cannot be null in MaterialSupplier");
+        }
+        
         this.supplierId = ms.getSupplier().getId();
         this.supplierName = ms.getSupplier().getName();
         this.price = ms.getPrice();

@@ -36,6 +36,7 @@ import org.example.coretrack.model.material.MaterialStatus;
 import org.example.coretrack.model.material.MaterialStatusAuditLog;
 import org.example.coretrack.model.material.MaterialVariant;
 import org.example.coretrack.model.material.UoM;
+import org.example.coretrack.model.material.inventory.MaterialInventory;
 import org.example.coretrack.model.supplier.MaterialSupplier;
 import org.example.coretrack.model.supplier.MaterialSupplierId;
 import org.example.coretrack.model.supplier.Supplier;
@@ -744,4 +745,44 @@ public class MaterialServiceImpl implements MaterialService{
                                      material.getName(), currentStatus);
         return new MaterialStatusTransitionResponse(materialId, currentStatus, availableTransitions, message);
     }
+
+    @Override
+    public List<MaterialSupplierResponse> getSuppliersByMaterialVariantSku(String materialVariantSku) {
+        // Validate input parameter
+        if (materialVariantSku == null || materialVariantSku.trim().isEmpty()) {
+            throw new IllegalArgumentException("Material variant SKU cannot be null or empty");
+        }
+
+        // Step 1: Find the material variant by SKU
+        MaterialVariant materialVariant = materialVariantRepository.findBySku(materialVariantSku)
+                .orElseThrow(() -> new RuntimeException("Material variant not found with SKU: " + materialVariantSku));
+
+        // Step 2: Get the material from the variant
+        Material material = materialVariant.getMaterial();
+        if (material == null) {
+            throw new RuntimeException("Material not found for variant SKU: " + materialVariantSku);
+        }
+
+        // Step 3: Find all suppliers for this material
+        List<MaterialSupplier> materialSuppliers = materialSupplierRepository.findByMaterial(material);
+
+        // Step 4: Convert to response DTOs with null safety
+        List<MaterialSupplierResponse> supplierResponses = materialSuppliers.stream()
+                .filter(materialSupplier -> materialSupplier != null) // Filter out null MaterialSupplier
+                .filter(materialSupplier -> materialSupplier.getSupplier() != null) // Filter out MaterialSupplier with null Supplier
+                .map(materialSupplier -> {
+                    try {
+                        return new MaterialSupplierResponse(materialSupplier);
+                    } catch (IllegalArgumentException e) {
+                        // Log the error but continue processing other suppliers
+                        System.err.println("Skipping invalid MaterialSupplier: " + e.getMessage());
+                        return null;
+                    }
+                })
+                .filter(response -> response != null) // Filter out null responses
+                .collect(Collectors.toList());
+
+        return supplierResponses;
+    }
+
 }

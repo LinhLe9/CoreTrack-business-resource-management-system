@@ -8,6 +8,10 @@ const api = axios.create({
   withCredentials: true, 
 });
 
+// Add unique identifier to track this instance
+api.defaults.headers.common['X-Client-Instance'] = 'frontend-client';
+console.log('Creating axios instance with ID:', api.defaults.headers.common['X-Client-Instance']);
+
 // Flag to prevent infinite logout loops
 let isLoggingOut = false;
 
@@ -17,16 +21,34 @@ export const resetLogoutFlag = () => {
 };
 
 api.interceptors.request.use((config) => {
+  console.log('=== REQUEST INTERCEPTOR START ===');
+  console.log('isClient:', isClient);
+  console.log('Request URL:', config.url);
+  console.log('Request method:', config.method);
+  console.log('Client instance ID:', config.headers['X-Client-Instance']);
+  console.log('Request headers before:', config.headers);
+  
   if (isClient) {
     try {
       const token = localStorage.getItem("token");
+      console.log('Token found:', !!token);
+      console.log('Token value:', token ? token.substring(0, 20) + '...' : 'null');
+      
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log('Authorization header set to:', `Bearer ${token.substring(0, 20)}...`);
+      } else {
+        console.log('No token found in localStorage');
       }
     } catch (error) {
       console.error('Error setting authorization header:', error);
     }
+  } else {
+    console.log('Not client-side - skipping token setup');
   }
+  
+  console.log('Request headers after:', config.headers);
+  console.log('=== REQUEST INTERCEPTOR END ===');
   return config;
 });
 

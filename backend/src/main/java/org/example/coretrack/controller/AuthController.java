@@ -5,8 +5,10 @@ import org.example.coretrack.dto.auth.LoginRequest;
 import org.example.coretrack.dto.auth.RegistrationRequest;
 import org.example.coretrack.dto.auth.ResendValidationTokenResquest;
 import org.example.coretrack.dto.auth.ValidationTokenRequest;
+import org.example.coretrack.dto.auth.UserDetailResponse;
 import org.example.coretrack.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 // import org.springframework.security.authentication.AuthenticationManager;
 // import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -65,4 +67,31 @@ public class AuthController {
 //        SecurityContextHolder.getContext().setAuthentication(authentication);
         return ResponseEntity.ok(authResponse);
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout() {
+        try {
+            userService.logout();
+            return ResponseEntity.ok("Logged out successfully");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error during logout: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/current-user")
+    public ResponseEntity<UserDetailResponse> getCurrentUserDetails() {
+        try {
+            // Get current user email from security context
+            String currentUserEmail = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext()
+                    .getAuthentication()
+                    .getName();
+            
+            UserDetailResponse userDetails = userService.getCurrentUserDetails(currentUserEmail);
+            return ResponseEntity.ok(userDetails);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
 }

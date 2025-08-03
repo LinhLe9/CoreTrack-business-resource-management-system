@@ -1,17 +1,17 @@
-package org.example.coretrack.dto.productionTicket;
+package org.example.coretrack.dto.purchasingTicket;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-public class ProductTicketDetailShortResponse {
+public class PurchasingTicketDetailShortResponse {
     private Long id;
-    private String productVariantSku;
+    private String materialVariantSku;
     private BigDecimal quantity;
 
     private String status;
     
-    private LocalDateTime expected_complete_date;
-    private LocalDateTime completed_date;
+    private LocalDateTime expected_ready_date;
+    private LocalDateTime ready_date;
 
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdatedAt;
@@ -23,16 +23,16 @@ public class ProductTicketDetailShortResponse {
     private String lastUpdatedAt_role;
 
     // constructor
-    public ProductTicketDetailShortResponse(Long id, String productVariantSku, BigDecimal quantity,
-            LocalDateTime expected_complete_date, LocalDateTime completed_date, String status,
-            LocalDateTime createdAt, LocalDateTime lastUpdatedAt, String createdBy_name, String createdBy_role, 
-            String lastUpdatedAt_name, String lastUpdatedAt_role) {
+    public PurchasingTicketDetailShortResponse(Long id, String materialVariantSku, BigDecimal quantity, String status,
+            LocalDateTime expected_ready_date, LocalDateTime ready_date, LocalDateTime createdAt,
+            LocalDateTime lastUpdatedAt, String createdBy_name, String createdBy_role, String lastUpdatedAt_name,
+            String lastUpdatedAt_role) {
         this.id = id;
-        this.productVariantSku = productVariantSku;
+        this.materialVariantSku = materialVariantSku;
         this.quantity = quantity;
-        this.expected_complete_date = expected_complete_date;
-        this.completed_date = completed_date;
         this.status = status;
+        this.expected_ready_date = expected_ready_date;
+        this.ready_date = ready_date;
         this.createdAt = createdAt;
         this.lastUpdatedAt = lastUpdatedAt;
         this.createdBy_name = createdBy_name;
@@ -40,10 +40,11 @@ public class ProductTicketDetailShortResponse {
         this.lastUpdatedAt_name = lastUpdatedAt_name;
         this.lastUpdatedAt_role = lastUpdatedAt_role;
     }
-    
-    public ProductTicketDetailShortResponse(){}
 
-    // getter and setter
+    public PurchasingTicketDetailShortResponse(){}
+
+
+    //setter & getter
     public Long getId() {
         return id;
     }
@@ -52,12 +53,12 @@ public class ProductTicketDetailShortResponse {
         this.id = id;
     }
 
-    public String getProductVariantSku() {
-        return productVariantSku;
+    public String getMaterialVariantSku() {
+        return materialVariantSku;
     }
 
-    public void setProductVariantSku(String productVariantSku) {
-        this.productVariantSku = productVariantSku;
+    public void setMaterialVariantSku(String materialVariantSku) {
+        this.materialVariantSku = materialVariantSku;
     }
 
     public BigDecimal getQuantity() {
@@ -68,20 +69,28 @@ public class ProductTicketDetailShortResponse {
         this.quantity = quantity;
     }
 
-    public LocalDateTime getExpected_complete_date() {
-        return expected_complete_date;
+    public String getStatus() {
+        return status;
     }
 
-    public void setExpected_complete_date(LocalDateTime expected_complete_date) {
-        this.expected_complete_date = expected_complete_date;
+    public void setStatus(String status) {
+        this.status = status;
     }
 
-    public LocalDateTime getCompleted_date() {
-        return completed_date;
+    public LocalDateTime getExpected_ready_date() {
+        return expected_ready_date;
     }
 
-    public void setCompleted_date(LocalDateTime completed_date) {
-        this.completed_date = completed_date;
+    public void setExpected_ready_date(LocalDateTime expected_ready_date) {
+        this.expected_ready_date = expected_ready_date;
+    }
+
+    public LocalDateTime getReady_date() {
+        return ready_date;
+    }
+
+    public void setReady_date(LocalDateTime ready_date) {
+        this.ready_date = ready_date;
     }
 
     public LocalDateTime getCreatedAt() {
@@ -131,13 +140,6 @@ public class ProductTicketDetailShortResponse {
     public void setLastUpdatedAt_role(String lastUpdatedAt_role) {
         this.lastUpdatedAt_role = lastUpdatedAt_role;
     }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
+    
+    
 }

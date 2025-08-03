@@ -136,7 +136,7 @@ const EditProductPage: React.FC = () => {
             description: v.variant.description || '',
             imageUrl: v.variant.imageUrl || '',
             bomItems: v.variant.bomItems?.map(bom => ({
-              materialId: bom.materialId,
+              materialId: parseInt(bom.materialSku), // Convert materialSku to materialId
               materialName: bom.materialName,
               quantity: bom.quantity,
               notes: bom.notes

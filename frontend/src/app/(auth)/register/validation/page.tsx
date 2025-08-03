@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   Box,
   Button,
@@ -11,17 +12,58 @@ import {
   Heading,
   useToast,
   Text,
+  Spinner,
 } from '@chakra-ui/react'
 import { useRouter } from 'next/navigation'
 import api from '@/lib/axios'
 
-export default function TokenVerificationForm() {
+function TokenVerificationFormContent() {
   const [token, setToken] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResending, setIsResending] = useState(false)
   const [error, setError] = useState('')
+  const [isAutoValidating, setIsAutoValidating] = useState(false)
   const toast = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Auto-validate if token is in URL
+  useEffect(() => {
+    const urlToken = searchParams.get('token')
+    if (urlToken && !isAutoValidating) {
+      setIsAutoValidating(true)
+      setToken(urlToken)
+      handleAutoValidation(urlToken)
+    }
+  }, [searchParams])
+
+  const handleAutoValidation = async (validationToken: string) => {
+    try {
+      const res = await api.post('/auth/verify', { token: validationToken })
+      
+      toast({
+        title: 'Email validation succeed!',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      })
+
+      router.push('/login')
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Error! Please try again'
+      setError(message)
+      
+      toast({
+        title: 'Validation failed',
+        description: message,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    } finally {
+      setIsAutoValidating(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -78,6 +120,21 @@ export default function TokenVerificationForm() {
     }
   };
 
+  // Show loading if auto-validating
+  if (isAutoValidating) {
+    return (
+      <Box maxW="md" mx="auto" mt={10} p={6} borderWidth={1} borderRadius="lg" textAlign="center">
+        <Spinner size="xl" mb={4} />
+        <Heading size="md" mb={4}>
+          Validating your account...
+        </Heading>
+        <Text color="gray.600">
+          Please wait while we verify your email address.
+        </Text>
+      </Box>
+    )
+  }
+
   return (
     <Box maxW="md" mx="auto" mt={10} p={6} borderWidth={1} borderRadius="lg">
       <Heading size="md" mb={6} textAlign="center">
@@ -118,5 +175,20 @@ export default function TokenVerificationForm() {
         </Text>
     </Text>
     </Box>
+  )
+}
+
+export default function TokenVerificationForm() {
+  return (
+    <Suspense fallback={
+      <Box maxW="md" mx="auto" mt={10} p={6} borderWidth={1} borderRadius="lg" textAlign="center">
+        <Spinner size="xl" mb={4} />
+        <Heading size="md" mb={4}>
+          Loading...
+        </Heading>
+      </Box>
+    }>
+      <TokenVerificationFormContent />
+    </Suspense>
   )
 }

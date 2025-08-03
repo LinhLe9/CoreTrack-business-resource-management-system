@@ -18,12 +18,14 @@ public class ProductionTicketResponse {
     private String lastUpdateBy;
     private String lastUpdateBy_role;
 
-    List<ProductTicketDetailShortResponse> detail;
+    List<ProductionTicketDetailShortResponse> detail;
+    List<ProductionTicketStatusLogResponse> logs;
 
     // constructor
     public ProductionTicketResponse(Long id, String name, LocalDateTime completed_date, String status,
             LocalDateTime createdAt, String createdBy, String createdBy_role, LocalDateTime lastUpdatedAt,
-            String lastUpdateBy, String lastUpdateBy_role, List<ProductTicketDetailShortResponse> detail) {
+            String lastUpdateBy, String lastUpdateBy_role, List<ProductionTicketDetailShortResponse> detail, 
+            List<ProductionTicketStatusLogResponse> logs) {
         this.id = id;
         this.name = name;
         this.completed_date = completed_date;
@@ -35,10 +37,12 @@ public class ProductionTicketResponse {
         this.lastUpdateBy = lastUpdateBy;
         this.lastUpdateBy_role = lastUpdateBy_role;
         this.detail = detail;
+        this.logs = logs;
     }
     
     public ProductionTicketResponse(){}
 
+    //getter & setter
     public Long getId() {
         return id;
     }
@@ -119,14 +123,19 @@ public class ProductionTicketResponse {
         this.lastUpdateBy_role = lastUpdateBy_role;
     }
 
-    public List<ProductTicketDetailShortResponse> getDetail() {
+    public List<ProductionTicketDetailShortResponse> getDetail() {
         return detail;
     }
 
-    public void setDetail(List<ProductTicketDetailShortResponse> detail) {
+    public void setDetail(List<ProductionTicketDetailShortResponse> detail) {
         this.detail = detail;
     }
-    
-    //getter & setter
-    
+
+    public List<ProductionTicketStatusLogResponse> getLogs() {
+        return logs;
+    }
+
+    public void setLogs(List<ProductionTicketStatusLogResponse> logs) {
+        this.logs = logs;
+    }
 }

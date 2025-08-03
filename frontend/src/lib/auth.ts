@@ -8,9 +8,9 @@ export const logout = (message?: string) => {
   console.log('logout function called with message:', message);
   console.log('Current pathname:', window.location.pathname);
   
-  // Check if we're already on login page to avoid infinite redirects
-  if (window.location.pathname === '/login') {
-    console.log('Already on login page, skipping redirect');
+  // Check if we're already on home page to avoid infinite redirects
+  if (window.location.pathname === '/') {
+    console.log('Already on home page, skipping redirect');
     return;
   }
   
@@ -35,9 +35,9 @@ export const logout = (message?: string) => {
     }
   }
   
-  // Redirect to login page
-  console.log('Redirecting to login page...');
-  window.location.href = '/login';
+  // Redirect to home page
+  console.log('Redirecting to home page...');
+  window.location.href = '/';
 };
 
 export const isAuthenticated = (): boolean => {

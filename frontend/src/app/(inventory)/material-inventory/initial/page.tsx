@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Heading,
@@ -49,25 +49,15 @@ const InitialStockPage: React.FC = () => {
   const toast = useToast();
   const router = useRouter();
 
-  // Fetch autocomplete list
-  useEffect(() => {
-    const fetchAllMaterialVariants = async () => {
-      try {
-        const data = await getAllMaterialVariantsForAutocomplete();
-        setAllMaterialVariantsForAutocomplete(data);
-      } catch (err) {
-        console.error("Error fetching all material variants for autocomplete:", err);
-        toast({
-          title: 'Error',
-          description: 'Failed to load material variants for search.',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
-      }
-    };
-    fetchAllMaterialVariants();
-  }, [toast]);
+  // Handle material variant search
+  const handleMaterialVariantSearch = useCallback(async (search: string) => {
+    try {
+      const results = await getAllMaterialVariantsForAutocomplete(search);
+      setAllMaterialVariantsForAutocomplete(results);
+    } catch (err) {
+      console.error('Error searching material variants:', err);
+    }
+  }, []);
 
   const handleSelectMaterialVariant = (variantId: number) => {
     const variant = allMaterialVariantsForAutocomplete.find(v => v.variantId === variantId);
@@ -204,7 +194,7 @@ const InitialStockPage: React.FC = () => {
             Search and Select Materials
           </Text>
           <MaterialVariantSearchBar
-            onSearch={() => {}} // Not used for search, only for selection
+            onSearch={handleMaterialVariantSearch}
             onSelectMaterialVariant={handleSelectMaterialVariant}
             materialVariantsForAutocomplete={allMaterialVariantsForAutocomplete}
           />

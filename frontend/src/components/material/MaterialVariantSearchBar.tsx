@@ -12,6 +12,7 @@ import { MaterialVariantAutoComplete } from '../../types/material';
 interface MaterialVariantSearchBarProps {
   onSearch: (searchTerm: string) => void;
   onSelectMaterialVariant?: (variantId: number) => void;
+  initialSearchTerm?: string;
   materialVariantsForAutocomplete: MaterialVariantAutoComplete[];
 }
 
@@ -27,9 +28,12 @@ interface OptionType {
 const MaterialVariantSearchBar: React.FC<MaterialVariantSearchBarProps> = ({
   onSearch,
   onSelectMaterialVariant,
+  initialSearchTerm = '',
   materialVariantsForAutocomplete,
 }) => {
   const [selectedOption, setSelectedOption] = useState<OptionType | null>(null);
+  const [inputValue, setInputValue] = useState('');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const options: OptionType[] = materialVariantsForAutocomplete.map((variant) => ({
     value: variant.variantId,
@@ -42,6 +46,7 @@ const MaterialVariantSearchBar: React.FC<MaterialVariantSearchBarProps> = ({
 
   const handleChange = (option: OptionType | null) => {
     setSelectedOption(option);
+    setIsMenuOpen(false); // Close menu when option is selected
     if (option) {
       if (onSelectMaterialVariant) {
         onSelectMaterialVariant(option.value);
@@ -51,9 +56,21 @@ const MaterialVariantSearchBar: React.FC<MaterialVariantSearchBarProps> = ({
     }
   };
 
+  const handleInputChange = (newValue: string) => {
+    setInputValue(newValue);
+    if (newValue.length >= 2) {
+      onSearch(newValue);
+      setIsMenuOpen(true); // Open menu when user types
+    } else {
+      setIsMenuOpen(false); // Close menu when input is too short
+    }
+  };
+
   const handleSearch = () => {
     if (selectedOption) {
       onSearch(selectedOption.label);
+    } else if (inputValue) {
+      onSearch(inputValue);
     }
   };
 
@@ -86,6 +103,10 @@ const MaterialVariantSearchBar: React.FC<MaterialVariantSearchBarProps> = ({
           onChange={handleChange}
           value={selectedOption}
           isClearable
+          isSearchable
+          menuIsOpen={isMenuOpen && materialVariantsForAutocomplete.length > 0}
+          onMenuOpen={() => setIsMenuOpen(true)}
+          onMenuClose={() => setIsMenuOpen(false)}
           components={{ SingleValue: customSingleValue, Option: customOption }}
           filterOption={(option, inputValue) => {
             const nameMatch = option.label.toLowerCase().includes(inputValue.toLowerCase());
@@ -96,6 +117,7 @@ const MaterialVariantSearchBar: React.FC<MaterialVariantSearchBarProps> = ({
 
             return nameMatch || materialSkuMatch || variantSkuMatch || variantNameMatch || groupMatch;
           }}
+          onInputChange={handleInputChange}
         />
       </Box>
       <Button colorScheme="blue" onClick={handleSearch}>Search</Button>

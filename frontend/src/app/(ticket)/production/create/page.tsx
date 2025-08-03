@@ -54,7 +54,7 @@ import { getAllMaterialVariantsForAutocomplete } from '../../../../services/mate
 interface ProductVariantData {
   variant: ProductVariantAutoComplete;
   quantity: number;
-  expectedCompleteDate: string;
+  expectedCompleteDate: string; // YYYY-MM-DD date string
   bomItems: BOMItemResponse[];
   customBomItems: BomItemProductionTicketRequest[];
 }
@@ -66,6 +66,21 @@ const CreateProductionTicketPage: React.FC = () => {
   const [materialVariantSearchResults, setMaterialVariantSearchResults] = useState<MaterialVariantAutoComplete[]>([]);
   const [currentVariantIndex, setCurrentVariantIndex] = useState<number>(-1);
   const [currentMaterialIndex, setCurrentMaterialIndex] = useState<number>(-1);
+
+  // Helper function to convert date string to YYYY-MM-DD format
+  const convertToDateString = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      if (date instanceof Date && !isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0]; // Return YYYY-MM-DD format
+      }
+      throw new Error('Invalid date');
+    } catch (error) {
+      console.error('Error converting date:', dateString, error);
+      // Fallback to current date + 7 days
+      return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    }
+  };
   
   const { bulkCreateProductionTicket, bulkCreating, error, clearError } = useProductionTicket();
   const { fetchVariantAutocomplete, fetchBomItems } = useProduct();
@@ -123,15 +138,15 @@ const CreateProductionTicketPage: React.FC = () => {
       }
 
       // Get BOM items for the variant
-      const bomItems = await fetchBomItems(selectedVariant.variantId, selectedVariant.variantId);
+      const bomItems = await fetchBomItems(selectedVariant.productId, selectedVariant.variantId);
       
-      const newProductVariant: ProductVariantData = {
-        variant: selectedVariant,
-        quantity: 1,
-        expectedCompleteDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        bomItems,
-        customBomItems: [],
-      };
+             const newProductVariant: ProductVariantData = {
+         variant: selectedVariant,
+         quantity: 1,
+         expectedCompleteDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+         bomItems,
+         customBomItems: [],
+       };
 
       setProductVariants(prev => [...prev, newProductVariant]);
       setProductVariantSearchResults([]);
@@ -147,8 +162,15 @@ const CreateProductionTicketPage: React.FC = () => {
   }, [productVariants, productVariantSearchResults, fetchBomItems, toast]);
 
   // Handle material variant selection for custom BOM
-  const handleMaterialVariantSelect = useCallback((materialVariantId: number) => {
-    if (currentVariantIndex === -1 || currentMaterialIndex === -1) return;
+  const handleMaterialVariantSelect = useCallback((materialVariantId: number, variantIndex?: number, bomIndex?: number) => {
+    const targetVariantIndex = variantIndex ?? currentVariantIndex;
+    const targetBomIndex = bomIndex ?? currentMaterialIndex;
+    
+    console.log(`handleMaterialVariantSelect called with materialVariantId: ${materialVariantId}, targetVariantIndex: ${targetVariantIndex}, targetBomIndex: ${targetBomIndex}`);
+    if (targetVariantIndex === -1 || targetBomIndex === -1) {
+      console.log('Early return: targetVariantIndex or targetBomIndex is -1');
+      return;
+    }
 
     // Find the selected material variant from search results
     const selectedMaterialVariant = materialVariantSearchResults.find(m => m.variantId === materialVariantId);
@@ -163,21 +185,46 @@ const CreateProductionTicketPage: React.FC = () => {
       return;
     }
 
-    const newBomItem: BomItemProductionTicketRequest = {
-      materialVariantSku: selectedMaterialVariant.variantSku,
-      plannedQuantity: 1,
-      actualQuantity: 0,
-    };
+    // Check for duplicate material variant in the same product variant
+    const currentProductVariant = productVariants[targetVariantIndex];
+    const isDuplicate = currentProductVariant.customBomItems.some((item, index) => 
+      index !== targetBomIndex && item.materialVariantSku === selectedMaterialVariant.variantSku
+    );
+
+    if (isDuplicate) {
+      toast({
+        title: 'Duplicate Material Variant',
+        description: `Material variant "${selectedMaterialVariant.variantName}" has already been selected for this product variant.`,
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
 
     setProductVariants(prev => {
       const updated = [...prev];
-      updated[currentVariantIndex].customBomItems[currentMaterialIndex] = newBomItem;
+      const currentBomItem = updated[targetVariantIndex].customBomItems[targetBomIndex];
+      console.log('Current BOM item before update:', currentBomItem);
+      
+      // Keep existing quantities if they were already set
+      const plannedQuantity = currentBomItem.plannedQuantity > 0 ? currentBomItem.plannedQuantity : 1;
+      const actualQuantity = currentBomItem.actualQuantity > 0 ? currentBomItem.actualQuantity : 0;
+      
+      const updatedBomItem = {
+        materialVariantSku: selectedMaterialVariant.variantSku,
+        plannedQuantity: plannedQuantity,
+        actualQuantity: actualQuantity,
+      };
+      console.log('Updated BOM item:', updatedBomItem);
+      
+      updated[targetVariantIndex].customBomItems[targetBomIndex] = updatedBomItem;
       return updated;
     });
 
     setMaterialVariantSearchResults([]);
     setCurrentMaterialIndex(-1);
-  }, [currentVariantIndex, currentMaterialIndex, materialVariantSearchResults, toast]);
+  }, [currentVariantIndex, currentMaterialIndex, materialVariantSearchResults, productVariants, toast]);
 
   // Remove product variant
   const removeProductVariant = useCallback((index: number) => {
@@ -188,11 +235,13 @@ const CreateProductionTicketPage: React.FC = () => {
   const addCustomBomItem = useCallback((variantIndex: number) => {
     setProductVariants(prev => {
       const updated = [...prev];
-      updated[variantIndex].customBomItems.push({
+      const newBomItem = {
         materialVariantSku: '',
         plannedQuantity: 1,
         actualQuantity: 0,
-      });
+      };
+      console.log('Adding new BOM item:', newBomItem);
+      updated[variantIndex].customBomItems.push(newBomItem);
       return updated;
     });
   }, []);
@@ -230,16 +279,126 @@ const CreateProductionTicketPage: React.FC = () => {
       return;
     }
 
+    // Validate that each product variant has BOM items (either custom or from backend)
+    for (let i = 0; i < productVariants.length; i++) {
+      const pv = productVariants[i];
+      if (pv.customBomItems.length === 0 && pv.bomItems.length === 0) {
+        toast({
+          title: 'Missing BOM Items',
+          description: `Product variant "${pv.variant.variantName}" has no BOM items. Please add custom BOM items or ensure the variant has BOM items from backend.`,
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+        return;
+      }
+
+      // Validate custom BOM items if they exist
+      if (pv.customBomItems.length > 0) {
+        console.log(`Validating custom BOM items for ${pv.variant.variantName}:`, pv.customBomItems);
+        for (let j = 0; j < pv.customBomItems.length; j++) {
+          const bomItem = pv.customBomItems[j];
+          console.log(`BOM Item ${j + 1}:`, bomItem);
+          
+          // Check for empty material SKU
+          if (!bomItem.materialVariantSku || bomItem.materialVariantSku.trim() === '') {
+            console.log(`Empty material SKU found in BOM item ${j + 1}:`, bomItem.materialVariantSku);
+            toast({
+              title: 'Invalid BOM Item',
+              description: `Product variant "${pv.variant.variantName}" has a BOM item with empty material SKU. Please select a material variant.`,
+              status: 'error',
+              duration: 5000,
+              isClosable: true,
+            });
+            return;
+          }
+
+          // Check for invalid planned quantity
+          if (!bomItem.plannedQuantity || bomItem.plannedQuantity <= 0) {
+            toast({
+              title: 'Invalid Planned Quantity',
+              description: `Product variant "${pv.variant.variantName}" has a BOM item with invalid planned quantity. Please enter a value greater than 0.`,
+              status: 'error',
+              duration: 5000,
+              isClosable: true,
+            });
+            return;
+          }
+
+          // Check for invalid actual quantity (should be >= 0)
+          if (bomItem.actualQuantity < 0) {
+            toast({
+              title: 'Invalid Actual Quantity',
+              description: `Product variant "${pv.variant.variantName}" has a BOM item with invalid actual quantity. Please enter a value >= 0.`,
+              status: 'error',
+              duration: 5000,
+              isClosable: true,
+            });
+            return;
+          }
+        }
+      }
+    }
+
     try {
-      const request: BulkCreateProductionTicketRequest = {
-        name: title,
-        productVariants: productVariants.map(pv => ({
-          productVariantSku: pv.variant.variantSku,
-          quantity: pv.quantity,
-          expectedCompleteDate: pv.expectedCompleteDate,
-          boms: pv.customBomItems,
-        })),
-      };
+             const request: BulkCreateProductionTicketRequest = {
+         name: title,
+         productVariants: productVariants.map(pv => {
+           // Determine which BOM items to use
+           let boms: BomItemProductionTicketRequest[];
+           
+           if (pv.customBomItems.length > 0) {
+             // Use custom BOM items if user has created them
+             console.log(`Using custom BOM items for ${pv.variant.variantName}:`, pv.customBomItems);
+             boms = pv.customBomItems;
+           } else if (pv.bomItems.length > 0) {
+             // Convert backend BOM items to request format if no custom items
+             const convertedBoms = pv.bomItems
+               .filter(bomItem => bomItem.materialSku && bomItem.materialSku.trim() !== '') // Filter out empty material SKUs
+               .map(bomItem => ({
+                 materialVariantSku: bomItem.materialSku,
+                 plannedQuantity: parseFloat(bomItem.quantity) || 1,
+                 actualQuantity: parseFloat(bomItem.quantity) || 0,
+               }));
+             console.log(`Using backend BOM items for ${pv.variant.variantName}:`, convertedBoms);
+             boms = convertedBoms;
+           } else {
+             console.log(`No BOM items found for ${pv.variant.variantName}`);
+             boms = [];
+           }
+
+           // Validate that we have at least one valid BOM item
+           if (boms.length === 0) {
+             toast({
+               title: 'No Valid BOM Items',
+               description: `Product variant "${pv.variant.variantName}" has no valid BOM items. Please add at least one BOM item with a valid material variant.`,
+               status: 'error',
+               duration: 5000,
+               isClosable: true,
+             });
+             throw new Error('Validation failed');
+           }
+           
+           console.log(`Product variant ${pv.variant.variantName} expectedCompleteDate:`, pv.expectedCompleteDate);
+           
+           // Ensure expectedCompleteDate is in correct date format (YYYY-MM-DD)
+           let formattedDate = pv.expectedCompleteDate;
+           if (formattedDate.includes('T')) {
+             // If it's ISO string, extract just the date part
+             formattedDate = formattedDate.split('T')[0];
+             console.log(`Converted date format for ${pv.variant.variantName}:`, formattedDate);
+           }
+           
+           return {
+             productVariantSku: pv.variant.variantSku,
+             quantity: pv.quantity,
+             expectedCompleteDate: formattedDate,
+             boms,
+           };
+         }),
+       };
+
+      console.log('Final request:', request);
 
       const response = await bulkCreateProductionTicket(request);
       
@@ -251,7 +410,7 @@ const CreateProductionTicketPage: React.FC = () => {
         isClosable: true,
       });
 
-      router.push('/ticket/production');
+      router.push('/production');
     } catch (err: any) {
       toast({
         title: 'Error',
@@ -349,20 +508,26 @@ const CreateProductionTicketPage: React.FC = () => {
                   </NumberInput>
                 </FormControl>
 
-                <FormControl>
-                  <FormLabel>Expected Complete Date</FormLabel>
-                  <Input
-                    type="date"
-                    value={productVariant.expectedCompleteDate}
-                    onChange={(e) => {
-                      setProductVariants(prev => {
-                        const updated = [...prev];
-                        updated[variantIndex].expectedCompleteDate = e.target.value;
-                        return updated;
-                      });
-                    }}
-                  />
-                </FormControl>
+                                 <FormControl>
+                   <FormLabel>Expected Complete Date</FormLabel>
+                                            <Input
+                           type="date"
+                           value={productVariant.expectedCompleteDate}
+                     onChange={(e) => {
+                       setProductVariants(prev => {
+                         const updated = [...prev];
+                         console.log('Input value:', e.target.value);
+                         
+                         // Use helper function to convert to date string
+                         const dateString = convertToDateString(e.target.value);
+                         console.log('Converted date string:', dateString);
+                         updated[variantIndex].expectedCompleteDate = dateString;
+                         
+                         return updated;
+                       });
+                     }}
+                   />
+                 </FormControl>
               </HStack>
 
               {/* BOM Items Section */}
@@ -458,9 +623,8 @@ const CreateProductionTicketPage: React.FC = () => {
                         <MaterialVariantSearchBar
                           onSearch={handleMaterialVariantSearch}
                           onSelectMaterialVariant={(materialVariantId) => {
-                            setCurrentVariantIndex(variantIndex);
-                            setCurrentMaterialIndex(bomIndex);
-                            handleMaterialVariantSelect(materialVariantId);
+                            console.log(`Calling handleMaterialVariantSelect with variantIndex: ${variantIndex}, bomIndex: ${bomIndex}`);
+                            handleMaterialVariantSelect(materialVariantId, variantIndex, bomIndex);
                           }}
                           materialVariantsForAutocomplete={materialVariantSearchResults}
                         />

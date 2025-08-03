@@ -1,5 +1,6 @@
 package org.example.coretrack.service;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import org.example.coretrack.dto.material.AddMaterialRequest;
@@ -14,7 +15,9 @@ import org.example.coretrack.dto.material.ChangeMaterialStatusRequest;
 import org.example.coretrack.dto.material.ChangeMaterialStatusResponse;
 import org.example.coretrack.dto.material.MaterialStatusTransitionResponse;
 import org.example.coretrack.dto.material.MaterialVariantAutoCompleteResponse;
+import org.example.coretrack.dto.material.MaterialSupplierResponse;
 import org.example.coretrack.model.auth.User;
+import org.example.coretrack.model.material.MaterialVariant;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -51,4 +54,8 @@ public interface MaterialService {
 
     // to get available status transitions for a material
     MaterialStatusTransitionResponse getAvailableStatusTransitions(Long materialId);
+
+    // to get suppliers by material variant SKU
+    List<MaterialSupplierResponse> getSuppliersByMaterialVariantSku(String materialVariantSku);
+
 }

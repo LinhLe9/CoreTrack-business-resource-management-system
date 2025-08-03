@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Box, Text, Badge, Button, IconButton } from '@chakra-ui/react';
+import { Box, Text, Badge, Button, IconButton, VStack } from '@chakra-ui/react';
 import { CloseIcon } from '@chakra-ui/icons';
 import api from '@/lib/axios';
 
@@ -25,6 +25,30 @@ const BackendStatus: React.FC = () => {
       console.error('Backend connection failed:', error);
       setStatus('offline');
       setLastCheck(new Date());
+    }
+  };
+
+  const testSendNotification = async () => {
+    try {
+      const username = localStorage.getItem('username') || 'testuser';
+      await api.post('/test/websocket/send-notification', null, {
+        params: { username }
+      });
+      console.log('Test notification sent successfully');
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+    }
+  };
+
+  const testSendUnreadCount = async () => {
+    try {
+      const username = localStorage.getItem('username') || 'testuser';
+      await api.post('/test/websocket/send-unread-count', null, {
+        params: { username, count: 5 }
+      });
+      console.log('Test unread count sent successfully');
+    } catch (error) {
+      console.error('Error sending test unread count:', error);
     }
   };
 
@@ -82,9 +106,17 @@ const BackendStatus: React.FC = () => {
             Last check: {lastCheck.toLocaleTimeString()}
           </Text>
         )}
-        <Button size="xs" onClick={checkBackendStatus} isLoading={status === 'loading'}>
-          Retry
-        </Button>
+        <VStack spacing={2} align="stretch">
+          <Button size="xs" onClick={checkBackendStatus} isLoading={status === 'loading'}>
+            Retry
+          </Button>
+          <Button size="xs" onClick={testSendNotification} colorScheme="blue">
+            Test Notification
+          </Button>
+          <Button size="xs" onClick={testSendUnreadCount} colorScheme="green">
+            Test Unread Count
+          </Button>
+        </VStack>
       </Box>
     </Box>
   );

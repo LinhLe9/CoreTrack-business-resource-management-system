@@ -187,6 +187,29 @@ export const getProductInventoryFilter = async (params: any): Promise<any> => {
   return response.data;
 };
 
+// Product Inventory Alarm Filter
+export const getProductAlarmFilter = async (params: any): Promise<any> => {
+  const queryParams = new URLSearchParams();
+  
+  if (params.search) queryParams.append('search', params.search);
+  if (params.groupProducts) {
+    params.groupProducts.forEach((group: string) => {
+      queryParams.append('groupProducts', group);
+    });
+  }
+  if (params.status) {
+    params.status.forEach((status: string) => {
+      queryParams.append('status', status);
+    });
+  }
+  if (params.sortByOldest !== undefined) queryParams.append('sortByOldest', params.sortByOldest.toString());
+  if (params.page !== undefined) queryParams.append('page', params.page.toString());
+  if (params.size !== undefined) queryParams.append('size', params.size.toString());
+
+  const response = await apiClient.get(`/product-inventory/alarm/filter?${queryParams.toString()}`);
+  return response.data;
+};
+
 export const getAllProductInventoryForAutocomplete = async (search?: string): Promise<AllSearchInventoryResponse[]> => {
   const params = search ? `?search=${encodeURIComponent(search)}` : '';
   const response = await apiClient.get(`/product-inventory/autocomplete${params}`);

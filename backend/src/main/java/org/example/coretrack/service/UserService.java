@@ -4,7 +4,9 @@ import org.example.coretrack.dto.auth.AuthResponse;
 import org.example.coretrack.dto.auth.CreateUserRequest;
 import org.example.coretrack.dto.auth.LoginRequest;
 import org.example.coretrack.dto.auth.RegistrationRequest;
+import org.example.coretrack.dto.auth.UserDetailResponse;
 import org.example.coretrack.model.auth.User;
+import java.util.List;
 
 public interface UserService {
     // method to register
@@ -23,6 +25,15 @@ public interface UserService {
 
     // method to login
     AuthResponse login(LoginRequest loginRequest);
+    
+    // method to logout
+    void logout();
+    
+    // method to get all users with details
+    List<UserDetailResponse> getAllUsers();
+    
+    // method to get current user details
+    UserDetailResponse getCurrentUserDetails(String email);
     
 //
 //    void createPasswordResetTokenForUser(User user, String token);

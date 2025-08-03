@@ -817,6 +817,7 @@ public class ProductServiceImpl implements ProductService{
         
         return variants.stream()
                 .map(variant -> new ProductVariantAutoCompleteResponse(
+                    variant.getProduct().getId(),
                     variant.getId(),
                     variant.getProduct().getName(),
                     variant.getProduct().getSku(),
@@ -838,8 +839,9 @@ public class ProductServiceImpl implements ProductService{
         }
         
         List<BOMItemResponse> response = new ArrayList<>();
-        if(variant.getBom().getBomItems() != null && !variant.getBom().getBomItems().isEmpty()){
-            List<BOMItem> bomItem = variant.getBom().getBomItems();
+        BOM bom = variant.getBom();
+        if(bom != null && bom.getBomItems() != null && !bom.getBomItems().isEmpty()){
+            List<BOMItem> bomItem = bom.getBomItems();
             
             for (BOMItem item : bomItem){
                 BOMItemResponse itemResponse = new BOMItemResponse(

@@ -45,6 +45,8 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() 
                         .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/verify", "/api/auth/reset-password").permitAll()
+                        .requestMatchers("/api/products/test").permitAll()
+                        .requestMatchers("/api/test/websocket/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("OWNER")
                         .anyRequest().authenticated()
                 )
@@ -64,7 +66,7 @@ public class SecurityConfiguration {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of("http://localhost:3030")); 
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Client-Instance"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

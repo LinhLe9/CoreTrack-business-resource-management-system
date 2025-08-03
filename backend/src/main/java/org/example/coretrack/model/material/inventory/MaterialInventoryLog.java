@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 import org.example.coretrack.model.auth.User;
 import org.example.coretrack.model.product.inventory.InventoryTransactionType;
+import org.example.coretrack.model.product.inventory.StockType;
 
 import jakarta.persistence.*;
 
@@ -21,6 +22,10 @@ public class MaterialInventoryLog {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "material_inventory_id", nullable = false) 
     private MaterialInventory materialInventory;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "stock_type", nullable = false)
+    private StockType stockType;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false)
@@ -64,12 +69,13 @@ public class MaterialInventoryLog {
     public MaterialInventoryLog() {
     }
 
-    public MaterialInventoryLog(LocalDateTime transactionTimestamp, MaterialInventory materialInventory,
+    public MaterialInventoryLog(LocalDateTime transactionTimestamp, MaterialInventory materialInventory, StockType stockType,
                                 InventoryTransactionType transactionType, materialInventoryTransactionSourceType transactionSourceType,
                                 BigDecimal quantity, BigDecimal beforeQuantity, BigDecimal afterQuantity, String note,
                                 materialInventoryReferenceDocumentType referenceDocumentType, Long referenceDocumentId, User createdBy) {
         this.transactionTimestamp = transactionTimestamp;
         this.materialInventory = materialInventory;
+        this.stockType = stockType;
         this.transactionType = transactionType;
         this.transactionSourceType = transactionSourceType;
         this.quantity = quantity;
@@ -202,5 +208,13 @@ public class MaterialInventoryLog {
 
     public void setAfterQuantity(BigDecimal afterQuantity) {
         this.afterQuantity = afterQuantity;
+    }
+
+    public StockType getStockType() {
+        return stockType;
+    }
+
+    public void setStockType(StockType stockType) {
+        this.stockType = stockType;
     }
 }

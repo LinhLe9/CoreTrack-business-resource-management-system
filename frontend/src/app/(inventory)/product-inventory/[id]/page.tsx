@@ -49,6 +49,7 @@ interface InventoryTransaction {
   referenceDocumentType?: string;
   referenceDocumentId?: number;
   transactionSource?: string;
+  stockType?: string;
   createdAt: string;
   createdBy?: string;
   user_role?: string;
@@ -254,13 +255,18 @@ const ProductInventoryDetailPage: React.FC = () => {
                   {transactions.map((transaction) => (
                     <Card key={transaction.id} size="sm" variant="outline">
                       <CardBody>
-                        <Grid templateColumns={{ base: '1fr', md: '2fr 1fr 1fr 1fr' }} gap={4}>
+                        <Grid templateColumns={{ base: '1fr', md: '2fr 1fr 1fr 1fr 1fr' }} gap={4}>
                           <GridItem>
                             <VStack align="start" spacing={1}>
                               <HStack>
                                 <Badge colorScheme={getTransactionTypeColor(transaction.transactionType)}>
                                   {transaction.transactionType}
                                 </Badge>
+                                {transaction.stockType && (
+                                  <Badge colorScheme="blue" variant="outline">
+                                    {transaction.stockType}
+                                  </Badge>
+                                )}
                                 {transaction.referenceDocumentType && (
                                   <Badge colorScheme="purple" variant="outline">
                                     {transaction.referenceDocumentType}

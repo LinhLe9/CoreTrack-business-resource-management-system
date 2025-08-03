@@ -51,6 +51,9 @@ public class ProductionTicketDetail {
     @OneToMany(mappedBy = "productionTicketDetail", cascade = CascadeType.ALL)
     private List<BomItemProductionTicketDetail> bomItem = new ArrayList<>();
 
+    @OneToMany(mappedBy = "productionTicketDetail", cascade = CascadeType.ALL)
+    private List<ProductionTicketDetailStatusLog> statusLogs = new ArrayList<>();
+
     // status and date 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -200,6 +203,14 @@ public class ProductionTicketDetail {
 
     public void setBomItem(List<BomItemProductionTicketDetail> bomItem) {
         this.bomItem = bomItem;
+    }
+
+    public List<ProductionTicketDetailStatusLog> getStatusLogs() {
+        return statusLogs;
+    }
+
+    public void setStatusLogs(List<ProductionTicketDetailStatusLog> statusLogs) {
+        this.statusLogs = statusLogs;
     }
 
     

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import {
   Box, Button, FormControl, FormLabel, Input, Heading, VStack, useToast
 } from '@chakra-ui/react';
-import api, { resetLogoutFlag } from '@/lib/axios'; 
+import api, { resetLogoutFlag } from '@/lib/axios';
+import notificationPollingService from '@/services/websocketService';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
@@ -26,6 +27,9 @@ export default function LoginForm() {
       const token = res.data.token;
       localStorage.removeItem("token");
       localStorage.setItem("token", token);
+
+      // Start notification polling after successful login
+      notificationPollingService.startAfterLogin();
 
       // pop up noti
       toast({

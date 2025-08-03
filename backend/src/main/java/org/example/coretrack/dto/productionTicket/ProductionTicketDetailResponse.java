@@ -15,6 +15,8 @@ public class ProductionTicketDetailResponse {
     private LocalDateTime expected_complete_date;
     private LocalDateTime completed_date;
 
+    private List<ProductionTicketDetailStatusLogResponse> logs;
+
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdatedAt;
 
@@ -27,7 +29,8 @@ public class ProductionTicketDetailResponse {
     // constructor
     public ProductionTicketDetailResponse(Long id, String productVariantSku, BigDecimal quantity,
             List<BomItemProductionTicketResponse> boms, String status, LocalDateTime expected_complete_date,
-            LocalDateTime completed_date, LocalDateTime createdAt, LocalDateTime lastUpdatedAt, String createdBy_name,
+            LocalDateTime completed_date, List<ProductionTicketDetailStatusLogResponse> logs,
+            LocalDateTime createdAt, LocalDateTime lastUpdatedAt, String createdBy_name,
             String createdBy_role, String lastUpdatedAt_name, String lastUpdatedAt_role) {
         this.id = id;
         this.productVariantSku = productVariantSku;
@@ -36,6 +39,7 @@ public class ProductionTicketDetailResponse {
         this.status = status;
         this.expected_complete_date = expected_complete_date;
         this.completed_date = completed_date;
+        this.logs = logs;
         this.createdAt = createdAt;
         this.lastUpdatedAt = lastUpdatedAt;
         this.createdBy_name = createdBy_name;
@@ -149,5 +153,13 @@ public class ProductionTicketDetailResponse {
 
     public void setLastUpdatedAt_role(String lastUpdatedAt_role) {
         this.lastUpdatedAt_role = lastUpdatedAt_role;
+    }
+
+    public List<ProductionTicketDetailStatusLogResponse> getLogs() {
+        return logs;
+    }
+
+    public void setLogs(List<ProductionTicketDetailStatusLogResponse> logs) {
+        this.logs = logs;
     }
 }

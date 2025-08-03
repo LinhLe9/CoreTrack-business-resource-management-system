@@ -184,7 +184,7 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
 
           {/* Column 4: Action Buttons - Vertical layout */}
           {!isSelectionMode && (
-            <Box flexShrink={0} display="flex" flexDirection="column" gap={2} alignSelf={{ base: "center", lg: "flex-start" }}>
+            <Box flexShrink={0} display="flex" flexDirection="column" gap={2} alignSelf={{ base: "center", lg: "flex-start" }} position="relative" zIndex={10}>
               <IconButton
                 aria-label="Add stock"
                 icon={<AddIcon />}
@@ -217,13 +217,13 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
           )}
         </Flex>
 
-        {/* Clickable overlay for navigation */}
+        {/* Clickable overlay for navigation - excluding action buttons area */}
         <NextLink href={`/product-inventory/${productInventory.id}`} passHref>
           <Box
             position="absolute"
             top={0}
             left={0}
-            right={0}
+            right={!isSelectionMode ? "60px" : 0} // Exclude space for action buttons
             bottom={0}
             cursor="pointer"
             zIndex={1}

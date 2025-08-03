@@ -15,6 +15,7 @@ import org.example.coretrack.dto.material.ChangeMaterialStatusResponse;
 import org.example.coretrack.dto.material.MaterialStatusTransitionResponse;
 import org.example.coretrack.dto.material.UoMResponse;
 import org.example.coretrack.dto.material.MaterialVariantAutoCompleteResponse;
+import org.example.coretrack.dto.material.MaterialSupplierResponse;
 import org.example.coretrack.model.auth.User;
 import org.example.coretrack.model.material.UoM;
 import org.example.coretrack.repository.UserRepository;
@@ -262,6 +263,26 @@ public class MaterialController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new MaterialStatusTransitionResponse(id, null, null, 
                     "Internal server error: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Endpoint for getting suppliers by material variant SKU
+     * Returns list of suppliers that can supply the material variant
+     */
+    @GetMapping("/variants/{materialVariantSku}/suppliers")
+    public ResponseEntity<List<MaterialSupplierResponse>> getSuppliersByMaterialVariantSku(
+            @PathVariable String materialVariantSku) {
+        try {
+            List<MaterialSupplierResponse> suppliers = materialService.getSuppliersByMaterialVariantSku(materialVariantSku);
+            return ResponseEntity.ok(suppliers);
+        } catch (RuntimeException e) {
+            // Handle material variant not found
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, 
+                "Error retrieving suppliers for material variant: " + e.getMessage());
         }
     }
 }

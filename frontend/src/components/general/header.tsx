@@ -7,6 +7,7 @@ import {
   MenuButton,
   MenuList,
   MenuItem,
+  MenuDivider,
   Button,
   IconButton,
   Drawer,
@@ -16,16 +17,37 @@ import {
   DrawerHeader,
   DrawerBody,
   useDisclosure,
+  HStack,
+  Text,
 } from "@chakra-ui/react";
-import { ChevronDownIcon, BellIcon, HamburgerIcon } from "@chakra-ui/icons";
+import { ChevronDownIcon, HamburgerIcon } from "@chakra-ui/icons";
 import { FaUserCircle } from "react-icons/fa";
 import NextLink from "next/link";
 import Image from "next/image";
 import { useRef } from "react";
+import NotificationBell from "@/components/NotificationBell";
+import { useRouter } from "next/navigation";
+import userService from "@/services/userService";
 
 export default function Header() {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const btnRef = useRef<HTMLButtonElement>(null);
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await userService.logout();
+      // Clear token from localStorage
+      localStorage.removeItem('token');
+      // Redirect to home page
+      router.push('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Fallback: clear token and redirect
+      localStorage.removeItem('token');
+      router.push('/');
+    }
+  };
 
   return (
     <Box bg="white" borderBottom="1px solid" borderColor="gray.200" px={4} py={2}>
@@ -109,14 +131,29 @@ export default function Header() {
 
         {/* Right side: User actions */}
         <Flex align="center" gap={4}>
-          <IconButton aria-label="Notify" icon={<BellIcon />} variant="ghost" />
+          <NotificationBell />
 
-          <NextLink href="/profile" passHref>
-            <Box display="flex" alignItems="center" gap={2} color="blue.600" _hover={{ color: "blue.700" }} cursor="pointer">
-              <FaUserCircle size={20} />
-              <Box display={{ base: "none", sm: "block" }}>Student Portal</Box>
-            </Box>
-          </NextLink>
+          {/* User Menu */}
+          <Menu>
+            <MenuButton as={Button} variant="ghost" rightIcon={<ChevronDownIcon />}>
+              <HStack spacing={2}>
+                <FaUserCircle size={16} />
+                <Text display={{ base: "none", sm: "block" }}>User</Text>
+              </HStack>
+            </MenuButton>
+            <MenuList>
+              <MenuItem as="a" href="/user-management">
+                Admin Dashboard
+              </MenuItem>
+              <MenuItem as="a" href="/profile">
+                Profile
+              </MenuItem>
+              <MenuDivider />
+              <MenuItem onClick={handleLogout} color="red.500">
+                Logout
+              </MenuItem>
+            </MenuList>
+          </Menu>
         </Flex>
       </Flex>
 
@@ -177,6 +214,28 @@ export default function Header() {
                 </MenuItem>
                 <MenuItem as="a" href="/sale">
                   Sale Invoice
+                </MenuItem>
+              </MenuList>
+            </Menu>
+
+            {/* User Menu for Mobile */}
+            <Menu>
+              <MenuButton as={Button} variant="ghost" rightIcon={<ChevronDownIcon />}>
+                <HStack spacing={2}>
+                  <FaUserCircle size={16} />
+                  <Text>User</Text>
+                </HStack>
+              </MenuButton>
+              <MenuList>
+                <MenuItem as="a" href="/admin">
+                  Admin Dashboard
+                </MenuItem>
+                <MenuItem as="a" href="/profile">
+                  Profile
+                </MenuItem>
+                <MenuDivider />
+                <MenuItem onClick={handleLogout} color="red.500">
+                  Logout
                 </MenuItem>
               </MenuList>
             </Menu>

@@ -34,12 +34,15 @@ import org.example.coretrack.model.product.inventory.InventoryTransactionType;
 import org.example.coretrack.model.product.inventory.ProductInventory;
 import org.example.coretrack.model.product.inventory.ProductInventoryReferenceDocumentType;
 import org.example.coretrack.model.product.inventory.ProductInventoryTransactionSourceType;
+import org.example.coretrack.model.product.inventory.StockType;
 import org.example.coretrack.model.product.inventory.ProductInventoryLog;
 import org.example.coretrack.repository.ProductInventoryLogRepository;
 import org.example.coretrack.repository.ProductInventoryRepository;
 import org.example.coretrack.repository.ProductVariantRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
@@ -56,6 +59,9 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
 
     @Autowired
     private ProductInventoryLogRepository productInventoryLogRepository;
+
+    @Autowired
+    private NotificationService notificationService;
 
     @Override
     @Transactional
@@ -100,6 +106,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
         ProductInventoryLog inventoryLog = new ProductInventoryLog(
             LocalDateTime.now(),
             inventory,
+            StockType.CURRENT,
             InventoryTransactionType.SET,
             ProductInventoryTransactionSourceType.PRODUCT_WAREHOUSE_TRANSFER_IN,
             request.getCurrentStock(),
@@ -156,6 +163,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             ProductInventoryLog inventoryLog = new ProductInventoryLog(
                 LocalDateTime.now(),
                 productInventory,
+                StockType.CURRENT,
                 InventoryTransactionType.SET,
                 ProductInventoryTransactionSourceType.SET_INVENTORY,
                 result,
@@ -169,10 +177,20 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             productInventory.getLogs().add(inventoryLog);
             productInventory.setCurrentStock(request.getNewQuantity());
 
+            InventoryStatus oldStatus = productInventory.getInventoryStatus();
             InventoryStatus status = handelStatus(productInventory.getCurrentStock(), productInventory.getFutureStock(), 
                                                     productInventory.getAllocatedStock(), productInventory.getMinAlertStock(), productInventory.getMaxStockLevel());
             
             productInventory.setInventoryStatus(status);
+            
+            // Update audit fields
+            productInventory.setUpdatedAt(LocalDateTime.now());
+            productInventory.setUpdated_by(user);
+            
+            // Create notification if status changed to alarm status
+            if (!oldStatus.equals(status)) {
+                notificationService.createInventoryNotification(user, productInventory, oldStatus, status);
+            }
             
             return new InventoryTransactionResponse(
                 inventoryLog.getId(),
@@ -184,6 +202,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
                 inventoryLog.getNote(),
                 inventoryLog.getReferenceDocumentType().toString(),
                 inventoryLog.getReferenceDocumentId(),
+                inventoryLog.getStockType().getDisplayName(),
                 LocalDateTime.now(),
                 user.getUsername(),
                 user.getRole().toString()
@@ -194,6 +213,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             ProductInventoryLog inventoryLog = new ProductInventoryLog(
                 LocalDateTime.now(),
                 null,
+                StockType.CURRENT,
                 InventoryTransactionType.SET,
                 ProductInventoryTransactionSourceType.PRODUCT_WAREHOUSE_TRANSFER_IN,
                 request.getNewQuantity(),
@@ -233,6 +253,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
                 inventoryLog.getNote(),
                 inventoryLog.getReferenceDocumentType().toString(),
                 inventoryLog.getReferenceDocumentId(),
+                inventoryLog.getStockType().getDisplayName(),
                 LocalDateTime.now(),
                 user.getUsername(),
                 user.getRole().toString()
@@ -275,6 +296,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             ProductInventoryLog inventoryLog = new ProductInventoryLog(
                 LocalDateTime.now(),
                 productInventory,
+                StockType.CURRENT,
                 InventoryTransactionType.IN,
                 source,
                 request.getNewQuantity(),
@@ -288,11 +310,21 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             productInventory.getLogs().add(inventoryLog);
             productInventory.setCurrentStock(result);
 
+            InventoryStatus oldStatus = productInventory.getInventoryStatus();
             InventoryStatus status = handelStatus(result, productInventory.getFutureStock(), productInventory.getAllocatedStock()
                                                     , productInventory.getMinAlertStock(), productInventory.getMaxStockLevel());
 
             productInventory.setInventoryStatus(status);
-
+            
+            // Update audit fields
+            productInventory.setUpdatedAt(LocalDateTime.now());
+            productInventory.setUpdated_by(user);
+            
+            // Create notification if status changed to alarm status
+            if (!oldStatus.equals(status)) {
+                notificationService.createInventoryNotification(user, productInventory, oldStatus, status);
+            }
+            
             return new InventoryTransactionResponse(
                 inventoryLog.getId(),
                 inventoryLog.getTransactionType().toString(),
@@ -303,6 +335,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
                 inventoryLog.getNote(),
                 inventoryLog.getReferenceDocumentType().toString(),
                 inventoryLog.getReferenceDocumentId(),
+                inventoryLog.getStockType().getDisplayName(),
                 LocalDateTime.now(),
                 user.getUsername(),
                 user.getRole().toString()
@@ -313,6 +346,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             ProductInventoryLog inventoryLog = new ProductInventoryLog(
                 LocalDateTime.now(),
                 null,
+                StockType.CURRENT,
                 InventoryTransactionType.IN,
                 source,
                 request.getNewQuantity(),
@@ -345,6 +379,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
                 inventoryLog.getNote(),
                 inventoryLog.getReferenceDocumentType().toString(),
                 inventoryLog.getReferenceDocumentId(),
+                inventoryLog.getStockType().getDisplayName(),
                 LocalDateTime.now(),
                 user.getUsername(),
                 user.getRole().toString()
@@ -388,6 +423,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             ProductInventoryLog inventoryLog = new ProductInventoryLog(
                 LocalDateTime.now(),
                 productInventory,
+                StockType.CURRENT,
                 InventoryTransactionType.OUT,
                 source,
                 request.getNewQuantity(),
@@ -400,6 +436,22 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             );
             productInventory.getLogs().add(inventoryLog);
             productInventory.setCurrentStock(afterQuantity);
+            
+            InventoryStatus oldStatus = productInventory.getInventoryStatus();
+            InventoryStatus status = handelStatus(afterQuantity, productInventory.getFutureStock(), productInventory.getAllocatedStock()
+                                                    , productInventory.getMinAlertStock(), productInventory.getMaxStockLevel());
+            
+            productInventory.setInventoryStatus(status);
+            
+            // Update audit fields
+            productInventory.setUpdatedAt(LocalDateTime.now());
+            productInventory.setUpdated_by(user);
+            
+            // Create notification if status changed to alarm status
+            if (!oldStatus.equals(status)) {
+                notificationService.createInventoryNotification(user, productInventory, oldStatus, status);
+            }
+            
             return new InventoryTransactionResponse(
                 inventoryLog.getId(),
                 inventoryLog.getTransactionType().toString(),
@@ -410,6 +462,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
                 inventoryLog.getNote(),
                 inventoryLog.getReferenceDocumentType().toString(),
                 inventoryLog.getReferenceDocumentId(),
+                inventoryLog.getStockType().getDisplayName(),
                 LocalDateTime.now(),
                 user.getUsername(),
                 user.getRole().toString()
@@ -887,6 +940,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
         ProductInventoryLog log = new ProductInventoryLog(
             LocalDateTime.now(),
             inventory,
+            StockType.FUTURE,
             InventoryTransactionType.IN,
             ProductInventoryTransactionSourceType.PRODUCTION_COMPLETION,
             quantity,
@@ -911,27 +965,44 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
         }
 
         // Validate future stock is sufficient
-        BigDecimal currentFutureStock = inventory.getFutureStock() != null ? inventory.getFutureStock() : BigDecimal.ZERO;
-        if (currentFutureStock.compareTo(quantity) < 0) {
-            throw new RuntimeException("Insufficient future stock. Available: " + currentFutureStock + ", Required: " + quantity);
+        BigDecimal oldFutureStock = inventory.getFutureStock() != null ? inventory.getFutureStock() : BigDecimal.ZERO;
+        if (oldFutureStock.compareTo(quantity) < 0) {
+            inventory.setFutureStock(BigDecimal.ZERO);
+        } else {
+            BigDecimal newFutureStock = oldFutureStock.subtract(quantity);
+            inventory.setFutureStock(newFutureStock);
         }
-
+        // Create log for this operation
+        ProductInventoryLog log = new ProductInventoryLog(
+            LocalDateTime.now(),
+            inventory,
+            StockType.FUTURE,
+            InventoryTransactionType.IN,
+            ProductInventoryTransactionSourceType.PRODUCTION_COMPLETION,
+            quantity,
+            oldFutureStock,
+            inventory.getFutureStock(),
+            "Stock moved from future to current for production ticket",
+            ProductInventoryReferenceDocumentType.PRODUCTION_TICKET,
+            ticketId, // Use the provided ticketId
+            user
+        );
+        inventory.getLogs().add(log);
         // Store old values for logging
-        BigDecimal oldFutureStock = currentFutureStock;
         BigDecimal oldCurrentStock = inventory.getCurrentStock() != null ? inventory.getCurrentStock() : BigDecimal.ZERO;
-        BigDecimal newFutureStock = oldFutureStock.subtract(quantity);
         BigDecimal newCurrentStock = oldCurrentStock.add(quantity);
 
         // Move from future to current stock
-        inventory.setFutureStock(newFutureStock);
+        
         inventory.setCurrentStock(newCurrentStock);
         inventory.setUpdatedAt(LocalDateTime.now());
         inventory.setUpdated_by(user);
 
         // Create log for this operation
-        ProductInventoryLog log = new ProductInventoryLog(
+        ProductInventoryLog log2 = new ProductInventoryLog(
             LocalDateTime.now(),
             inventory,
+            StockType.CURRENT,
             InventoryTransactionType.IN,
             ProductInventoryTransactionSourceType.PRODUCTION_COMPLETION,
             quantity,
@@ -942,8 +1013,8 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             ticketId, // Use the provided ticketId
             user
         );
-
-        inventory.getLogs().add(log);
+        
+        inventory.getLogs().add(log2);   
         return productInventoryRepository.save(inventory);
     }
 
@@ -956,17 +1027,13 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
         }
 
         // Validate future stock is sufficient
-        BigDecimal currentFutureStock = inventory.getFutureStock() != null ? inventory.getFutureStock() : BigDecimal.ZERO;
-        if (currentFutureStock.compareTo(quantity) < 0) {
-            throw new RuntimeException("Insufficient future stock. Available: " + currentFutureStock + ", Required: " + quantity);
+        BigDecimal oldFutureStock = inventory.getFutureStock() != null ? inventory.getFutureStock() : BigDecimal.ZERO;
+        if (oldFutureStock.compareTo(quantity) < 0) {
+            inventory.setFutureStock(BigDecimal.ZERO);
+        } else {
+            BigDecimal newFutureStock = oldFutureStock.subtract(quantity);
+            inventory.setFutureStock(newFutureStock);
         }
-
-        // Store old values for logging
-        BigDecimal oldFutureStock = currentFutureStock;
-        BigDecimal newFutureStock = oldFutureStock.subtract(quantity);
-
-        // Remove from future stock
-        inventory.setFutureStock(newFutureStock);
         inventory.setUpdatedAt(LocalDateTime.now());
         inventory.setUpdated_by(user);
 
@@ -974,11 +1041,12 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
         ProductInventoryLog log = new ProductInventoryLog(
             LocalDateTime.now(),
             inventory,
+            StockType.FUTURE,
             InventoryTransactionType.OUT,
             ProductInventoryTransactionSourceType.PRODUCTION_CONSUMPTION,
             quantity,
             oldFutureStock,
-            newFutureStock,
+            inventory.getFutureStock(),
             "Future stock removed for production ticket cancellation",
             ProductInventoryReferenceDocumentType.PRODUCTION_TICKET,
             ticketId, // Use the provided ticketId
@@ -998,17 +1066,14 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
         }
 
         // Validate current stock is sufficient
-        BigDecimal currentStock = inventory.getCurrentStock() != null ? inventory.getCurrentStock() : BigDecimal.ZERO;
-        if (currentStock.compareTo(quantity) < 0) {
-            throw new RuntimeException("Insufficient current stock. Available: " + currentStock + ", Required: " + quantity);
+        BigDecimal oldCurrentStock = inventory.getCurrentStock() != null ? inventory.getCurrentStock() : BigDecimal.ZERO;
+        if (oldCurrentStock.compareTo(quantity) < 0) {
+            inventory.setCurrentStock(BigDecimal.ZERO);
+        } else {
+            BigDecimal newCurrentStock = oldCurrentStock.subtract(quantity);
+            inventory.setCurrentStock(newCurrentStock);
         }
 
-        // Store old values for logging
-        BigDecimal oldCurrentStock = currentStock;
-        BigDecimal newCurrentStock = oldCurrentStock.subtract(quantity);
-
-        // Remove from current stock
-        inventory.setCurrentStock(newCurrentStock);
         inventory.setUpdatedAt(LocalDateTime.now());
         inventory.setUpdated_by(user);
 
@@ -1016,11 +1081,12 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
         ProductInventoryLog log = new ProductInventoryLog(
             LocalDateTime.now(),
             inventory,
+            StockType.CURRENT,
             InventoryTransactionType.OUT,
             ProductInventoryTransactionSourceType.PRODUCTION_CONSUMPTION,
             quantity,
             oldCurrentStock,
-            newCurrentStock,
+            inventory.getCurrentStock(),
             "Current stock removed for production ticket cancellation",
             ProductInventoryReferenceDocumentType.PRODUCTION_TICKET,
             ticketId, // Use the provided ticketId
@@ -1035,6 +1101,284 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
     @Transactional(readOnly = true)
     public ProductInventory getByProductVariantId(Long variantId) {
         return productInventoryRepository.findByProductVariant_Id(variantId).orElse(null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<SearchInventoryResponse> getAlarmProduct(
+            String search,
+            List<String> groupProducts,
+            List<String> status,
+            boolean sortByOldest,
+            Pageable pageable) {
+        
+        System.out.println("=== GET ALARM PRODUCTS DEBUG ===");
+        System.out.println("Search: " + search);
+        System.out.println("Group Products: " + groupProducts);
+        System.out.println("Status: " + status);
+        System.out.println("Sort By Oldest: " + sortByOldest);
+        System.out.println("Pageable: " + pageable);
+        System.out.println("=====================================");
+
+        // Process search parameter
+        String processedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        
+        // Process group products parameter - convert string IDs to Long
+        List<Long> groupProductIds = null;
+        if (groupProducts != null && !groupProducts.isEmpty()) {
+            try {
+                groupProductIds = groupProducts.stream()
+                    .map(Long::parseLong)
+                    .collect(Collectors.toList());
+            } catch (NumberFormatException e) {
+                throw new RuntimeException("Invalid group product ID format");
+            }
+        }
+
+        // Process status parameter - convert string to InventoryStatus
+        List<InventoryStatus> statusList = null;
+        if (status != null && !status.isEmpty()) {
+            try {
+                statusList = status.stream()
+                    .map(s -> InventoryStatus.valueOf(s.toUpperCase()))
+                    .collect(Collectors.toList());
+            } catch (IllegalArgumentException e) {
+                throw new RuntimeException("Invalid status format: " + e.getMessage());
+            }
+        }
+
+        // Create pageable with sorting by updatedAt
+        Pageable sortedPageable;
+        if (sortByOldest) {
+            // Sort by oldest (ascending order of updatedAt)
+            sortedPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                org.springframework.data.domain.Sort.by("updatedAt").ascending()
+            );
+        } else {
+            // Sort by newest (descending order of updatedAt) - default
+            sortedPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                org.springframework.data.domain.Sort.by("updatedAt").descending()
+            );
+        }
+
+        // Call repository method with status filtering and sorting
+        Page<Object[]> rawResults = productInventoryRepository.searchAlarmInventoryWithUpdatedAt(
+            processedSearch, groupProductIds, statusList, sortedPageable);
+        
+        // Convert Object[] to SearchInventoryResponse
+        List<SearchInventoryResponse> content = rawResults.getContent().stream()
+            .map(row -> new SearchInventoryResponse(
+                (Long) row[0],      // id
+                (String) row[1],    // sku
+                (String) row[2],    // name
+                (String) row[3],    // groupName
+                (InventoryStatus) row[4], // inventoryStatus
+                (BigDecimal) row[5], // currentStock
+                (BigDecimal) row[6], // minAlertStock
+                (BigDecimal) row[7], // maxStockLevel
+                (String) row[8]     // imageUrl
+            ))
+            .collect(Collectors.toList());
+        
+        Page<SearchInventoryResponse> result = new PageImpl<>(
+            content, sortedPageable, rawResults.getTotalElements());
+            
+        System.out.println("Alarm Result total elements: " + result.getTotalElements());
+        System.out.println("Alarm Result content size: " + result.getContent().size());
+        System.out.println("Alarm Result content: " + result.getContent());
+        System.out.println("=====================================");
+        
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public ProductInventory addToAllocatedStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
+        ProductInventory inventory = getByProductVariantId(variantId);
+        if (inventory == null) {
+            throw new RuntimeException("ProductInventory not found for variant ID: " + variantId);
+        }
+
+        // Validate current stock is sufficient
+        BigDecimal oldAllocatedtock = inventory.getAllocatedStock() != null ? inventory.getAllocatedStock() : BigDecimal.ZERO;
+        BigDecimal availableStock = inventory.getCurrentStock().subtract(oldAllocatedtock);
+        if (availableStock.compareTo(quantity) < 0) {
+            throw new RuntimeException("Available stock is not enough to allocate this quantity");
+        } else {
+            BigDecimal newAllocatedStock = oldAllocatedtock.add(quantity);
+            inventory.setAllocatedStock(newAllocatedStock);
+        }
+        inventory.setUpdatedAt(LocalDateTime.now());
+        inventory.setUpdated_by(user);
+
+        // Create log for this operation
+        ProductInventoryLog log = new ProductInventoryLog(
+            LocalDateTime.now(),
+            inventory,
+            StockType.ALLOCATED,
+            InventoryTransactionType.OUT,
+            ProductInventoryTransactionSourceType.SALES_ORDER_FULFILLMENT,
+            quantity,
+            oldAllocatedtock,
+            inventory.getAllocatedStock(),
+            "Allocate stock for sales order fulfillment",
+            ProductInventoryReferenceDocumentType.SALES_ORDER,
+            ticketId, // Use the provided ticketId
+            user
+        );
+
+        inventory.getLogs().add(log);
+        return productInventoryRepository.save(inventory);
+    }
+
+    @Override
+    @Transactional
+    public ProductInventory removeFromAllocatedAndCurrentStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
+        ProductInventory inventory = getByProductVariantId(variantId);
+        if (inventory == null) {
+            throw new RuntimeException("ProductInventory not found for variant ID: " + variantId);
+        }
+
+        // Validate current stock is sufficient
+        BigDecimal oldCurrentStock = inventory.getCurrentStock() != null ? inventory.getCurrentStock() : BigDecimal.ZERO;
+        if (oldCurrentStock.compareTo(quantity) < 0) {
+            inventory.setCurrentStock(BigDecimal.ZERO);
+        } else {
+            BigDecimal newCurrentStock = oldCurrentStock.subtract(quantity);
+            inventory.setCurrentStock(newCurrentStock);
+        }
+
+        inventory.setUpdatedAt(LocalDateTime.now());
+        inventory.setUpdated_by(user);
+
+        // Create log for this operation
+        ProductInventoryLog log = new ProductInventoryLog(
+            LocalDateTime.now(),
+            inventory,
+            StockType.CURRENT,
+            InventoryTransactionType.OUT,
+            ProductInventoryTransactionSourceType.SALES_ORDER_FULFILLMENT,
+            quantity,
+            oldCurrentStock,
+            inventory.getCurrentStock(),
+            "Current stock removed for Sale Order",
+            ProductInventoryReferenceDocumentType.SALES_ORDER,
+            ticketId, // Use the provided ticketId
+            user
+        );
+        inventory.getLogs().add(log);
+
+        // Validate Allocated stock is sufficient
+        BigDecimal oldAllocatedStock = inventory.getAllocatedStock() != null ? inventory.getAllocatedStock() : BigDecimal.ZERO;
+        if (oldAllocatedStock.compareTo(quantity) < 0) {
+            inventory.setAllocatedStock(BigDecimal.ZERO);
+        } else {
+            BigDecimal newAllocatedStock = oldAllocatedStock.subtract(quantity);
+            inventory.setCurrentStock(newAllocatedStock);
+        }
+
+        inventory.setUpdatedAt(LocalDateTime.now());
+        inventory.setUpdated_by(user);
+
+        // Create log for this operation
+        ProductInventoryLog log2 = new ProductInventoryLog(
+            LocalDateTime.now(),
+            inventory,
+            StockType.ALLOCATED,
+            InventoryTransactionType.OUT,
+            ProductInventoryTransactionSourceType.SALES_ORDER_FULFILLMENT,
+            quantity,
+            oldAllocatedStock,
+            inventory.getAllocatedStock(),
+            "Allocated stock removed for Sale Order",
+            ProductInventoryReferenceDocumentType.SALES_ORDER,
+            ticketId, // Use the provided ticketId
+            user
+        );
+
+        inventory.getLogs().add(log2);
+        return productInventoryRepository.save(inventory);
+    }
+
+    @Override
+    @Transactional
+    public ProductInventory removeFromAllocatedStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
+        ProductInventory inventory = getByProductVariantId(variantId);
+        if (inventory == null) {
+            throw new RuntimeException("ProductInventory not found for variant ID: " + variantId);
+        }
+
+        // Validate Allocated stock is sufficient
+        BigDecimal oldAllocatedStock = inventory.getAllocatedStock() != null ? inventory.getAllocatedStock() : BigDecimal.ZERO;
+        if (oldAllocatedStock.compareTo(quantity) < 0) {
+            inventory.setAllocatedStock(BigDecimal.ZERO);
+        } else {
+            BigDecimal newAllocatedStock = oldAllocatedStock.subtract(quantity);
+            inventory.setCurrentStock(newAllocatedStock);
+        }
+
+        inventory.setUpdatedAt(LocalDateTime.now());
+        inventory.setUpdated_by(user);
+
+        // Create log for this operation
+        ProductInventoryLog log2 = new ProductInventoryLog(
+            LocalDateTime.now(),
+            inventory,
+            StockType.ALLOCATED,
+            InventoryTransactionType.IN,
+            ProductInventoryTransactionSourceType.SALES_ORDER_FULFILLMENT,
+            quantity,
+            oldAllocatedStock,
+            inventory.getAllocatedStock(),
+            "Allocated stock removed for Sale Cancel",
+            ProductInventoryReferenceDocumentType.SALES_ORDER,
+            ticketId, // Use the provided ticketId
+            user
+        );
+
+        inventory.getLogs().add(log2);
+        return productInventoryRepository.save(inventory);
+    }
+
+    @Override
+    @Transactional
+    public ProductInventory addToCurrentStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
+        ProductInventory inventory = getByProductVariantId(variantId);
+        if (inventory == null) {
+            throw new RuntimeException("ProductInventory not found for variant ID: " + variantId);
+        }
+
+        // Validate Allocated stock is sufficient
+        BigDecimal oldCurrentStock = inventory.getCurrentStock() != null ? inventory.getCurrentStock() : BigDecimal.ZERO;
+        BigDecimal newCurrentStock = oldCurrentStock.add(quantity);
+        inventory.setCurrentStock(newCurrentStock);
+        
+
+        inventory.setUpdatedAt(LocalDateTime.now());
+        inventory.setUpdated_by(user);
+
+        // Create log for this operation
+        ProductInventoryLog log2 = new ProductInventoryLog(
+            LocalDateTime.now(),
+            inventory,
+            StockType.CURRENT,
+            InventoryTransactionType.IN,
+            ProductInventoryTransactionSourceType.CUSTOMER_RETURN,
+            quantity,
+            oldCurrentStock,
+            inventory.getAllocatedStock(),
+            "Current stock added for Sale Cancel",
+            ProductInventoryReferenceDocumentType.SALES_ORDER,
+            ticketId, // Use the provided ticketId
+            user
+        );
+
+        inventory.getLogs().add(log2);
+        return productInventoryRepository.save(inventory);
     }
 
 }

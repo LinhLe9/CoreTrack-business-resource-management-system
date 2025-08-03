@@ -31,6 +31,7 @@ public interface ProductInventoryService {
     InventoryTransactionResponse addStock (Long variantId, StockModifyRequest request, User user);
 
     InventoryTransactionResponse subtractStock (Long variantId, StockModifyRequest request, User user);
+    
 
     Page<SearchInventoryResponse> findProduct(
             String search,
@@ -66,5 +67,14 @@ public interface ProductInventoryService {
     ProductInventory moveFromFutureToCurrentStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
     ProductInventory removeFromFutureStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
     ProductInventory removeFromCurrentStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
+    ProductInventory removeFromAllocatedAndCurrentStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
+    ProductInventory addToAllocatedStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
+    ProductInventory removeFromAllocatedStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
+    ProductInventory addToCurrentStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
     ProductInventory getByProductVariantId(Long variantId);
+    Page<SearchInventoryResponse> getAlarmProduct(String search,
+            List<String> groupProducts,
+            List<String> status,
+            boolean sortByOldest,
+            Pageable pageable);
 }

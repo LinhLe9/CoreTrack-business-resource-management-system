@@ -7,6 +7,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -31,6 +32,13 @@ public class User implements UserDetails {
 
     private boolean enabled;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
     // Constructor
     public User(String username, String email, String password, Role role, boolean enabled) {
         this.username = username;
@@ -38,6 +46,16 @@ public class User implements UserDetails {
         this.password = password;
         this.role = role;
         this.enabled = enabled;
+    }
+
+    public User(String username, String email, String password, Role role, boolean enabled, User createdBy) {
+        this.username = username;
+        this.email = email;
+        this.password = password;
+        this.role = role;
+        this.enabled = enabled;
+        this.createdBy = createdBy;
+        this.createdAt = LocalDateTime.now();
     }
 
     public User() {
@@ -112,5 +130,21 @@ public class User implements UserDetails {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public User getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(User createdBy) {
+        this.createdBy = createdBy;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 }

@@ -70,6 +70,7 @@ export interface ProductAutoComplete{
 }
 
 export interface ProductVariantAutoComplete {
+  productId: number;
   variantId: number;
   productName: string;
   productSku: string;

@@ -1,11 +1,14 @@
 package org.example.coretrack.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
+import javax.management.RuntimeErrorException;
 
 import org.example.coretrack.dto.productionTicket.BomItemProductionTicketRequest;
 import org.example.coretrack.dto.productionTicket.BomItemProductionTicketResponse;
@@ -13,10 +16,12 @@ import org.example.coretrack.dto.productionTicket.BulkCreateProductionTicketRequ
 import org.example.coretrack.dto.productionTicket.BulkCreateProductionTicketResponse;
 import org.example.coretrack.dto.productionTicket.CreateProductionTicketRequest;
 import org.example.coretrack.dto.productionTicket.CreateProductionTicketResponse;
-import org.example.coretrack.dto.productionTicket.ProductTicketDetailShortResponse;
+import org.example.coretrack.dto.productionTicket.ProductionTicketDetailShortResponse;
+import org.example.coretrack.dto.productionTicket.ProductionTicketDetailStatusLogResponse;
 import org.example.coretrack.dto.productionTicket.ProductionTicketCardResponse;
 import org.example.coretrack.dto.productionTicket.ProductionTicketDetailResponse;
 import org.example.coretrack.dto.productionTicket.ProductionTicketResponse;
+import org.example.coretrack.dto.productionTicket.ProductionTicketStatusLogResponse;
 import org.example.coretrack.dto.productionTicket.ProductionTicketStatusesResponse;
 import org.example.coretrack.dto.productionTicket.StatusTransitionRule;
 import org.example.coretrack.dto.productionTicket.UpdateDetailStatusRequest;
@@ -42,6 +47,7 @@ import org.example.coretrack.model.product.inventory.ProductInventory;
 import org.example.coretrack.model.product.inventory.InventoryStatus;
 import org.example.coretrack.model.product.inventory.InventoryTransactionType;
 import org.example.coretrack.model.product.inventory.ProductInventoryTransactionSourceType;
+import org.example.coretrack.model.product.inventory.StockType;
 import org.example.coretrack.model.product.inventory.ProductInventoryReferenceDocumentType;
 import org.example.coretrack.model.product.inventory.ProductInventoryLog;
 import org.example.coretrack.dto.productionTicket.ProductVariantBomRequest;
@@ -50,6 +56,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
+import org.example.coretrack.model.notification.Notification;
+import org.example.coretrack.model.notification.NotificationType;
 
 @Service
 public class ProductionTicketServiceImpl implements ProductionTicketService{
@@ -79,6 +87,12 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
 
     @Autowired
     private ProductInventoryService productInventoryService;
+
+    @Autowired 
+    private MaterialInventoryService materialInventoryService;
+
+    @Autowired
+    private NotificationService notificationService;
 
     /*
      * This use for user to create a production ticket for one productVariant by choose directly its sku from alarm
@@ -115,6 +129,18 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         if (inventory == null) {
             // We'll create the ProductInventory after the ProductionTicket is saved
             // so we can use the ticket ID as referenceDocumentId
+        }
+
+        // check if material is enough 
+        if (request.getBoms() != null && !request.getBoms().isEmpty()) {
+            for (BomItemProductionTicketRequest bomRequest : request.getBoms()) {
+                MaterialVariant materialVariant = materialVariantRepository.findBySku(bomRequest.getMaterialVariantSku())
+                    .orElseThrow(() -> new RuntimeException("Material Variant not found with SKU: " + bomRequest.getMaterialVariantSku()));
+                boolean check = materialInventoryService.isEnough(materialVariant, bomRequest.getPlannedQuantity());
+                if(check == false){
+                    throw new RuntimeException("Material Variant Stock for material variant sku " + materialVariant.getSku() + " for create production ticket");
+                }
+            }
         }
 
         // Create production ticket
@@ -207,7 +233,6 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         return response;
     }
 
-
     /*
      * Used when user create a production ticket including a list of production ticket detail
      */
@@ -231,50 +256,94 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
             ticket.setUpdatedBy(user);
 
             // Process each product variant to create ProductionTicketDetails
-            for (ProductVariantBomRequest productVariantRequest : request.getProductVariants()) {
+            for (int i = 0; i < request.getProductVariants().size(); i++) {
+                ProductVariantBomRequest productVariantRequest = request.getProductVariants().get(i);
+                System.out.println("=== Processing productVariant " + (i + 1) + " of " + request.getProductVariants().size() + " ===");
+                
                 try {
                     String sku = productVariantRequest.getProductVariantSku();
                     BigDecimal quantity = productVariantRequest.getQuantity();
-                    LocalDateTime expectedCompleteDate = productVariantRequest.getExpectedCompleteDate();
+                    LocalDate expectedCompleteDate = productVariantRequest.getExpectedCompleteDate();
+                    // Convert LocalDate to LocalDateTime with default time 00:00:00
+                    LocalDateTime expectedCompleteDateTime = expectedCompleteDate.atStartOfDay();
                     List<BomItemProductionTicketRequest> boms = productVariantRequest.getBoms();
+                    
+                    System.out.println("Processing SKU: " + sku + ", Quantity: " + quantity + ", ExpectedDate: " + expectedCompleteDate);
 
                     // Get ProductVariant
+                    System.out.println("Looking for ProductVariant with SKU: " + sku);
                     ProductVariant variant = productVariantRepository.findBySku(sku)
                         .orElseThrow(() -> new RuntimeException("Product Variant not found with SKU: " + sku));
+                    System.out.println("Found ProductVariant: " + variant.getName() + " (ID: " + variant.getId() + ")");
 
                     // Check if ProductInventory exists, if not we'll create it after ticket creation
                     ProductInventory inventory = productInventoryService.getByProductVariantId(variant.getId());
                     boolean needToCreateInventory = (inventory == null);
+                    System.out.println("ProductInventory exists: " + (inventory != null) + ", needToCreateInventory: " + needToCreateInventory);
+
+                    // check if material is enough 
+                    if (boms != null && !boms.isEmpty()) {
+                        for (BomItemProductionTicketRequest bomRequest : boms) {
+                            MaterialVariant materialVariant = materialVariantRepository.findBySku(bomRequest.getMaterialVariantSku())
+                                .orElseThrow(() -> new RuntimeException("Material Variant not found with SKU: " + bomRequest.getMaterialVariantSku()));
+                            boolean check = materialInventoryService.isEnough(materialVariant, bomRequest.getPlannedQuantity());
+                            if(check == false){
+                                throw new RuntimeException("Material Variant Stock for material variant sku " + materialVariant.getSku() + " for create production ticket");
+                            }
+                        }
+                    }
 
                     // Create ProductionTicketDetail
                     ProductionTicketDetail detail = new ProductionTicketDetail();
                     detail.setProductVariant(variant);
                     detail.setQuantity(quantity);
                     detail.setStatus(ProductionTicketDetailStatus.NEW);
-                    detail.setExpected_complete_date(expectedCompleteDate);
+                    detail.setExpected_complete_date(expectedCompleteDateTime);
                     detail.setCompleted_date(null);
                     detail.setCreatedAt(LocalDateTime.now());
                     detail.setUpdatedAt(LocalDateTime.now());
                     detail.setCreatedBy(user);
                     detail.setUpdatedBy(user);
                     detail.setProductionTicket(ticket);
+                    detail.setActive(true); // Set isActive to true
 
                     // Add BOM items if provided
                     if (boms != null && !boms.isEmpty()) {
+                        System.out.println("Processing " + boms.size() + " BOM items for SKU: " + sku);
                         for (BomItemProductionTicketRequest bomRequest : boms) {
-                            MaterialVariant materialVariant = materialVariantRepository.findBySku(bomRequest.getMaterialVariantSku())
-                                .orElseThrow(() -> new RuntimeException("Material Variant not found with SKU: " + bomRequest.getMaterialVariantSku()));
+                            String materialSku = bomRequest.getMaterialVariantSku();
+                            System.out.println("Processing BOM item with material SKU: " + materialSku);
                             
-                            if (!materialVariant.isActive()) {
-                                throw new RuntimeException("Material Variant is not active");
+                            // Skip BOM items with empty or null material SKU
+                            if (materialSku == null || materialSku.trim().isEmpty()) {
+                                System.out.println("Skipping BOM item with empty material SKU");
+                                continue;
                             }
+                            
+                            try {
+                                MaterialVariant materialVariant = materialVariantRepository.findBySku(materialSku)
+                                    .orElseThrow(() -> new RuntimeException("Material Variant not found with SKU: " + materialSku));
+                                
+                                System.out.println("Found material variant: " + materialVariant.getName() + ", active: " + materialVariant.isActive());
+                                
+                                if (!materialVariant.isActive()) {
+                                    System.out.println("Skipping inactive material variant: " + materialSku);
+                                    continue;
+                                }
 
-                            BomItemProductionTicketDetail bomItem = new BomItemProductionTicketDetail();
-                            bomItem.setMaterialVariant(materialVariant);
-                            bomItem.setPlannedQuantity(bomRequest.getPlannedQuantity());
-                            bomItem.setActualQuantity(bomRequest.getActualQuantity());
-                            bomItem.setProductionTicketDetail(detail);
-                            detail.getBomItem().add(bomItem);
+                                BomItemProductionTicketDetail bomItem = new BomItemProductionTicketDetail();
+                                bomItem.setMaterialVariant(materialVariant);
+                                bomItem.setPlannedQuantity(bomRequest.getPlannedQuantity());
+                                bomItem.setActualQuantity(bomRequest.getActualQuantity());
+                                bomItem.setProductionTicketDetail(detail);
+                                detail.getBomItem().add(bomItem);
+                                
+                                System.out.println("Added BOM item for material: " + materialVariant.getName());
+                            } catch (Exception e) {
+                                System.err.println("Error processing BOM item with SKU " + materialSku + ": " + e.getMessage());
+                                // Continue processing other BOM items instead of failing the entire ticket
+                                continue;
+                            }
                         }
                     }
 
@@ -283,48 +352,78 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
 
                     // If we need to create ProductInventory, do it now
                     if (needToCreateInventory) {
+                        System.out.println("Creating default product inventory for SKU: " + sku);
                         createDefaultProductInventory(variant, user, ticket.getId());
+                        System.out.println("Created product inventory for SKU: " + sku);
                     }
 
                     totalCreated++;
+                    System.out.println("Successfully processed SKU: " + sku + ", totalCreated: " + totalCreated);
 
                 } catch (Exception e) {
                     String error = "Failed to create production ticket detail for SKU " + 
                                  productVariantRequest.getProductVariantSku() + ": " + e.getMessage();
+                    System.err.println("=== ERROR in bulk create for productVariant " + (i + 1) + " ===");
+                    System.err.println("Error: " + error);
+                    e.printStackTrace();
                     errors.add(error);
                     totalFailed++;
+                    System.err.println("=== END ERROR ===");
                 }
             }
 
-            // Save the ticket with all details
-            ticket = productionTicketRepository.save(ticket);
+            // Only save the ticket if at least one detail was created successfully
+            if (totalCreated > 0) {
+                System.out.println("At least one detail created successfully (" + totalCreated + "), saving ticket...");
+                
+                // Save the ticket with all details
+                ticket = productionTicketRepository.save(ticket);
+                System.out.println("Saved production ticket with ID: " + ticket.getId());
 
-            // Create initial status logs for the ticket and all details
-            createInitialTicketStatusLog(ticket, user); // Only one ticket status log
-            for (ProductionTicketDetail detail : ticket.getTicketDetail()) {
-                createInitialDetailStatusLog(detail, user); // One log per detail
-            }
+                // Create initial status logs for the ticket and all details
+                System.out.println("Creating initial status logs...");
+                try {
+                    createInitialTicketStatusLog(ticket, user); // Only one ticket status log
+                    for (ProductionTicketDetail detail : ticket.getTicketDetail()) {
+                        createInitialDetailStatusLog(detail, user); // One log per detail
+                    }
+                    System.out.println("Finished creating status logs");
+                } catch (Exception e) {
+                    System.err.println("Error creating status logs: " + e.getMessage());
+                    e.printStackTrace();
+                    // Don't throw exception to avoid rolling back the ticket creation
+                    // Add error to errors list but don't fail the entire operation
+                    errors.add("Warning: Status logs could not be created: " + e.getMessage());
+                }
 
-            // Create response for each detail
-            for (ProductionTicketDetail detail : ticket.getTicketDetail()) {
-                CreateProductionTicketResponse response = new CreateProductionTicketResponse(
-                    ticket.getId(),
-                    ticket.getName(),
-                    detail.getProductVariant().getSku(),
-                    detail.getProductVariant().getId(),
-                    detail.getQuantity(),
-                    detail.getStatus().getDisplayName(),
-                    detail.getExpected_complete_date(),
-                    detail.getCompleted_date(),
-                    detail.getCreatedAt(),
-                    detail.getCreatedBy().getUsername(),
-                    detail.getCreatedBy().getRole().toString()
-                );
-                createdTickets.add(response);
+                // Create response for each detail
+                for (ProductionTicketDetail detail : ticket.getTicketDetail()) {
+                    CreateProductionTicketResponse response = new CreateProductionTicketResponse(
+                        ticket.getId(),
+                        ticket.getName(),
+                        detail.getProductVariant().getSku(),
+                        detail.getProductVariant().getId(),
+                        detail.getQuantity(),
+                        detail.getStatus().getDisplayName(),
+                        detail.getExpected_complete_date(),
+                        detail.getCompleted_date(),
+                        detail.getCreatedAt(),
+                        detail.getCreatedBy().getUsername(),
+                        detail.getCreatedBy().getRole().toString()
+                    );
+                    createdTickets.add(response);
+                }
+            } else {
+                System.out.println("No details were created successfully, skipping ticket creation");
+                // If no details were created, mark all as failed
+                totalFailed = totalRequested;
+                errors.add("No production ticket details could be created successfully");
             }
 
         } catch (Exception e) {
             String error = "Failed to create bulk production ticket: " + e.getMessage();
+            System.err.println("Error in bulk create main: " + error);
+            e.printStackTrace();
             errors.add(error);
             totalFailed = totalRequested;
         }
@@ -342,27 +441,59 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
     }
 
     private void createInitialTicketStatusLog(ProductionTicket ticket, User user) {
-        // Create initial ProductionTicket status log (only once per ticket)
-        ProductionTicketStatusLog ticketStatusLog = new ProductionTicketStatusLog();
-        ticketStatusLog.setProductionTicket(ticket);
-        ticketStatusLog.setOld_status(null); // No previous status for new ticket
-        ticketStatusLog.setNew_status(ProductionTicketStatus.NEW);
-        ticketStatusLog.setNote("Production ticket created");
-        ticketStatusLog.setUpdatedAt(LocalDateTime.now());
-        ticketStatusLog.setUpdatedBy(user);
-        productionTicketStatusLogRepository.save(ticketStatusLog);
+        try {
+            // Create initial ProductionTicket status log (only once per ticket)
+            ProductionTicketStatusLog ticketStatusLog = new ProductionTicketStatusLog();
+            ticketStatusLog.setProductionTicket(ticket);
+            
+            // Set status values
+            ProductionTicketStatus newStatus = ProductionTicketStatus.NEW;
+            ticketStatusLog.setOld_status(newStatus);
+            ticketStatusLog.setNew_status(newStatus);
+            ticketStatusLog.setNote("Production ticket created");
+            ticketStatusLog.setUpdatedAt(LocalDateTime.now());
+            ticketStatusLog.setUpdatedBy(user);
+            
+            System.out.println("About to save ticket status log with old_status: " + ticketStatusLog.getOld_status());
+            System.out.println("About to save ticket status log with new_status: " + ticketStatusLog.getNew_status());
+            System.out.println("Ticket ID: " + ticket.getId());
+            System.out.println("User ID: " + user.getId());
+            
+            ProductionTicketStatusLog savedLog = productionTicketStatusLogRepository.save(ticketStatusLog);
+            System.out.println("Created ticket status log with ID: " + savedLog.getId());
+        } catch (Exception e) {
+            System.err.println("Error creating ticket status log: " + e.getMessage());
+            e.printStackTrace();
+            throw e; // Re-throw to see the error in the main flow
+        }
     }
 
     private void createInitialDetailStatusLog(ProductionTicketDetail detail, User user) {
-        // Create initial ProductionTicketDetail status log (one per detail)
-        ProductionTicketDetailStatusLog detailStatusLog = new ProductionTicketDetailStatusLog();
-        detailStatusLog.setProductionTicketDetail(detail);
-        detailStatusLog.setOld_status(null); // No previous status for new detail
-        detailStatusLog.setNew_status(ProductionTicketDetailStatus.NEW);
-        detailStatusLog.setNote("Production ticket detail created");
-        detailStatusLog.setUpdatedAt(LocalDateTime.now());
-        detailStatusLog.setUpdatedBy(user);
-        productionTicketDetailStatusLogRepository.save(detailStatusLog);
+        try {
+            // Create initial ProductionTicketDetail status log (one per detail)
+            ProductionTicketDetailStatusLog detailStatusLog = new ProductionTicketDetailStatusLog();
+            detailStatusLog.setProductionTicketDetail(detail);
+            
+            // Set status values
+            ProductionTicketDetailStatus newStatus = ProductionTicketDetailStatus.NEW;
+            detailStatusLog.setOld_status(newStatus);
+            detailStatusLog.setNew_status(newStatus);
+            detailStatusLog.setNote("Production ticket detail created");
+            detailStatusLog.setUpdatedAt(LocalDateTime.now());
+            detailStatusLog.setUpdatedBy(user);
+            
+            System.out.println("About to save detail status log with old_status: " + detailStatusLog.getOld_status());
+            System.out.println("About to save detail status log with new_status: " + detailStatusLog.getNew_status());
+            System.out.println("Detail ID: " + detail.getId());
+            System.out.println("User ID: " + user.getId());
+            
+            ProductionTicketDetailStatusLog savedLog = productionTicketDetailStatusLogRepository.save(detailStatusLog);
+            System.out.println("Created detail status log with ID: " + savedLog.getId() + " for detail ID: " + detail.getId());
+        } catch (Exception e) {
+            System.err.println("Error creating detail status log: " + e.getMessage());
+            e.printStackTrace();
+            throw e; // Re-throw to see the error in the main flow
+        }
     }
 
     @Override
@@ -370,27 +501,43 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         ProductionTicket ticket = productionTicketRepository.findByIdAndIsActive(id, true)
             .orElseThrow(() -> new RuntimeException("Production Ticket not found with id: " + id));
 
-        List<ProductTicketDetailShortResponse> response = new ArrayList<>();
-
-        if (ticket.getTicketDetail() != null && !ticket.getTicketDetail().isEmpty()) {
-            response = ticket.getTicketDetail().stream()
-                .map(detail -> new ProductTicketDetailShortResponse(
-                        detail.getId(),
-                        detail.getProductVariant().getSku(),
-                        detail.getQuantity(),
-                        detail.getExpected_complete_date(),
-                        detail.getCompleted_date(),
-                        detail.getStatus().getDisplayName(),
-                        detail.getCreatedAt(),
-                        detail.getUpdatedAt(),
-                        detail.getCreatedBy().getUsername(),
-                        detail.getCreatedBy().getRole().name(),
-                        detail.getUpdatedBy().getUsername(),
-                        detail.getUpdatedBy().getRole().name()
+        List<ProductionTicketDetailShortResponse> response = 
+            (ticket.getTicketDetail() != null && !ticket.getTicketDetail().isEmpty()) 
+                ? ticket.getTicketDetail().stream()
+                    .map(detail -> new ProductionTicketDetailShortResponse(
+                            detail.getId(),
+                            detail.getProductVariant().getSku(),
+                            detail.getQuantity(),
+                            detail.getExpected_complete_date(),
+                            detail.getCompleted_date(),
+                            detail.getStatus().getDisplayName(),
+                            detail.getCreatedAt(),
+                            detail.getUpdatedAt(),
+                            detail.getCreatedBy().getUsername(),
+                            detail.getCreatedBy().getRole().name(),
+                            detail.getUpdatedBy().getUsername(),
+                            detail.getUpdatedBy().getRole().name()
+                        )
                     )
-                )
-                .collect(Collectors.toList());
-        }
+                    .collect(Collectors.toList())
+                : new ArrayList<>();
+
+        List<ProductionTicketStatusLogResponse> logs = 
+            (ticket.getStatusLogs() != null && !ticket.getStatusLogs().isEmpty())
+                ? ticket.getStatusLogs().stream()
+                    .map(log -> new ProductionTicketStatusLogResponse(
+                        log.getId(),
+                        ticket.getId(),
+                        ticket.getName(),
+                        log.getNew_status().getDisplayName(),
+                        log.getOld_status() != null ? log.getOld_status().getDisplayName() : "N/A",
+                        log.getNote(),
+                        log.getUpdatedAt(),
+                        log.getUpdatedBy().getUsername(),
+                        log.getUpdatedBy().getRole().name()
+                    )
+                ).collect(Collectors.toList())
+                : new ArrayList<>();
 
         return new ProductionTicketResponse(
             ticket.getId(),
@@ -403,7 +550,8 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
             ticket.getUpdatedAt(),
             ticket.getUpdatedBy().getUsername(),
             ticket.getUpdatedBy().getRole().name(),
-            response
+            response,
+            logs
         );
     }
 
@@ -464,16 +612,21 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
      */
     @Override
     public ProductionTicketDetailResponse getProductionTicketDetails(Long id, Long detailId) {
+        System.out.println("getProductionTicketDetails called with ticketId: " + id + ", detailId: " + detailId);
+        
         // First verify the production ticket exists
         ProductionTicket ticket = productionTicketRepository.findByIdAndIsActive(id, true)
             .orElseThrow(() -> new RuntimeException("Production Ticket not found with id: " + id));
+        System.out.println("Found production ticket: " + ticket.getName());
         
         // Find the specific detail
         ProductionTicketDetail detail = productionTicketDetailRepository.findByIdAndIsActive(detailId, true)
             .orElseThrow(() -> new RuntimeException("Production Ticket Detail not found with id: " + detailId));
+        System.out.println("Found production ticket detail: " + detail.getId() + ", belongs to ticket: " + detail.getProductionTicket().getId());
         
         // Verify the detail belongs to the ticket
         if (!detail.getProductionTicket().getId().equals(id)) {
+            System.out.println("Detail does not belong to ticket. Detail ticket ID: " + detail.getProductionTicket().getId() + ", requested ticket ID: " + id);
             throw new RuntimeException("Production Ticket Detail does not belong to the specified Production Ticket");
         }
         
@@ -488,6 +641,22 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
                     bom.getPlannedQuantity()))
                 .collect(Collectors.toList());
         }
+
+        // Get Logs for this detail
+        List<ProductionTicketDetailStatusLogResponse> logs = new ArrayList<>();
+        if (detail.getStatusLogs() != null && !detail.getStatusLogs().isEmpty()){
+            logs = detail.getStatusLogs().stream()
+                .map(log -> new ProductionTicketDetailStatusLogResponse(
+                    log.getId(),
+                    detail.getId(),
+                    log.getNew_status().getDisplayName(),
+                    log.getOld_status() != null ? log.getOld_status().getDisplayName() : null,
+                    log.getNote(),
+                    log.getUpdatedAt(),
+                    log.getUpdatedBy().getUsername(),
+                    log.getUpdatedBy().getRole().name()
+                )).collect(Collectors.toList());
+        }
         
         return new ProductionTicketDetailResponse(
             detail.getId(),
@@ -497,6 +666,7 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
             detail.getStatus().getDisplayName(),
             detail.getExpected_complete_date(),
             detail.getCompleted_date(),
+            logs,
             detail.getCreatedAt(),
             detail.getUpdatedAt(),
             detail.getCreatedBy().getUsername(),
@@ -544,18 +714,18 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         return List.of(
             new StatusTransitionRule(
                 ProductionTicketDetailStatus.NEW,
-                List.of(ProductionTicketDetailStatus.APPROVAL, ProductionTicketDetailStatus.CANCELLED),
-                "New tickets can be approved or cancelled"
+                List.of(ProductionTicketDetailStatus.APPROVAL),
+                "New tickets can be approved"
             ),
             new StatusTransitionRule(
                 ProductionTicketDetailStatus.APPROVAL,
-                List.of(ProductionTicketDetailStatus.COMPLETE, ProductionTicketDetailStatus.CANCELLED),
-                "Approved tickets can be completed or cancelled"
+                List.of(ProductionTicketDetailStatus.COMPLETE),
+                "Approved tickets can be completed"
             ),
             new StatusTransitionRule(
                 ProductionTicketDetailStatus.COMPLETE,
-                List.of(ProductionTicketDetailStatus.READY, ProductionTicketDetailStatus.CANCELLED),
-                "Completed tickets can be made ready or cancelled"
+                List.of(ProductionTicketDetailStatus.READY),
+                "Completed tickets can be made ready"
             ),
             new StatusTransitionRule(
                 ProductionTicketDetailStatus.READY,
@@ -607,6 +777,9 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         detail.setUpdatedAt(LocalDateTime.now());
         detail.setUpdatedBy(user);
         
+        if(detail.getStatus().compareTo(ProductionTicketDetailStatus.READY)==0){
+            detail.setCompleted_date(LocalDateTime.now());
+        }
         // Save the detail
         detail = productionTicketDetailRepository.save(detail);
         
@@ -617,7 +790,19 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         updateProductInventory(detail, oldStatus, request.getNewStatus(), user);
         
         // Update production ticket status based on all details
+        ProductionTicketStatus oldTicketStatus = ticket.getStatus();
         updateProductionTicketStatusBasedOnDetails(ticket, user);
+        if(ticket.getStatus().compareTo(ProductionTicketStatus.COMPLETE) == 0){
+            ticket.setCompleted_date(LocalDateTime.now());
+        }
+        
+        // Create notification for status changes
+        if (!oldStatus.equals(request.getNewStatus())) {
+            createProductionTicketDetailNotification(user, detail, oldStatus, request.getNewStatus());
+        }
+        if (!oldTicketStatus.equals(ticket.getStatus())) {
+            createProductionTicketNotification(user, ticket, oldTicketStatus, ticket.getStatus());
+        }
         
         // Return updated detail response
         return getProductionTicketDetails(ticketId, detailId);
@@ -625,44 +810,73 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
 
     @Override
     public ProductionTicket cancelProductionTicket(Long ticketId, String reason, User user) {
-        ProductionTicket ticket = productionTicketRepository.findByIdAndIsActive(ticketId, true)
-            .orElseThrow(() -> new RuntimeException("Production Ticket not found with id: " + ticketId));
+        System.out.println("=== Starting cancelProductionTicket ===");
+        System.out.println("Ticket ID: " + ticketId);
+        System.out.println("Reason: " + reason);
+        System.out.println("User: " + user.getUsername());
         
-        // Store old status for logging
-        ProductionTicketStatus oldTicketStatus = ticket.getStatus();
-        
-        // Cancel all details
-        for (ProductionTicketDetail detail : ticket.getTicketDetail()) {
-            if (detail.getStatus() != ProductionTicketDetailStatus.CANCELLED) {
-                // Store old status for logging
-                ProductionTicketDetailStatus oldDetailStatus = detail.getStatus();
+        try {
+            ProductionTicket ticket = productionTicketRepository.findByIdAndIsActive(ticketId, true)
+                .orElseThrow(() -> new RuntimeException("Production Ticket not found with id: " + ticketId));
+            
+            System.out.println("Found ticket: " + ticket.getName() + " (ID: " + ticket.getId() + ")");
+            System.out.println("Current ticket status: " + ticket.getStatus());
+            
+            // Store old status for logging
+            ProductionTicketStatus oldTicketStatus = ticket.getStatus();
+            
+            // Cancel all details
+            System.out.println("Cancelling " + ticket.getTicketDetail().size() + " details...");
+            for (ProductionTicketDetail detail : ticket.getTicketDetail()) {
+                System.out.println("Processing detail ID: " + detail.getId() + ", current status: " + detail.getStatus());
                 
-                detail.setStatus(ProductionTicketDetailStatus.CANCELLED);
-                detail.setUpdatedAt(LocalDateTime.now());
-                detail.setUpdatedBy(user);
-                productionTicketDetailRepository.save(detail);
-                
-                // Update inventory based on status change to CANCELLED
-                updateProductInventory(detail, oldDetailStatus, ProductionTicketDetailStatus.CANCELLED, user);
-                
-                // Log the detail status change
-                logDetailStatusChange(detail, oldDetailStatus, ProductionTicketDetailStatus.CANCELLED, 
-                    "Cancelled due to production ticket cancellation: " + reason, user);
+                if (detail.getStatus() != ProductionTicketDetailStatus.CANCELLED) {
+                    // Store old status for logging
+                    ProductionTicketDetailStatus oldDetailStatus = detail.getStatus();
+                    
+                    detail.setStatus(ProductionTicketDetailStatus.CANCELLED);
+                    detail.setUpdatedAt(LocalDateTime.now());
+                    detail.setUpdatedBy(user);
+                    productionTicketDetailRepository.save(detail);
+                    
+                    System.out.println("Cancelled detail ID: " + detail.getId());
+                    
+                    // Update inventory based on status change to CANCELLED
+                    updateProductInventory(detail, oldDetailStatus, ProductionTicketDetailStatus.CANCELLED, user);
+                    
+                    // Log the detail status change
+                    logDetailStatusChange(detail, oldDetailStatus, ProductionTicketDetailStatus.CANCELLED, 
+                        "Cancelled due to production ticket cancellation: " + reason, user);
+                } else {
+                    System.out.println("Detail ID: " + detail.getId() + " is already cancelled, skipping...");
+                }
             }
+            
+            // Set ticket status to cancelled
+            ticket.setStatus(ProductionTicketStatus.CANCELLED);
+            ticket.setUpdatedAt(LocalDateTime.now());
+            ticket.setUpdatedBy(user);
+            
+            ticket = productionTicketRepository.save(ticket);
+            System.out.println("Updated ticket status to: " + ticket.getStatus());
+            
+            // Log the ticket status change
+            logTicketStatusChange(ticket, oldTicketStatus, ProductionTicketStatus.CANCELLED, 
+                "Production ticket cancelled: " + reason, user);
+            
+            // Create notification for ticket cancellation
+            createProductionTicketNotification(user, ticket, oldTicketStatus, ProductionTicketStatus.CANCELLED);
+            
+            System.out.println("=== Successfully cancelled production ticket ===");
+            return ticket;
+            
+        } catch (Exception e) {
+            System.err.println("=== ERROR in cancelProductionTicket ===");
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+            System.err.println("=== END ERROR ===");
+            throw e;
         }
-        
-        // Set ticket status to cancelled
-        ticket.setStatus(ProductionTicketStatus.CANCELLED);
-        ticket.setUpdatedAt(LocalDateTime.now());
-        ticket.setUpdatedBy(user);
-        
-        ticket = productionTicketRepository.save(ticket);
-        
-        // Log the ticket status change
-        logTicketStatusChange(ticket, oldTicketStatus, ProductionTicketStatus.CANCELLED, 
-            "Production ticket cancelled: " + reason, user);
-        
-        return ticket;
     }
 
     @Override
@@ -699,7 +913,14 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
             "Detail cancelled: " + reason, user);
         
         // Update production ticket status based on all details
+        ProductionTicketStatus oldTicketStatus = ticket.getStatus();
         updateProductionTicketStatusBasedOnDetails(ticket, user);
+        
+        // Create notification for status changes
+        createProductionTicketDetailNotification(user, detail, oldDetailStatus, ProductionTicketDetailStatus.CANCELLED);
+        if (!oldTicketStatus.equals(ticket.getStatus())) {
+            createProductionTicketNotification(user, ticket, oldTicketStatus, ticket.getStatus());
+        }
         
         // Return updated detail response
         return getProductionTicketDetails(ticketId, detailId);
@@ -768,6 +989,12 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
             ticket.setStatus(newTicketStatus);
             ticket.setUpdatedAt(LocalDateTime.now());
             ticket.setUpdatedBy(user);
+            
+            // Set completed_date when ticket status becomes COMPLETE
+            if (newTicketStatus == ProductionTicketStatus.COMPLETE) {
+                ticket.setCompleted_date(LocalDateTime.now());
+            }
+            
             productionTicketRepository.save(ticket);
             
             // Log the ticket status change
@@ -814,17 +1041,30 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
             // When status changes from NEW to APPROVAL, add to futureStock
             // This indicates the product is planned for production
             productInventoryService.addToFutureStock(variantId, quantity, user, ticketId);
-            
-        } else if (oldStatus == ProductionTicketDetailStatus.APPROVAL && newStatus == ProductionTicketDetailStatus.READY) {
-            // When status changes from APPROVAL to READY, move from futureStock to currentStock
+            materialInventoryService.addToAllocatedStock(variantId, quantity, user, ticketId);
+
+        }  else if (oldStatus == ProductionTicketDetailStatus.APPROVAL && newStatus == ProductionTicketDetailStatus.COMPLETE){
+            // When status change from APPROVEL to COMPLETE, move from allocatedStock, substract currentStock
+            // This indicates the material is comsumpt by production 
+            materialInventoryService.removeFromCurrentAndAllocatedStock(variantId, quantity, user, ticketId);
+
+        } else if (oldStatus == ProductionTicketDetailStatus.COMPLETE && newStatus == ProductionTicketDetailStatus.READY) {
+            // When status changes from COMPLETE to READY, move from futureStock to currentStock
             // This indicates the product is now ready and available
             productInventoryService.moveFromFutureToCurrentStock(variantId, quantity, user, ticketId);
-            
+
         } else if (oldStatus == ProductionTicketDetailStatus.APPROVAL && newStatus == ProductionTicketDetailStatus.CANCELLED) {
+            // cancel ticket, remove material from allocated
+            materialInventoryService.removeFromAllocatedStock(variantId, quantity, user, ticketId);
+            // remove product from future stock as well
+            productInventoryService.removeFromFutureStock(variantId, quantity, user, ticketId);
+
+        } else if (oldStatus == ProductionTicketDetailStatus.COMPLETE && newStatus == ProductionTicketDetailStatus.CANCELLED) {
             // When status changes from APPROVAL to CANCELLED, remove from futureStock
             // This indicates the production is cancelled
             productInventoryService.removeFromFutureStock(variantId, quantity, user, ticketId);
-            
+            // cancel ticket, material no longer available because of the production 
+            // no action because can turn back          
         } else if (oldStatus == ProductionTicketDetailStatus.READY && newStatus == ProductionTicketDetailStatus.CANCELLED) {
             // When status changes from READY to CANCELLED, remove from currentStock
             // This indicates the ready product is cancelled
@@ -837,6 +1077,7 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         ProductInventoryLog initialLog = new ProductInventoryLog(
             LocalDateTime.now(),
             null, // Will be set after inventory is created
+            StockType.CURRENT,
             InventoryTransactionType.SET,
             ProductInventoryTransactionSourceType.SET_INVENTORY,
             BigDecimal.ZERO, // quantity = 0
@@ -933,6 +1174,82 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
             default:
                 return "Unknown production detail status";
         }
+    }
+    
+    private void createProductionTicketNotification(User user, ProductionTicket ticket, 
+                                                 ProductionTicketStatus oldStatus, ProductionTicketStatus newStatus) {
+        if (!oldStatus.equals(newStatus)) {
+            String title = getProductionTicketNotificationTitle(newStatus);
+            String message = getProductionTicketNotificationMessage(ticket, oldStatus, newStatus);
+            
+            Notification notification = new Notification(user, NotificationType.PRODUCTION_TICKET_STATUS_CHANGE, title, message);
+            notificationService.createTicketNotification(notification);
+        }
+    }
+    
+    private void createProductionTicketDetailNotification(User user, ProductionTicketDetail detail, 
+                                                       ProductionTicketDetailStatus oldStatus, ProductionTicketDetailStatus newStatus) {
+        if (!oldStatus.equals(newStatus)) {
+            String title = getProductionTicketDetailNotificationTitle(newStatus);
+            String message = getProductionTicketDetailNotificationMessage(detail, oldStatus, newStatus);
+            
+            Notification notification = new Notification(user, NotificationType.PRODUCTION_TICKET_DETAIL_STATUS_CHANGE, title, message);
+            notificationService.createTicketNotification(notification);
+        }
+    }
+    
+    private String getProductionTicketNotificationTitle(ProductionTicketStatus status) {
+        switch (status) {
+            case NEW:
+                return "Production Ticket Created";
+            case IN_PROGRESS:
+                return "Production Ticket in progress";
+            case PARTIAL_CANCELLED:
+                return "Production Ticket Partially Cancelled";
+            case COMPLETE:
+                return "Production Ticket Completed";
+            case CANCELLED:
+                return "Production Ticket Cancelled";
+            case PARTIAL_COMPLETE:
+                return "Production Ticket Partially Completed";
+            default:
+                return "Production Ticket Status Changed";
+        }
+    }
+    
+    private String getProductionTicketNotificationMessage(ProductionTicket ticket, ProductionTicketStatus oldStatus, ProductionTicketStatus newStatus) {
+        String ticketName = ticket.getName();
+        String ticketId = ticket.getId().toString();
+        
+        return String.format("Production Ticket '%s' (ID: %s) status changed from %s to %s", 
+                           ticketName, ticketId, oldStatus.name(), newStatus.name());
+    }
+    
+    private String getProductionTicketDetailNotificationTitle(ProductionTicketDetailStatus status) {
+        switch (status) {
+            case NEW:
+                return "Production Detail Created";
+            case APPROVAL:
+                return "Production Detail Approved";
+            case READY:
+                return "Production Detail Ready";
+            case COMPLETE:
+                return "Production Detail Completed";
+            case CANCELLED:
+                return "Production Detail Cancelled";
+            default:
+                return "Production Detail Status Changed";
+        }
+    }
+    
+    private String getProductionTicketDetailNotificationMessage(ProductionTicketDetail detail, 
+                                                             ProductionTicketDetailStatus oldStatus, ProductionTicketDetailStatus newStatus) {
+        String productName = detail.getProductVariant().getName();
+        String detailId = detail.getId().toString();
+        String ticketName = detail.getProductionTicket().getName();
+        
+        return String.format("Production Detail for product '%s' (Detail ID: %s) in ticket '%s' status changed from %s to %s", 
+                           productName, detailId, ticketName, oldStatus.name(), newStatus.name());
     }
 }
     

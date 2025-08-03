@@ -22,6 +22,10 @@ public class ProductInventoryLog {
     private ProductInventory productInventory;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "stock_type", nullable = false)
+    private StockType stockType;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false)
     private InventoryTransactionType transactionType; 
 
@@ -62,12 +66,13 @@ public class ProductInventoryLog {
 
     public ProductInventoryLog() {}
 
-    public ProductInventoryLog(LocalDateTime transactionTimestamp, ProductInventory productInventory,
+    public ProductInventoryLog(LocalDateTime transactionTimestamp, ProductInventory productInventory, StockType stockType,
                                 InventoryTransactionType transactionType, ProductInventoryTransactionSourceType transactionSourceType,
                                 BigDecimal quantity, BigDecimal beforeQuantity, BigDecimal afterQuantity, String note,
                                 ProductInventoryReferenceDocumentType referenceDocumentType, Long referenceDocumentId, User createdBy) {
         this.transactionTimestamp = transactionTimestamp;
         this.productInventory = productInventory;
+        this.stockType = stockType;
         this.transactionType = transactionType;
         this.transactionSourceType = transactionSourceType;
         this.quantity = quantity;
@@ -201,6 +206,12 @@ public class ProductInventoryLog {
     public void setAfterQuantity(BigDecimal afterQuantity) {
         this.afterQuantity = afterQuantity;
     }
-    
-    
+
+    public StockType getStockType() {
+        return stockType;
+    }
+
+    public void setStockType(StockType stockType) {
+        this.stockType = stockType;
+    }
 }

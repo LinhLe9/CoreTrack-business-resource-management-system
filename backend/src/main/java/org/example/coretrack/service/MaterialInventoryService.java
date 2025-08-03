@@ -1,5 +1,6 @@
 package org.example.coretrack.service;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import org.example.coretrack.dto.material.Inventory.AddMaterialInventoryRequest;
@@ -17,6 +18,8 @@ import org.example.coretrack.dto.product.inventory.StockModifyRequest;
 import org.example.coretrack.dto.product.inventory.StockSetRequest;
 import org.example.coretrack.dto.product.inventory.TransactionEnumsResponse;
 import org.example.coretrack.model.auth.User;
+import org.example.coretrack.model.material.MaterialVariant;
+import org.example.coretrack.model.material.inventory.MaterialInventory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -44,4 +47,22 @@ public interface MaterialInventoryService {
     BulkMInitInventoryResponse bulkInitInventory (BulkMInitInventoryRequest request, User user);
 
     TransactionEnumsResponse getTransactionEnums();
+
+    MaterialInventory addToFutureStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
+
+    MaterialInventory moveFromFutureToCurrentStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
+
+    MaterialInventory removeFromFutureStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
+
+    MaterialInventory removeFromCurrentStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
+
+    MaterialInventory removeFromCurrentAndAllocatedStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
+ 
+    boolean isEnough(MaterialVariant variant, BigDecimal plannedQuantity);
+
+    MaterialInventory addToAllocatedStock (Long variantId, BigDecimal quantity, User user, Long ticketId);
+
+    MaterialInventory removeFromAllocatedStock (Long variantId, BigDecimal quantity, User user, Long ticketId);
+
+    Page<SearchInventoryResponse> getAlarmMaterial(String search, List<Long> groupMaterials, List<String> status, boolean sortByOldest, Pageable pageable);
 }

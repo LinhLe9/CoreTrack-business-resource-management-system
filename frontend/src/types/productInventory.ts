@@ -65,6 +65,8 @@ export interface BulkTransactionError {
   reason: string;
 }
 
+import { InventoryTransactionResponse } from './inventory';
+
 export interface BulkInventoryTransactionResponse {
   successfulTransactions: InventoryTransactionResponse[];
   failedTransactions: BulkTransactionError[];
@@ -130,17 +132,4 @@ export interface AddProductInventoryResponse {
   inventoryStatus: string;
 }
 
-export interface InventoryTransactionResponse {
-  id: number;
-  transactionType: string;
-  quantity: string; // BigDecimal as string
-  previousStock: string; // BigDecimal as string
-  newStock: string; // BigDecimal as string
-  note?: string;
-  referenceDocumentType?: string;
-  referenceDocumentId?: number;
-  transactionSource: string;
-  createdAt: string; // LocalDateTime as string
-  createdBy: string;
-  user_role: string;
-} 
+export type { InventoryTransactionResponse } from './inventory'; 

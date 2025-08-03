@@ -34,7 +34,28 @@ const ProductionTicketCard: React.FC<ProductionTicketCardProps> = ({
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
   const getStatusColor = (status: string) => {
-    return productionTicketUtils.getStatusColor(status);
+    switch (status) {
+      case 'NEW':
+        return 'blue';
+      case 'IN_PROGRESS':
+        return 'yellow';
+      case 'PARTIAL_COMPLETE':
+        return 'orange';
+      case 'COMPLETE':
+        return 'green';
+      case 'PARTIAL_CANCELLED':
+        return 'red';
+      case 'CANCELLED':
+        return 'red';
+      case 'APPROVAL':
+        return 'purple';
+      case 'READY':
+        return 'green';
+      case 'CLOSED':
+        return 'gray';
+      default:
+        return 'blue';
+    }
   };
 
   const getStatusBadgeText = (status: string) => {
@@ -73,7 +94,7 @@ const ProductionTicketCard: React.FC<ProductionTicketCardProps> = ({
           </VStack>
           
           <Badge
-            className={getStatusColor(productionTicket.status)}
+            colorScheme={getStatusColor(productionTicket.status)}
             px={3}
             py={1}
             borderRadius="full"

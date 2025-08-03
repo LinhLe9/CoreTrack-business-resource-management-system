@@ -1,19 +1,21 @@
 package org.example.coretrack.dto.productionTicket;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 public class ProductVariantBomRequest {
     private String productVariantSku;
     private BigDecimal quantity;
-    private LocalDateTime expectedCompleteDate;
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate expectedCompleteDate;
     private List<BomItemProductionTicketRequest> boms;
 
     public ProductVariantBomRequest() {}
 
     public ProductVariantBomRequest(String productVariantSku, BigDecimal quantity, 
-                                   LocalDateTime expectedCompleteDate, List<BomItemProductionTicketRequest> boms) {
+                                   LocalDate expectedCompleteDate, List<BomItemProductionTicketRequest> boms) {
         this.productVariantSku = productVariantSku;
         this.quantity = quantity;
         this.expectedCompleteDate = expectedCompleteDate;
@@ -36,11 +38,11 @@ public class ProductVariantBomRequest {
         this.quantity = quantity;
     }
 
-    public LocalDateTime getExpectedCompleteDate() {
+    public LocalDate getExpectedCompleteDate() {
         return expectedCompleteDate;
     }
 
-    public void setExpectedCompleteDate(LocalDateTime expectedCompleteDate) {
+    public void setExpectedCompleteDate(LocalDate expectedCompleteDate) {
         this.expectedCompleteDate = expectedCompleteDate;
     }
 

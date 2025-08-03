@@ -31,4 +31,18 @@ export const formatBigDecimal = (value: string | null | undefined): string => {
  */
 export const toBigDecimalString = (value: number): string => {
   return value.toFixed(2);
+};
+
+
+
+// Helper function to ensure error is always a string
+export const getErrorMessage = (error: any): string => {
+  if (typeof error === 'string') return error;
+  if (error?.message) return error.message;
+  if (error?.response?.data?.message) return error.response.data.message;
+  if (error?.response?.data) {
+    const data = error.response.data;
+    return typeof data === 'string' ? data : JSON.stringify(data);
+  }
+  return 'An error occurred';
 }; 

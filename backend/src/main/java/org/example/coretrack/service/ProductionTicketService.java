@@ -2,8 +2,6 @@ package org.example.coretrack.service;
 
 import java.util.List;
 
-import org.example.coretrack.dto.productionTicket.BomItemProductionTicketRequest;
-import org.example.coretrack.dto.productionTicket.BomItemProductionTicketResponse;
 import org.example.coretrack.dto.productionTicket.BulkCreateProductionTicketRequest;
 import org.example.coretrack.dto.productionTicket.BulkCreateProductionTicketResponse;
 import org.example.coretrack.dto.productionTicket.CreateProductionTicketRequest;

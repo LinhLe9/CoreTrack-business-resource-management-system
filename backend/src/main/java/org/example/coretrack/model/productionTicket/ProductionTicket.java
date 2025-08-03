@@ -40,6 +40,9 @@ public class ProductionTicket {
     @OneToMany(mappedBy = "productionTicket", cascade = CascadeType.ALL)
     private List<ProductionTicketDetail> ticketDetail = new ArrayList<>();
 
+    @OneToMany(mappedBy = "productionTicket", cascade = CascadeType.ALL)
+    private List<ProductionTicketStatusLog> statusLogs = new ArrayList<>();
+
     private LocalDateTime completed_date;
     
     // Audit Fields
@@ -141,6 +144,14 @@ public class ProductionTicket {
 
     public void setTicketDetail(List<ProductionTicketDetail> ticketDetail) {
         this.ticketDetail = ticketDetail;
+    }
+
+    public List<ProductionTicketStatusLog> getStatusLogs() {
+        return statusLogs;
+    }
+
+    public void setStatusLogs(List<ProductionTicketStatusLog> statusLogs) {
+        this.statusLogs = statusLogs;
     }
 
     public String getName() {

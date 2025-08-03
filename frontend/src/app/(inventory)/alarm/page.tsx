@@ -31,7 +31,6 @@ import {
   StatHelpText,
 } from '@chakra-ui/react';
 import { getProductAlarms, getMaterialAlarms, getAlarmStatistics } from '@/services/alarmService';
-import { ProductAlarm, MaterialAlarm } from '@/types/alarm';
 
 const AlarmPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -123,7 +122,7 @@ const AlarmPage: React.FC = () => {
 // Product Alarms Component
 const ProductAlarms: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [alarms, setAlarms] = useState<ProductAlarm[]>([]);
+  const [alarms, setAlarms] = useState<any[]>([]);
   const toast = useToast();
 
   useEffect(() => {
@@ -149,7 +148,7 @@ const ProductAlarms: React.FC = () => {
     fetchAlarms();
   }, [toast]);
 
-  const getSeverityColor = (severity: string) => {
+  const getSeverityColor = (severity?: string) => {
     switch (severity) {
       case 'CRITICAL': return 'red';
       case 'HIGH': return 'orange';
@@ -159,7 +158,7 @@ const ProductAlarms: React.FC = () => {
     }
   };
 
-  const getTypeColor = (type: string) => {
+  const getTypeColor = (type?: string) => {
     switch (type) {
       case 'OUT_OF_STOCK': return 'red';
       case 'LOW_STOCK': return 'orange';
@@ -206,10 +205,10 @@ const ProductAlarms: React.FC = () => {
                   </Box>
                   <HStack spacing={2}>
                     <Badge colorScheme={getSeverityColor(alarm.severity)}>
-                      {alarm.severity}
+                      {alarm.severity || 'Unknown'}
                     </Badge>
                     <Badge colorScheme={getTypeColor(alarm.type)}>
-                      {alarm.type.replace('_', ' ')}
+                      {alarm.type ? alarm.type.replace('_', ' ') : 'Unknown'}
                     </Badge>
                   </HStack>
                 </Flex>
@@ -246,7 +245,7 @@ const ProductAlarms: React.FC = () => {
 // Material Alarms Component
 const MaterialAlarms: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [alarms, setAlarms] = useState<MaterialAlarm[]>([]);
+  const [alarms, setAlarms] = useState<any[]>([]);
   const toast = useToast();
 
   useEffect(() => {
@@ -272,7 +271,7 @@ const MaterialAlarms: React.FC = () => {
     fetchAlarms();
   }, [toast]);
 
-  const getSeverityColor = (severity: string) => {
+  const getSeverityColor = (severity?: string) => {
     switch (severity) {
       case 'CRITICAL': return 'red';
       case 'HIGH': return 'orange';
@@ -282,7 +281,7 @@ const MaterialAlarms: React.FC = () => {
     }
   };
 
-  const getTypeColor = (type: string) => {
+  const getTypeColor = (type?: string) => {
     switch (type) {
       case 'OUT_OF_STOCK': return 'red';
       case 'LOW_STOCK': return 'orange';
@@ -329,10 +328,10 @@ const MaterialAlarms: React.FC = () => {
                   </Box>
                   <HStack spacing={2}>
                     <Badge colorScheme={getSeverityColor(alarm.severity)}>
-                      {alarm.severity}
+                      {alarm.severity || 'Unknown'}
                     </Badge>
                     <Badge colorScheme={getTypeColor(alarm.type)}>
-                      {alarm.type.replace('_', ' ')}
+                      {alarm.type ? alarm.type.replace('_', ' ') : 'Unknown'}
                     </Badge>
                   </HStack>
                 </Flex>

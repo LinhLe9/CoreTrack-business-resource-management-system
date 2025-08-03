@@ -1,6 +1,7 @@
 package org.example.coretrack.dto.product;
 
 public class ProductVariantAutoCompleteResponse {
+    private Long productId;
     private Long variantId;
     private String productName;
     private String productSku;
@@ -10,8 +11,9 @@ public class ProductVariantAutoCompleteResponse {
 
     public ProductVariantAutoCompleteResponse() {}
 
-    public ProductVariantAutoCompleteResponse(Long variantId, String productName, String productSku, 
+    public ProductVariantAutoCompleteResponse(Long productId, Long variantId, String productName, String productSku, 
                                            String variantSku, String variantName, String productGroup) {
+        this.productId = productId;
         this.variantId = variantId;
         this.productName = productName;
         this.productSku = productSku;
@@ -58,6 +60,14 @@ public class ProductVariantAutoCompleteResponse {
 
     public void setVariantName(String variantName) {
         this.variantName = variantName;
+    }
+
+    public Long getProductId() {
+        return productId;
+    }
+
+    public void setProductId(Long productId) {
+        this.productId = productId;
     }
 
     public String getProductGroup() {
