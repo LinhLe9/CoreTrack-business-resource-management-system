@@ -21,24 +21,25 @@ public interface ProductInventoryRepository extends JpaRepository<ProductInvento
         pv.id,
         pv.sku,
         pv.name,
-        p.group.name,
+        COALESCE(pg.name, ''),
         inv.inventoryStatus,
         inv.currentStock,
         inv.minAlertStock,
         inv.maxStockLevel,
-        pv.imageUrl
+        pv.imageUrl,
+        inv.updatedAt
     )
     FROM ProductVariant pv
     LEFT JOIN Product p ON pv.product.id = p.id
+    LEFT JOIN ProductGroup pg ON p.group.id = pg.id
     JOIN ProductInventory inv ON pv.id = inv.productVariant.id
     WHERE (:search IS NULL OR 
            LOWER(pv.sku) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(pv.name) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')))
-      AND (:groupProducts IS NULL OR p.group.id IN :groupProducts)
+      AND (:groupProducts IS NULL OR pg.id IN :groupProducts)
       AND (:inventoryStatus IS NULL OR inv.inventoryStatus IN :inventoryStatus)
-      AND p.status <> org.example.coretrack.model.product.ProductStatus.DELETED
-      AND p.isActive = true
+      AND (p IS NULL OR (p.status <> org.example.coretrack.model.product.ProductStatus.DELETED AND p.isActive = true))
     """)
     Page<SearchInventoryResponse> searchInventoryByCriteria(
         @Param("search") String search,
@@ -63,8 +64,7 @@ public interface ProductInventoryRepository extends JpaRepository<ProductInvento
            LOWER(pv.sku) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(pv.name) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')))
-      AND p.status <> org.example.coretrack.model.product.ProductStatus.DELETED
-      AND p.isActive = true
+      AND (p IS NULL OR (p.status <> org.example.coretrack.model.product.ProductStatus.DELETED AND p.isActive = true))
     """)
     List<AllSearchInventoryResponse> searchInventory(
         @Param("search") String search
@@ -75,24 +75,25 @@ public interface ProductInventoryRepository extends JpaRepository<ProductInvento
         pv.id,
         pv.sku,
         pv.name,
-        p.group.name,
+        COALESCE(pg.name, ''),
         inv.inventoryStatus,
         inv.currentStock,
         inv.minAlertStock,
         inv.maxStockLevel,
-        pv.imageUrl
+        pv.imageUrl,
+        inv.updatedAt
     )
     FROM ProductVariant pv
     LEFT JOIN Product p ON pv.product.id = p.id
+    LEFT JOIN ProductGroup pg ON p.group.id = pg.id
     JOIN ProductInventory inv ON pv.id = inv.productVariant.id
     WHERE (:search IS NULL OR 
            LOWER(pv.sku) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(pv.name) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')))
-      AND (:groupProducts IS NULL OR p.group.id IN :groupProducts)
-      AND inv.inventoryStatus IN :inventoryStatus
-      AND p.status <> org.example.coretrack.model.product.ProductStatus.DELETED
-      AND p.isActive = true
+      AND (:groupProducts IS NULL OR pg.id IN :groupProducts)
+      AND (:inventoryStatus IS NULL OR inv.inventoryStatus IN :inventoryStatus)
+      AND (p IS NULL OR (p.status <> org.example.coretrack.model.product.ProductStatus.DELETED AND p.isActive = true))
     """)
     Page<SearchInventoryResponse> searchAlarmInventoryByCriteria(
         @Param("search") String search,
@@ -106,26 +107,25 @@ public interface ProductInventoryRepository extends JpaRepository<ProductInvento
         pv.id,
         pv.sku,
         pv.name,
-        p.group.name,
+        COALESCE(pg.name, ''),
         inv.inventoryStatus,
         inv.currentStock,
         inv.minAlertStock,
         inv.maxStockLevel,
-        pv.imageUrl
+        pv.imageUrl,
+        inv.updatedAt
     )
     FROM ProductVariant pv
     LEFT JOIN Product p ON pv.product.id = p.id
     JOIN ProductInventory inv ON pv.id = inv.productVariant.id
-    LEFT JOIN ProductInventoryLog pil ON inv.id = pil.productInventory.id
+    LEFT JOIN ProductGroup pg ON p.group.id = pg.id
     WHERE (:search IS NULL OR 
            LOWER(pv.sku) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(pv.name) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')))
-      AND (:groupProducts IS NULL OR p.group.id IN :groupProducts)
-      AND inv.inventoryStatus IN :inventoryStatus
-      AND p.status <> org.example.coretrack.model.product.ProductStatus.DELETED
-      AND p.isActive = true
-    GROUP BY pv.id, pv.sku, pv.name, p.group.name, inv.inventoryStatus, inv.currentStock, inv.minAlertStock, inv.maxStockLevel, pv.imageUrl
+      AND (:groupProducts IS NULL OR pg.id IN :groupProducts)
+      AND (:inventoryStatus IS NULL OR inv.inventoryStatus IN :inventoryStatus)
+      AND (p IS NULL OR (p.status <> org.example.coretrack.model.product.ProductStatus.DELETED AND p.isActive = true))
     """)
     Page<SearchInventoryResponse> searchAlarmInventoryWithLogSorting(
         @Param("search") String search,
@@ -139,24 +139,25 @@ public interface ProductInventoryRepository extends JpaRepository<ProductInvento
         pv.id,
         pv.sku,
         pv.name,
-        p.group.name,
+        COALESCE(pg.name, ''),
         inv.inventoryStatus,
         inv.currentStock,
         inv.minAlertStock,
         inv.maxStockLevel,
-        pv.imageUrl
+        pv.imageUrl,
+        inv.updatedAt
     )
     FROM ProductVariant pv
     LEFT JOIN Product p ON pv.product.id = p.id
+    LEFT JOIN ProductGroup pg ON p.group.id = pg.id
     JOIN ProductInventory inv ON pv.id = inv.productVariant.id
     WHERE (:search IS NULL OR 
            LOWER(pv.sku) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(pv.name) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')))
-      AND (:groupProducts IS NULL OR p.group.id IN :groupProducts)
+      AND (:groupProducts IS NULL OR pg.id IN :groupProducts)
       AND (:status IS NULL OR inv.inventoryStatus IN :status)
-      AND p.status <> org.example.coretrack.model.product.ProductStatus.DELETED
-      AND p.isActive = true
+      AND (p IS NULL OR (p.status <> org.example.coretrack.model.product.ProductStatus.DELETED AND p.isActive = true))
     """)
     Page<SearchInventoryResponse> searchAlarmInventoryWithStatus(
         @Param("search") String search,
@@ -166,19 +167,19 @@ public interface ProductInventoryRepository extends JpaRepository<ProductInvento
     );
 
     @Query("""
-    SELECT pv.id, pv.sku, pv.name, p.group.name, inv.inventoryStatus, 
+    SELECT pv.id, pv.sku, pv.name, COALESCE(pg.name, ''), inv.inventoryStatus, 
            inv.currentStock, inv.minAlertStock, inv.maxStockLevel, pv.imageUrl, inv.updatedAt
     FROM ProductVariant pv
     LEFT JOIN Product p ON pv.product.id = p.id
+    LEFT JOIN ProductGroup pg ON p.group.id = pg.id
     JOIN ProductInventory inv ON pv.id = inv.productVariant.id
     WHERE (:search IS NULL OR 
            LOWER(pv.sku) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(pv.name) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')))
-      AND (:groupProducts IS NULL OR p.group.id IN :groupProducts)
+      AND (:groupProducts IS NULL OR pg.id IN :groupProducts)
       AND (:status IS NULL OR inv.inventoryStatus IN :status)
-      AND p.status <> org.example.coretrack.model.product.ProductStatus.DELETED
-      AND p.isActive = true
+      AND (p IS NULL OR (p.status <> org.example.coretrack.model.product.ProductStatus.DELETED AND p.isActive = true))
     """)
     Page<Object[]> searchAlarmInventoryWithUpdatedAt(
         @Param("search") String search,

@@ -43,7 +43,7 @@ import {
   cancelSaleTicket, 
   allocateOrderDetail, 
   getStatusTransitionRules,
-  updateSaleStatus 
+  updateSaleStatus
 } from '@/services/saleService';
 import { 
   SaleTicketResponse, 
@@ -164,6 +164,7 @@ const SaleDetailPage = () => {
     setCancelling(true);
     try {
       await cancelSaleTicket(Number(id), cancelReason.trim());
+      
       toast({
         title: 'Success',
         description: 'Sale cancelled successfully.',
@@ -171,9 +172,10 @@ const SaleDetailPage = () => {
         duration: 5000,
         isClosable: true,
       });
-      await refreshSale();
       onClose();
       setCancelReason('');
+      // Redirect to sale page after successful cancellation
+      router.push('/sale');
     } catch (err: any) {
       console.error('Error cancelling sale:', err);
       toast({
@@ -216,11 +218,14 @@ const SaleDetailPage = () => {
     }
   };
 
+
+
   const handleStatusChange = async () => {
     if (!sale || !id || !newStatus) return;
     
     try {
       await updateSaleStatus(Number(id), newStatus as OrderStatus, statusNote);
+      
       toast({
         title: 'Success',
         description: 'Sale status updated successfully.',
@@ -245,9 +250,30 @@ const SaleDetailPage = () => {
   };
 
   const getAvailableStatusTransitions = () => {
-    if (!sale || !statusTransitionRules.length) return [];
-    return statusTransitionRules.filter(rule => rule.fromStatus === sale.status);
+    if (!sale || !statusTransitionRules.length) {
+      return [];
+    }
+    
+    // Convert display name to enum name for comparison
+    const statusMap: { [key: string]: string } = {
+      'New': 'NEW',
+      'Allocated': 'ALLOCATED', 
+      'Packed': 'PACKED',
+      'Shipped': 'SHIPPED',
+      'Done': 'DONE',
+      'Cancelled': 'CANCELLED'
+    };
+    
+    const saleStatusEnum = statusMap[sale.status] || sale.status;
+    
+    const availableTransitions = statusTransitionRules.filter(rule => {
+      const matches = rule.currentStatus === saleStatusEnum;
+      return matches;
+    });
+    return availableTransitions;
   };
+
+
 
   const openCancelModal = () => {
     setCancelReason('');
@@ -298,37 +324,25 @@ const SaleDetailPage = () => {
           Order Information
         </Heading>
         <VStack align="start" spacing={3} p={4} border="1px" borderColor="gray.200" borderRadius="md">
-          <HStack spacing={8} wrap="wrap">
-            <Text><strong>SKU:</strong> {sale.sku}</Text>
-            <Text><strong>Status:</strong> 
-              <Badge colorScheme={getStatusColor(sale.status)} ml={2}>
-                {sale.status}
-              </Badge>
-            </Text>
-            <Text><strong>Total:</strong> {formatCurrency(sale.total)}</Text>
-          </HStack>
-          <HStack spacing={8} wrap="wrap">
-            <Text><strong>Promotion:</strong> {formatCurrency(sale.promotion)}</Text>
-            <Text><strong>Net Total:</strong> {formatCurrency(sale.netTotal)}</Text>
-            <Text><strong>Expected Complete Date:</strong> {formatDate(sale.expected_complete_date)}</Text>
-          </HStack>
+          <Text><strong>SKU:</strong> {sale.sku}</Text>
+          <Text><strong>Status:</strong> 
+            <Badge colorScheme={getStatusColor(sale.status)} ml={2}>
+              {sale.status}
+            </Badge>
+          </Text>
+          <Text><strong>Total:</strong> {formatCurrency(sale.total)}</Text>
+          <Text><strong>Promotion:</strong> {formatCurrency(sale.promotion)}</Text>
+          <Text><strong>Net Total:</strong> {formatCurrency(sale.netTotal)}</Text>
+          <Text><strong>Expected Complete Date:</strong> {formatDate(sale.expected_complete_date)}</Text>
           {sale.completed_date && (
-            <HStack spacing={8} wrap="wrap">
-              <Text><strong>Completed Date:</strong> {formatDate(sale.completed_date)}</Text>
-            </HStack>
+            <Text><strong>Completed Date:</strong> {formatDate(sale.completed_date)}</Text>
           )}
-          <HStack spacing={8} wrap="wrap">
-            <Text><strong>Customer Name:</strong> {sale.customerName}</Text>
-            <Text><strong>Customer Email:</strong> {sale.customerEmail}</Text>
-          </HStack>
-          <HStack spacing={8} wrap="wrap">
-            <Text><strong>Customer Phone:</strong> {sale.customerPhone}</Text>
-            <Text><strong>Customer Address:</strong> {sale.customerAddress}</Text>
-          </HStack>
-          <HStack spacing={8} wrap="wrap">
-            <Text><strong>Created:</strong> {formatDate(sale.createdAt)} by {sale.createdBy}</Text>
-            <Text><strong>Updated:</strong> {formatDate(sale.updatedAt)} by {sale.updatedBy || 'N/A'}</Text>
-          </HStack>
+          <Text><strong>Customer Name:</strong> {sale.customerName || 'N/A'}</Text>
+          <Text><strong>Customer Email:</strong> {sale.customerEmail || 'N/A'}</Text>
+          <Text><strong>Customer Phone:</strong> {sale.customerPhone || 'N/A'}</Text>
+          <Text><strong>Customer Address:</strong> {sale.customerAddress || 'N/A'}</Text>
+          <Text><strong>Created:</strong> {formatDate(sale.createdAt)} by {sale.createdBy}</Text>
+          <Text><strong>Updated:</strong> {formatDate(sale.updatedAt)} by {sale.updatedBy || 'N/A'}</Text>
         </VStack>
       </Box>
 
@@ -350,7 +364,10 @@ const SaleDetailPage = () => {
                   <Th>Unit Price</Th>
                   <Th>Total Price</Th>
                   <Th>Status</Th>
-                  <Th>Allocated Quantity</Th>
+                  <Th>Current Stock</Th>
+                  <Th>Allocated Stock</Th>
+                  <Th>Future Stock</Th>
+                  <Th>Available Stock</Th>
                   <Th>Actions</Th>
                 </Tr>
               </Thead>
@@ -387,28 +404,41 @@ const SaleDetailPage = () => {
                       </Badge>
                     </Td>
                     <Td>
-                      {detail.allocatedQuantity ? (
-                        <Text fontSize="sm" color="green.600">
-                          {detail.allocatedQuantity}
+                      <Text fontSize="sm" fontWeight="medium" color="blue.600">
+                        {detail.currentStock || 0}
+                      </Text>
+                    </Td>
+                    <Td>
+                      <Text fontSize="sm" fontWeight="medium" color="orange.600">
+                        {detail.allocatedStock || 0}
+                      </Text>
+                    </Td>
+                    <Td>
+                      <Text fontSize="sm" fontWeight="medium" color="purple.600">
+                        {detail.futureStock || 0}
+                      </Text>
+                    </Td>
+                    <Td>
+                      <Text fontSize="sm" fontWeight="medium" color="green.600">
+                        {detail.availableStock || 0}
+                      </Text>
+                    </Td>
+                    <Td>
+                      {detail.status === 'New' ? (
+                        <Text
+                          as="button"
+                          color="blue.500"
+                          textDecoration="underline"
+                          cursor="pointer"
+                          onClick={() => handleAllocateDetail(detail.id)}
+                          _hover={{ color: 'blue.700' }}
+                        >
+                          Allocated
                         </Text>
                       ) : (
                         <Text fontSize="sm" color="gray.500">
-                          Not allocated
+                          -
                         </Text>
-                      )}
-                    </Td>
-                    <Td>
-                      {detail.status === 'NEW' && (
-                        <Button
-                          size="sm"
-                          colorScheme="green"
-                          variant="outline"
-                          onClick={() => handleAllocateDetail(detail.id)}
-                          isLoading={allocating}
-                          loadingText="Allocating..."
-                        >
-                          Allocate
-                        </Button>
                       )}
                     </Td>
                   </Tr>
@@ -501,7 +531,7 @@ const SaleDetailPage = () => {
               size="lg"
               onClick={openStatusModal}
             >
-              Change Status
+              {availableStatusTransitions[0]?.allowedTransitions[0]}
             </Button>
           )}
           {sale.status !== 'CANCELLED' && (
@@ -573,11 +603,13 @@ const SaleDetailPage = () => {
                   onChange={(e) => setNewStatus(e.target.value as OrderStatus)}
                   placeholder="Select new status"
                 >
-                  {availableStatusTransitions.map((transition) => (
-                    <option key={transition.toStatus} value={transition.toStatus}>
-                      {transition.toStatus}
-                    </option>
-                  ))}
+                  {availableStatusTransitions.flatMap((transition) => 
+                    transition.allowedTransitions.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))
+                  )}
                 </Select>
               </FormControl>
               <FormControl>

@@ -37,6 +37,7 @@ import org.example.coretrack.model.product.inventory.InventoryTransactionType;
 import org.example.coretrack.model.product.inventory.StockType;
 import org.example.coretrack.repository.MaterialInventoryLogRepository;
 import org.example.coretrack.repository.MaterialInventoryRepository;
+import org.example.coretrack.repository.MaterialRepository;
 import org.example.coretrack.repository.MaterialVariantRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -56,6 +57,9 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
     private MaterialInventoryLogRepository materialInventoryLogRepository;
 
     @Autowired
+    private MaterialRepository materialRepository;
+
+    @Autowired
     private NotificationService notificationService;
 
     @Override
@@ -66,6 +70,12 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
 
         if (materialVariant.getStatus() == MaterialStatus.DELETED) {
             throw new RuntimeException("Material was deleted, cannot initialize the stock quantity");
+        }
+
+        // Check if MaterialInventory already exists for this material variant
+        Optional<MaterialInventory> existingInventory = materialInventoryRepository.findByMaterialVariant_Id(materialVariant.getId());
+        if (existingInventory.isPresent()) {
+            throw new RuntimeException("Material inventory already exists for SKU: " + request.getMaterialVariantSku() + ". Cannot create duplicate inventory.");
         }
 
         String inventoryStatus = request.getCurrentStock().compareTo(BigDecimal.ZERO) == 0
@@ -518,6 +528,42 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
         System.out.println("Result total elements: " + result.getTotalElements());
         System.out.println("Result content size: " + result.getContent().size());
         System.out.println("Result content: " + result.getContent());
+        
+        // Debug: Check if there are any material inventories in database
+        long totalMaterialInventories = materialInventoryRepository.count();
+        System.out.println("Total MaterialInventories in database: " + totalMaterialInventories);
+        
+        // Debug: Check if there are any material variants in database
+        long totalMaterialVariants = materialVariantRepository.count();
+        System.out.println("Total MaterialVariants in database: " + totalMaterialVariants);
+        
+        // Debug: Check if there are any materials in database
+        long totalMaterials = materialRepository.count();
+        System.out.println("Total Materials in database: " + totalMaterials);
+        
+        // Debug: Check materials with groups
+        List<Material> materialsWithGroups = materialRepository.findAll().stream()
+            .filter(m -> m.getGroup() != null)
+            .collect(Collectors.toList());
+        System.out.println("Materials with groups: " + materialsWithGroups.size());
+        
+        // Debug: Check materials without groups
+        List<Material> materialsWithoutGroups = materialRepository.findAll().stream()
+            .filter(m -> m.getGroup() == null)
+            .collect(Collectors.toList());
+        System.out.println("Materials without groups: " + materialsWithoutGroups.size());
+        
+        // Debug: Check material status
+        List<Material> activeMaterials = materialRepository.findAll().stream()
+            .filter(m -> m.isActive())
+            .collect(Collectors.toList());
+        System.out.println("Active materials: " + activeMaterials.size());
+        
+        List<Material> deletedMaterials = materialRepository.findAll().stream()
+            .filter(m -> m.getStatus() == MaterialStatus.DELETED)
+            .collect(Collectors.toList());
+        System.out.println("Deleted materials: " + deletedMaterials.size());
+        
         System.out.println("=====================================");
         
         return result;
@@ -1197,12 +1243,13 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
                 variant.getId(),
                 variant.getSku(),
                 variant.getName(),
-                material.getGroup().getName(),
+                material.getGroup() != null ? material.getGroup().getName() : "",
                 inventory.getInventoryStatus(),
                 inventory.getCurrentStock(),
                 inventory.getMinAlertStock(),
                 inventory.getMaxStockLevel(),
-                variant.getImageUrl()
+                variant.getImageUrl(),
+                inventory.getUpdatedAt()
             );
         });
 

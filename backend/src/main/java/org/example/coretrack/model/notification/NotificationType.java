@@ -8,7 +8,9 @@ public enum NotificationType {
     PRODUCTION_TICKET_STATUS_CHANGE("Production Ticket Status", "Production ticket status has changed"),
     PRODUCTION_TICKET_DETAIL_STATUS_CHANGE("Production Detail Status", "Production ticket detail status has changed"),
     PURCHASING_TICKET_STATUS_CHANGE("Purchasing Ticket Status", "Purchasing ticket status has changed"),
-    PURCHASING_TICKET_DETAIL_STATUS_CHANGE("Purchasing Detail Status", "Purchasing ticket detail status has changed");
+    PURCHASING_TICKET_DETAIL_STATUS_CHANGE("Purchasing Detail Status", "Purchasing ticket detail status has changed"),
+    SALE_STATUS_CHANGE("Sale Status", "Sale order status has changed"),
+    SALE_CANCELLED("Sale Cancelled", "Sale order has been cancelled");
     
     private final String displayName;
     private final String description;

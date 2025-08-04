@@ -1,11 +1,13 @@
 package org.example.coretrack.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import org.example.coretrack.dto.product.inventory.AllSearchInventoryResponse;
 import org.example.coretrack.model.Sale.Order;
 import org.example.coretrack.model.Sale.OrderStatus;
+import org.example.coretrack.model.auth.User;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +19,8 @@ import org.springframework.data.repository.query.Param;
 public interface OrdersRepository extends JpaRepository<Order, Long>{
     Optional<Order> findBySku(String Sku);
     Optional<Order> findByIdAndIsActive(Long id, boolean isActive);
+    
+    List<Order> findByCreatedByAndCreatedAtAfter(User createdBy, LocalDateTime createdAt);
 
     @Query("""
     SELECT DISTINCT o

@@ -8,6 +8,7 @@ export interface SearchInventoryResponse {
   minAlertStock: string; // BigDecimal as string
   maxStockLevel: string; // BigDecimal as string
   imageUrl?: string;
+  updatedAt?: string; // ISO date string
 }
 
 export interface ProductInventoryAutoComplete {

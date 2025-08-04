@@ -140,4 +140,17 @@ public class SaleController {
             return ResponseEntity.badRequest().build();
         }
     }
+
+
+    
+    @GetMapping("/debug/orders")
+    @PreAuthorize("hasAnyRole('OWNER')")
+    public ResponseEntity<String> debugOrders() {
+        try {
+            saleService.debugCheckOrders();
+            return ResponseEntity.ok("Debug completed - check server logs");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Debug failed: " + e.getMessage());
+        }
+    }
 }

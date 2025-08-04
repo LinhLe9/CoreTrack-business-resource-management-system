@@ -25,24 +25,25 @@ public interface MaterialInventoryRepository extends JpaRepository<MaterialInven
         mv.id,
         mv.sku,
         mv.name,
-        m.group.name,
+        COALESCE(mg.name, ''),
         inv.inventoryStatus,
         inv.currentStock,
         inv.minAlertStock,
         inv.maxStockLevel,
-        mv.imageUrl
+        mv.imageUrl,
+        inv.updatedAt
     )
     FROM MaterialVariant mv
     LEFT JOIN Material m ON mv.material.id = m.id
+    LEFT JOIN MaterialGroup mg ON m.group.id = mg.id
     JOIN MaterialInventory inv ON mv.id = inv.materialVariant.id
     WHERE (:search IS NULL OR 
            LOWER(mv.sku) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(mv.name) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(m.name) LIKE LOWER(CONCAT('%', :search, '%')))
-      AND (:groupMaterials IS NULL OR m.group.id IN :groupMaterials)
+      AND (:groupMaterials IS NULL OR mg.id IN :groupMaterials)
       AND (:inventoryStatus IS NULL OR inv.inventoryStatus IN :inventoryStatus)
-      AND m.status <> org.example.coretrack.model.material.MaterialStatus.DELETED
-      AND m.isActive = true
+      AND (m IS NULL OR (m.status <> org.example.coretrack.model.material.MaterialStatus.DELETED AND m.isActive = true))
     """)
     Page<SearchInventoryResponse> searchInventoryByCriteria(
         @Param("search") String search,
@@ -67,8 +68,7 @@ public interface MaterialInventoryRepository extends JpaRepository<MaterialInven
            LOWER(mv.sku) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(mv.name) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(m.name) LIKE LOWER(CONCAT('%', :search, '%')))
-      AND m.status <> org.example.coretrack.model.material.MaterialStatus.DELETED
-      AND m.isActive = true
+      AND (m IS NULL OR (m.status <> org.example.coretrack.model.material.MaterialStatus.DELETED AND m.isActive = true))
     """)
     List<AllSearchInventoryResponse> searchInventory(
         @Param("search") String search
@@ -78,15 +78,15 @@ public interface MaterialInventoryRepository extends JpaRepository<MaterialInven
     SELECT inv
     FROM MaterialInventory inv
     JOIN MaterialVariant mv ON inv.materialVariant.id = mv.id
-    JOIN Material m ON mv.material.id = m.id
+    LEFT JOIN Material m ON mv.material.id = m.id
+    LEFT JOIN MaterialGroup mg ON m.group.id = mg.id
     WHERE (:search IS NULL OR 
            LOWER(mv.sku) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(mv.name) LIKE LOWER(CONCAT('%', :search, '%')) OR 
            LOWER(m.name) LIKE LOWER(CONCAT('%', :search, '%')))
-      AND (:groupMaterials IS NULL OR m.group.id IN :groupMaterials)
+      AND (:groupMaterials IS NULL OR mg.id IN :groupMaterials)
       AND (:status IS NULL OR inv.inventoryStatus IN :status)
-      AND m.status <> org.example.coretrack.model.material.MaterialStatus.DELETED
-      AND m.isActive = true
+      AND (m IS NULL OR (m.status <> org.example.coretrack.model.material.MaterialStatus.DELETED AND m.isActive = true))
     ORDER BY 
         CASE WHEN :sortByOldest = true THEN inv.updatedAt END ASC,
         CASE WHEN :sortByOldest = false THEN inv.updatedAt END DESC

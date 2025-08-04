@@ -55,7 +55,7 @@ export default function Header() {
         {/* Left side: Logo + Menus */}
         <Flex align="center" gap={4}>
           {/* Logo */}
-          <NextLink href="/" passHref>
+          <NextLink href="/dashboard" passHref>
             <Box display="flex" alignItems="center" cursor="pointer">
               <Image src="/coretrack.png" alt="Logo" width={120} height={30} priority />
             </Box>

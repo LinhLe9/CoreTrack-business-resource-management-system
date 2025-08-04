@@ -74,6 +74,8 @@ export const allocateOrderDetail = async (ticketId: number, detailId: number): P
   return response.data;
 };
 
+
+
 // Helper function to create a simple sale ticket
 export const createSimpleSaleTicket = async (
   sku: string,

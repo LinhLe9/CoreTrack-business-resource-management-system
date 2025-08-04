@@ -1,6 +1,7 @@
 package org.example.coretrack.dto.product.inventory;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import org.example.coretrack.model.product.inventory.InventoryStatus;
 
 public class SearchInventoryResponse {
@@ -13,9 +14,10 @@ public class SearchInventoryResponse {
     private BigDecimal minAlertStock;
     private BigDecimal maxStockLevel;
     private String imageUrl;
+    private LocalDateTime updatedAt;
 
     public SearchInventoryResponse(Long id, String sku, String name, String group, InventoryStatus inventoryStatus,
-            BigDecimal currentStock, BigDecimal minAlertStock, BigDecimal maxStockLevel, String imageUrl) {
+            BigDecimal currentStock, BigDecimal minAlertStock, BigDecimal maxStockLevel, String imageUrl, LocalDateTime updatedAt) {
         this.id = id;
         this.sku = sku;
         this.name = name;
@@ -25,6 +27,7 @@ public class SearchInventoryResponse {
         this.minAlertStock = minAlertStock;
         this.maxStockLevel = maxStockLevel;
         this.imageUrl = imageUrl;
+        this.updatedAt = updatedAt;
     }
 
     public SearchInventoryResponse(){}
@@ -82,5 +85,11 @@ public class SearchInventoryResponse {
     }
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

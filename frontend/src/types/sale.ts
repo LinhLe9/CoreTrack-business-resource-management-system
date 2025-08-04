@@ -45,9 +45,9 @@ export enum OrderStatus {
 }
 
 export interface SaleStatusTransitionRule {
-  fromStatus: OrderStatus;
-  toStatus: OrderStatus;
-  allowedRoles: string[];
+  currentStatus: OrderStatus;
+  allowedTransitions: OrderStatus[];
+  description: string;
 }
 
 export interface SaleDetailResponse {
@@ -62,6 +62,10 @@ export interface SaleDetailResponse {
   allocatedQuantity?: string; // BigDecimal as string
   allocatedAt?: string;
   allocatedBy?: string;
+  currentStock: string; // BigDecimal as string
+  allocatedStock: string; // BigDecimal as string
+  futureStock: string; // BigDecimal as string
+  availableStock: string; // BigDecimal as string
 }
 
 export interface SaleOrderStatusLogResponse {

@@ -29,4 +29,5 @@ public interface SaleService {
 
     SaleTicketResponse allocateOrderDetail(Long ticketId, Long detailId, User user);
 
+    void debugCheckOrders();
 }

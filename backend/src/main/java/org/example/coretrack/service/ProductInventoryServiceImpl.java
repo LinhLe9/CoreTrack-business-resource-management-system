@@ -1180,7 +1180,8 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
                 (BigDecimal) row[5], // currentStock
                 (BigDecimal) row[6], // minAlertStock
                 (BigDecimal) row[7], // maxStockLevel
-                (String) row[8]     // imageUrl
+                (String) row[8],    // imageUrl
+                (LocalDateTime) row[9] // updatedAt
             ))
             .collect(Collectors.toList());
         

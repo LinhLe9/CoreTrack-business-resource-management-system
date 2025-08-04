@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 import java.util.stream.Collectors;
+import java.util.Map;
 
 import org.example.coretrack.dto.productionTicket.BomItemProductionTicketRequest;
 import org.example.coretrack.dto.productionTicket.ProductVariantBomRequest;
@@ -27,6 +28,8 @@ import org.example.coretrack.model.Sale.OrderDetail;
 import org.example.coretrack.model.Sale.OrderStatus;
 import org.example.coretrack.model.Sale.OrderStatusLog;
 import org.example.coretrack.model.auth.User;
+import org.example.coretrack.model.notification.Notification;
+import org.example.coretrack.model.notification.NotificationType;
 import org.example.coretrack.model.product.ProductVariant;
 import org.example.coretrack.model.product.inventory.InventoryStatus;
 import org.example.coretrack.model.product.inventory.InventoryTransactionType;
@@ -47,6 +50,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
@@ -73,8 +77,32 @@ public class SaleServiceImpl implements SaleService{
     @Autowired
     private ProductInventoryLogRepository productInventoryLogRepository;
 
+    @Autowired
+    private NotificationService notificationService;
+
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public SaleCardResponse createSaleTicket(SaleCreateRequest request, User user) {
+        System.out.println("=== Starting createSaleTicket ===");
+        System.out.println("Request SKU: " + request.getSku());
+        System.out.println("Request details count: " + (request.getDetails() != null ? request.getDetails().size() : 0));
+        System.out.println("User: " + user.getUsername());
+        
+        // Simple duplicate prevention - check if a similar request was processed recently
+        String requestHash = generateRequestHash(request, user);
+        System.out.println("Request hash: " + requestHash);
+        
+        // Check for recent duplicate orders (within last 5 minutes)
+        LocalDateTime fiveMinutesAgo = LocalDateTime.now().minusMinutes(5);
+        List<Order> recentOrders = ordersRepository.findByCreatedByAndCreatedAtAfter(user, fiveMinutesAgo);
+        
+        for (Order recentOrder : recentOrders) {
+            if (isDuplicateOrder(recentOrder, request)) {
+                System.out.println("Duplicate order detected! Recent order ID: " + recentOrder.getId());
+                throw new RuntimeException("A similar order was created recently. Please check if this is a duplicate request.");
+            }
+        }
+        
         if (CollectionUtils.isEmpty(request.getDetails())) {
             throw new RuntimeException("At least one product Variant is required");
         }
@@ -108,6 +136,8 @@ public class SaleServiceImpl implements SaleService{
             // Automatic SKU Generation
             orderSku = generateUniqueOrderSku(); 
         }
+        
+        System.out.println("Generated/Manual SKU: " + orderSku);
 
         // Handle expected_complete_date
         LocalDateTime expectedCompleteDateTime = null;
@@ -129,6 +159,8 @@ public class SaleServiceImpl implements SaleService{
         ticket.setUpdatedBy(user);
         ticket.setCreatedAt(LocalDateTime.now());
         ticket.setUpdatedAt(LocalDateTime.now());
+        
+        System.out.println("Ticket object created with SKU: " + ticket.getSku());
 
         // Initialize order details list
         List<OrderDetail> orderDetails = new ArrayList<>();
@@ -166,7 +198,7 @@ public class SaleServiceImpl implements SaleService{
                 detail.setActive(true);
                 
                 orderDetails.add(detail);
-                ticket.getOrderDetail().add(detail); // Add to ticket's detail list
+                // Don't add to ticket's detail list here - let JPA handle it
                 System.out.println("Successfully created detail for product variant: " + productVariantSku);
 
             } catch (Exception e) {
@@ -182,8 +214,16 @@ public class SaleServiceImpl implements SaleService{
         }
 
         // Save ticket first
+        System.out.println("About to save ticket with SKU: " + ticket.getSku());
         ticket = ordersRepository.save(ticket);
-        System.out.println("Saved order ticket with ID: " + ticket.getId());
+        System.out.println("Saved order ticket with ID: " + ticket.getId() + " and SKU: " + ticket.getSku());
+
+        // Save order details explicitly
+        System.out.println("Saving " + orderDetails.size() + " order details...");
+        for (OrderDetail detail : orderDetails) {
+            detail = orderDetailRepository.save(detail);
+            System.out.println("Saved order detail with ID: " + detail.getId() + " and SKU: " + detail.getSku());
+        }
 
         // Create initial status log for ticket
         createInitialTicketStatusLog(ticket, user);
@@ -215,7 +255,17 @@ public class SaleServiceImpl implements SaleService{
         }
 
         // Convert to response
-        return convertToSaleCardResponse(ticket);
+        SaleCardResponse response = convertToSaleCardResponse(ticket);
+        System.out.println("=== Completed createSaleTicket for ticket ID: " + ticket.getId() + " ===");
+        
+        // Validate that the order was created successfully
+        Order savedOrder = ordersRepository.findByIdAndIsActive(ticket.getId(), true)
+            .orElseThrow(() -> new RuntimeException("Failed to retrieve created order"));
+        
+        System.out.println("Validation: Order retrieved successfully with " + 
+            (savedOrder.getOrderDetail() != null ? savedOrder.getOrderDetail().size() : 0) + " details");
+        
+        return response;
     }
 
     /**
@@ -365,74 +415,108 @@ public class SaleServiceImpl implements SaleService{
 
     @Override
     public SaleTicketResponse getSaleTicketById(Long id) {
-        Order ticket = ordersRepository.findByIdAndIsActive(id, true)
-            .orElseThrow(() -> new RuntimeException("Order not found with id: " + id));
+        System.out.println("=== Starting getSaleTicketById ===");
+        System.out.println("Looking for order with ID: " + id);
+        
+        try {
+            Order ticket = ordersRepository.findByIdAndIsActive(id, true)
+                .orElseThrow(() -> new RuntimeException("Order not found with id: " + id));
+            
+            System.out.println("Found order: " + ticket.getSku() + " (ID: " + ticket.getId() + ")");
+            System.out.println("Order details count: " + (ticket.getOrderDetail() != null ? ticket.getOrderDetail().size() : 0));
 
-        List<SaleDetailResponse> details = new ArrayList<>();
-        if(ticket.getOrderDetail() != null && !ticket.getOrderDetail().isEmpty()){
-            for(OrderDetail detail : ticket.getOrderDetail()){
-                ProductInventory inventory = productInventoryRepository.findByProductVariant_Id(detail.getProductVariant().getId())
-                                            .orElseThrow(() -> new RuntimeException("ProductVariant is not found by id " + detail.getProductVariant().getId()));
-                BigDecimal currentStock = inventory.getCurrentStock();
-                BigDecimal allocatedStock = inventory.getAllocatedStock();
-                BigDecimal futureStock = inventory.getFutureStock();
-                BigDecimal availableStock = (currentStock.subtract(allocatedStock).compareTo(BigDecimal.ZERO) <= 0 ? BigDecimal.ZERO : currentStock.subtract(allocatedStock));
-                SaleDetailResponse response = new SaleDetailResponse(
-                            detail.getId(),
-                            detail.getSku(),
-                            detail.getProductVariant().getSku(),
-                            detail.getProductVariant().getName(),
-                            detail.getQuantity(),
-                            detail.getProductVariant().getPrice() != null ? detail.getProductVariant().getPrice() : null,
-                            detail.getProductVariant().getPrice() != null ? detail.getProductVariant().getPrice().multiply(detail.getQuantity()) : null,
-                            detail.getStatus().getDisplayName(),
-                            currentStock,
-                            allocatedStock,
-                            futureStock,
-                            availableStock
-                );
-                details.add(response);
+            List<SaleDetailResponse> details = new ArrayList<>();
+            if(ticket.getOrderDetail() != null && !ticket.getOrderDetail().isEmpty()){
+                System.out.println("Processing " + ticket.getOrderDetail().size() + " order details...");
+                for(OrderDetail detail : ticket.getOrderDetail()){
+                    System.out.println("Processing detail ID: " + detail.getId() + ", SKU: " + detail.getSku());
+                    
+                    ProductInventory inventory = productInventoryRepository.findByProductVariant_Id(detail.getProductVariant().getId())
+                                                .orElseThrow(() -> new RuntimeException("ProductVariant is not found by id " + detail.getProductVariant().getId()));
+                    
+                    System.out.println("Inventory found for product variant ID: " + detail.getProductVariant().getId());
+                    System.out.println("Raw currentStock: " + inventory.getCurrentStock());
+                    System.out.println("Raw allocatedStock: " + inventory.getAllocatedStock());
+                    System.out.println("Raw futureStock: " + inventory.getFutureStock());
+                    
+                    BigDecimal currentStock = inventory.getCurrentStock() != null ? inventory.getCurrentStock() : BigDecimal.ZERO;
+                    BigDecimal allocatedStock = inventory.getAllocatedStock() != null ? inventory.getAllocatedStock() : BigDecimal.ZERO;
+                    BigDecimal futureStock = inventory.getFutureStock() != null ? inventory.getFutureStock() : BigDecimal.ZERO;
+                    BigDecimal availableStock = (currentStock.subtract(allocatedStock).compareTo(BigDecimal.ZERO) <= 0 ? BigDecimal.ZERO : currentStock.subtract(allocatedStock));
+                    
+                    System.out.println("Processed currentStock: " + currentStock);
+                    System.out.println("Processed allocatedStock: " + allocatedStock);
+                    System.out.println("Processed futureStock: " + futureStock);
+                    System.out.println("Calculated availableStock: " + availableStock);
+                    SaleDetailResponse response = new SaleDetailResponse(
+                                detail.getId(),
+                                detail.getSku(),
+                                detail.getProductVariant().getSku(),
+                                detail.getProductVariant().getName(),
+                                detail.getQuantity() != null ? detail.getQuantity() : BigDecimal.ZERO,
+                                detail.getProductVariant().getPrice() != null ? detail.getProductVariant().getPrice() : null,
+                                detail.getProductVariant().getPrice() != null ? detail.getProductVariant().getPrice().multiply(detail.getQuantity() != null ? detail.getQuantity() : BigDecimal.ZERO) : null,
+                                detail.getStatus().getDisplayName(),
+                                currentStock,
+                                allocatedStock,
+                                futureStock,
+                                availableStock
+                    );
+                    details.add(response);
+                    System.out.println("Successfully processed detail: " + detail.getSku());
+                }
             }
-        }
-        List<SaleOrderStatusLogResponse> logs = 
-            (ticket.getStatusLogs() != null && !ticket.getStatusLogs().isEmpty())
-                ? ticket.getStatusLogs().stream()
-                    .map(log -> new SaleOrderStatusLogResponse(
-                            log.getId(),
-                            log.getNew_status().getDisplayName(),
-                            log.getOld_status().getDisplayName(),
-                            log.getNote(),
-                            log.getUpdatedAt(),
-                            log.getUpdatedBy().getUsername(),
-                            log.getUpdatedBy().getRole().name()
+            
+            List<SaleOrderStatusLogResponse> logs = 
+                (ticket.getStatusLogs() != null && !ticket.getStatusLogs().isEmpty())
+                    ? ticket.getStatusLogs().stream()
+                        .map(log -> new SaleOrderStatusLogResponse(
+                                log.getId(),
+                                log.getNew_status() != null ? log.getNew_status().getDisplayName() : null,
+                                log.getOld_status() != null ? log.getOld_status().getDisplayName() : null,
+                                log.getNote(),
+                                log.getUpdatedAt(),
+                                log.getUpdatedBy() != null ? log.getUpdatedBy().getUsername() : null,
+                                log.getUpdatedBy() != null ? log.getUpdatedBy().getRole().name() : null
+                            )
                         )
-                    )
-                    .collect(Collectors.toList())
-                : new ArrayList<>();
+                        .collect(Collectors.toList())
+                    : new ArrayList<>();
 
-        return new SaleTicketResponse(
-            ticket.getId(),
-            ticket.getSku(),
-            ticket.getTotal(),
-            ticket.getPromotion(),
-            ticket.getNetTotal(),
-            ticket.getExpected_complete_date(),
-            ticket.getCompleted_date(),
-            ticket.getStatus().getDisplayName(),
-            ticket.isActive(),
-            ticket.getCustomerName(),
-            ticket.getCustomerEmail(),
-            ticket.getCustomerPhone(),
-            ticket.getCustomerAddress(),
-            ticket.getCreatedAt(),
-            ticket.getCreatedBy().getUsername(),
-            ticket.getCreatedBy().getRole().name(),
-            ticket.getUpdatedAt(),
-            ticket.getUpdatedBy().getUsername(),
-            ticket.getUpdatedBy().getRole().name(),
-            logs,
-            details
-        );
+            SaleTicketResponse response = new SaleTicketResponse(
+                ticket.getId(),
+                ticket.getSku(),
+                ticket.getTotal() != null ? ticket.getTotal() : BigDecimal.ZERO,
+                ticket.getPromotion() != null ? ticket.getPromotion() : BigDecimal.ZERO,
+                ticket.getNetTotal() != null ? ticket.getNetTotal() : BigDecimal.ZERO,
+                ticket.getExpected_complete_date(),
+                ticket.getCompleted_date(),
+                ticket.getStatus().getDisplayName(),
+                ticket.isActive(),
+                ticket.getCustomerName(),
+                ticket.getCustomerEmail(),
+                ticket.getCustomerPhone(),
+                ticket.getCustomerAddress(),
+                ticket.getCreatedAt(),
+                ticket.getCreatedBy() != null ? ticket.getCreatedBy().getUsername() : null,
+                ticket.getCreatedBy() != null ? ticket.getCreatedBy().getRole().name() : null,
+                ticket.getUpdatedAt(),
+                ticket.getUpdatedBy() != null ? ticket.getUpdatedBy().getUsername() : null,
+                ticket.getUpdatedBy() != null ? ticket.getUpdatedBy().getRole().name() : null,
+                logs,
+                details
+            );
+            
+            System.out.println("=== Completed getSaleTicketById successfully ===");
+            return response;
+            
+        } catch (Exception e) {
+            System.err.println("=== ERROR in getSaleTicketById ===");
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+            System.err.println("=== END ERROR ===");
+            throw e;
+        }
     }
 
     @Override
@@ -491,23 +575,23 @@ public class SaleServiceImpl implements SaleService{
         return List.of(
             new SaleStatusTransitionRule(
                 OrderStatus.NEW,
-                List.of(OrderStatus.ALLOCATED, OrderStatus.CANCELLED),
-                "New orders can be allocated or cancelled"
+                List.of(OrderStatus.ALLOCATED),
+                "New orders can be allocated"
             ),
             new SaleStatusTransitionRule(
                 OrderStatus.ALLOCATED,
-                List.of(OrderStatus.PACKED, OrderStatus.CANCELLED),
-                "Allocated orders can be shipped or cancelled"
+                List.of(OrderStatus.PACKED),
+                "Allocated orders can be packed"
             ),
             new SaleStatusTransitionRule(
                 OrderStatus.PACKED,
-                List.of(OrderStatus.SHIPPED, OrderStatus.CANCELLED),
-                "Shipping orders can be completed or cancelled"
+                List.of(OrderStatus.SHIPPED),
+                "Packed orders can be shipped"
             ),
             new SaleStatusTransitionRule(
                 OrderStatus.SHIPPED,
                 List.of(OrderStatus.DONE),
-                "Completed orders cannot be changed"
+                "Shipped orders can be completed"
             ),
             new SaleStatusTransitionRule(
                 OrderStatus.DONE,
@@ -572,6 +656,28 @@ public class SaleServiceImpl implements SaleService{
             logTicketStatusChange(ticket, oldTicketStatus, OrderStatus.CANCELLED, 
                 "Sale ticket cancelled: " + reason, user);
             
+            // Create notification for sale cancellation
+            try {
+                String title = "Sale Cancelled";
+                String message = String.format("Sale Order #%d has been cancelled. Reason: %s", 
+                    ticket.getId(), reason);
+                
+                Notification notification = new Notification(
+                    ticket.getCreatedBy(), // Notify the sale creator
+                    NotificationType.SALE_CANCELLED,
+                    title,
+                    message
+                );
+                
+                notificationService.createTicketNotification(notification);
+                
+                System.out.println("Created sale cancellation notification for user: " + 
+                                 ticket.getCreatedBy().getUsername());
+            } catch (Exception e) {
+                System.err.println("Failed to create sale cancellation notification: " + e.getMessage());
+                // Don't fail the cancellation if notification fails
+            }
+            
             System.out.println("=== Successfully cancelled sale ticket ===");
             return ticket;
             
@@ -585,6 +691,67 @@ public class SaleServiceImpl implements SaleService{
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SaleTicketResponse allocateOrderDetail(Long ticketId, Long detailId, User user) {
+        System.out.println("=== Starting allocateOrderDetail ===");
+        System.out.println("Ticket ID: " + ticketId + ", Detail ID: " + detailId);
+        
+        // Find the ticket
+        Order ticket = ordersRepository.findByIdAndIsActive(ticketId, true)
+            .orElseThrow(() -> new RuntimeException("Sale ticket not found"));
+        
+        // Find the specific detail
+        OrderDetail detail = ticket.getOrderDetail().stream()
+            .filter(d -> d.getId().equals(detailId))
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("Order detail not found"));
+        
+        System.out.println("Found detail: " + detail.getId() + ", Status: " + detail.getStatus());
+        
+        // Check if detail is already allocated
+        if (detail.getStatus() == OrderStatus.ALLOCATED) {
+            throw new RuntimeException("Order detail is already allocated");
+        }
+        
+        // Check if detail can be allocated (should be NEW status)
+        if (detail.getStatus() != OrderStatus.NEW) {
+            throw new RuntimeException("Order detail must be in NEW status to be allocated");
+        }
+        
+        // Update detail status to ALLOCATED
+        OrderStatus oldStatus = detail.getStatus();
+        detail.setStatus(OrderStatus.ALLOCATED);
+        
+        // Update product inventory
+        updateProductInventoryForSale(detail, oldStatus, OrderStatus.ALLOCATED, user);
+        
+        // Save the detail
+        orderDetailRepository.save(detail);
+        
+        // Check if all details are allocated, then update order status
+        boolean allDetailsAllocated = ticket.getOrderDetail().stream()
+            .allMatch(d -> d.getStatus() == OrderStatus.ALLOCATED);
+        
+        if (allDetailsAllocated) {
+            OrderStatus oldTicketStatus = ticket.getStatus();
+            ticket.setStatus(OrderStatus.ALLOCATED);
+            ticket.setUpdatedAt(LocalDateTime.now());
+            ticket.setUpdatedBy(user);
+            ordersRepository.save(ticket);
+            
+            // Log the ticket status change
+            logTicketStatusChange(ticket, oldTicketStatus, OrderStatus.ALLOCATED, 
+                "All order details allocated", user);
+        }
+        
+        // Return updated ticket response
+        return getSaleTicketById(ticketId);
+    }
+
+
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public SaleTicketResponse updateDetailStatus(Long id, UpdateSaleOrderStatusRequest request, User user) {
         // Verify the sale ticket exists
         Order ticket = ordersRepository.findByIdAndIsActive(id, true)
@@ -613,72 +780,30 @@ public class SaleServiceImpl implements SaleService{
         logTicketStatusChange(ticket, oldStatus, request.getNewStatus(), 
                 "Order status updated: " + request.getNote(), user);
         
+        // Create notification for sale status change
+        try {
+            String title = "Sale Status Updated";
+            String message = String.format("Sale Order #%d status changed from %s to %s", 
+                ticket.getId(), oldStatus, request.getNewStatus());
+            
+            Notification notification = new Notification(
+                ticket.getCreatedBy(), // Notify the sale creator
+                NotificationType.SALE_STATUS_CHANGE,
+                title,
+                message
+            );
+            
+            notificationService.createTicketNotification(notification);
+            
+            System.out.println("Created sale status change notification for user: " + 
+                             ticket.getCreatedBy().getUsername());
+        } catch (Exception e) {
+            System.err.println("Failed to create sale status change notification: " + e.getMessage());
+            // Don't fail the status update if notification fails
+        }
+        
         // Return updated ticket response
         return getSaleTicketById(id);
-    }
-
-    @Override
-    public SaleTicketResponse allocateOrderDetail(Long ticketId, Long detailId, User user) {
-        // Verify the sale ticket exists
-        Order ticket = ordersRepository.findByIdAndIsActive(ticketId, true)
-            .orElseThrow(() -> new RuntimeException("Sale Ticket not found with id: " + ticketId));
-        
-        // Find the specific detail
-        OrderDetail detail = orderDetailRepository.findByIdAndIsActive(detailId, true)
-            .orElseThrow(() -> new RuntimeException("Sale Ticket Detail not found with id: " + detailId));
-        
-        // Verify the detail belongs to the ticket
-        if (!detail.getOrder().getId().equals(ticketId)) {
-            throw new RuntimeException("Sale Ticket Detail does not belong to the specified Sale Ticket");
-        }
-        
-        // Check if detail is already allocated
-        if (detail.getStatus() == OrderStatus.ALLOCATED) {
-            throw new RuntimeException("Order detail is already allocated");
-        }
-        
-        // Check if detail can be allocated (should be NEW status)
-        if (detail.getStatus() != OrderStatus.NEW) {
-            throw new RuntimeException("Order detail must be in NEW status to be allocated");
-        }
-        
-        // Check if there's enough stock to allocate
-        ProductVariant productVariant = detail.getProductVariant();
-        ProductInventory inventory = productInventoryRepository.findByProductVariant_Id(productVariant.getId())
-            .orElseThrow(() -> new RuntimeException("ProductInventory not found for product variant: " + productVariant.getSku()));
-        
-        BigDecimal availableStock = inventory.getCurrentStock().subtract(inventory.getAllocatedStock());
-        if (availableStock.compareTo(detail.getQuantity()) < 0) {
-            throw new RuntimeException("Insufficient stock to allocate. Available: " + availableStock + ", Required: " + detail.getQuantity());
-        }
-        
-        // Update detail status to ALLOCATED
-        OrderStatus oldStatus = detail.getStatus();
-        detail.setStatus(OrderStatus.ALLOCATED);
-
-        // Save the detail
-        detail = orderDetailRepository.save(detail);
-        
-        // Update inventory - subtract from current stock
-        updateProductInventoryForSale(detail, oldStatus, OrderStatus.ALLOCATED, user);
-        
-        // Check if all details are allocated, then update order status
-        boolean allDetailsAllocated = ticket.getOrderDetail().stream()
-            .allMatch(d -> d.getStatus() == OrderStatus.ALLOCATED);
-        
-        if (allDetailsAllocated) {
-            ticket.setStatus(OrderStatus.ALLOCATED);
-            ticket.setUpdatedAt(LocalDateTime.now());
-            ticket.setUpdatedBy(user);
-            ordersRepository.save(ticket);
-            
-            // Log the ticket status change
-            logTicketStatusChange(ticket, oldStatus, OrderStatus.ALLOCATED, 
-                "All order details allocated", user);
-        }
-        
-        // Return updated ticket response
-        return getSaleTicketById(ticketId);
     }
 
     // Helper methods for Sale Service
@@ -694,6 +819,8 @@ public class SaleServiceImpl implements SaleService{
             throw new RuntimeException("Invalid status transition from " + currentStatus + " to " + newStatus);
         }
     }
+
+
 
     private void updateSaleTicketStatusBasedOnDetails(Order ticket, User user) {
         List<OrderDetail> details = ticket.getOrderDetail();
@@ -792,4 +919,77 @@ public class SaleServiceImpl implements SaleService{
         }
     }
     
+    /**
+     * Generate a simple hash for duplicate request detection
+     */
+    private String generateRequestHash(SaleCreateRequest request, User user) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(user.getId()).append("-");
+        sb.append(request.getSku() != null ? request.getSku() : "").append("-");
+        sb.append(request.getTotal()).append("-");
+        sb.append(request.getPromotion()).append("-");
+        sb.append(request.getNetTotal()).append("-");
+        sb.append(request.getExpected_complete_date()).append("-");
+        
+        if (request.getDetails() != null) {
+            for (SaleCreateDetailRequest detail : request.getDetails()) {
+                sb.append(detail.getProductVariantSku()).append("-");
+                sb.append(detail.getQuantity()).append("-");
+            }
+        }
+        
+        return String.valueOf(sb.toString().hashCode());
+    }
+
+    /**
+     * Check if an order is a duplicate of the current request
+     */
+    private boolean isDuplicateOrder(Order order, SaleCreateRequest request) {
+        // Check basic properties
+        if (!order.getTotal().equals(request.getTotal()) || 
+            !order.getPromotion().equals(request.getPromotion()) ||
+            !order.getNetTotal().equals(request.getNetTotal())) {
+            return false;
+        }
+        
+        // Check details count
+        if (order.getOrderDetail().size() != request.getDetails().size()) {
+            return false;
+        }
+        
+        // Check details content
+        for (int i = 0; i < request.getDetails().size(); i++) {
+            SaleCreateDetailRequest requestDetail = request.getDetails().get(i);
+            OrderDetail orderDetail = order.getOrderDetail().get(i);
+            
+            if (!orderDetail.getProductVariant().getSku().equals(requestDetail.getProductVariantSku()) ||
+                !orderDetail.getQuantity().equals(requestDetail.getQuantity())) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Debug method to check if there are any orders in the database
+     */
+    public void debugCheckOrders() {
+        System.out.println("=== Debug: Checking orders in database ===");
+        try {
+            List<Order> allOrders = ordersRepository.findAll();
+            System.out.println("Total orders in database: " + allOrders.size());
+            
+            for (Order order : allOrders) {
+                System.out.println("Order ID: " + order.getId() + 
+                    ", SKU: " + order.getSku() + 
+                    ", Active: " + order.isActive() + 
+                    ", Status: " + order.getStatus());
+            }
+        } catch (Exception e) {
+            System.err.println("Error checking orders: " + e.getMessage());
+            e.printStackTrace();
+        }
+        System.out.println("=== End debug ===");
+    }
 }
