@@ -548,6 +548,13 @@ const SaleDetailPage = () => {
           <Button 
             variant="outline" 
             size="lg"
+            onClick={() => router.push(`/sale/${id}/edit`)}
+          >
+            Edit Sale
+          </Button>
+          <Button 
+            variant="outline" 
+            size="lg"
             onClick={() => router.push('/sale')}
           >
             Back to Sale Page

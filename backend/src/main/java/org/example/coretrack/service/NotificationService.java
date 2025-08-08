@@ -14,11 +14,17 @@ import org.springframework.data.domain.Pageable;
 
 public interface NotificationService {
     
-    // Create notification for product inventory status change
+    // Create notification for product inventory status change (single user)
     void createInventoryNotification(User user, ProductInventory productInventory, InventoryStatus oldStatus, InventoryStatus newStatus);
     
-    // Create notification for material inventory status change
+    // Create notification for product inventory status change (multiple users)
+    void createInventoryNotification(List<User> users, ProductInventory productInventory, InventoryStatus oldStatus, InventoryStatus newStatus);
+    
+    // Create notification for material inventory status change (single user)
     void createMaterialInventoryNotification(User user, MaterialInventory materialInventory, InventoryStatus oldStatus, InventoryStatus newStatus);
+    
+    // Create notification for material inventory status change (multiple users)
+    void createMaterialInventoryNotification(List<User> users, MaterialInventory materialInventory, InventoryStatus oldStatus, InventoryStatus newStatus);
     
     // Get notifications for user
     Page<NotificationResponse> getUserNotifications(User user, Pageable pageable);
@@ -38,6 +44,15 @@ public interface NotificationService {
     // Get notifications by type
     List<NotificationResponse> getNotificationsByType(User user, NotificationType type);
     
-    // Create ticket notification
+    // Create ticket notification (single user)
     void createTicketNotification(Notification notification);
+    
+    // Create ticket notification (multiple users)
+    void createTicketNotification(Notification notification, List<User> users);
+    
+    // Create general notification for multiple users
+    void createGeneralNotification(List<User> users, NotificationType type, String title, String message);
+    
+    // Create test notification
+    void createTestNotification(User user);
 } 

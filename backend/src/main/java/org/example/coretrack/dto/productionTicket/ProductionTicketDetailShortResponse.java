@@ -3,6 +3,8 @@ package org.example.coretrack.dto.productionTicket;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 public class ProductionTicketDetailShortResponse {
     private Long id;
     private String productVariantSku;
@@ -10,10 +12,14 @@ public class ProductionTicketDetailShortResponse {
 
     private String status;
     
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime expected_complete_date;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime completed_date;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime lastUpdatedAt;
 
     private String createdBy_name;

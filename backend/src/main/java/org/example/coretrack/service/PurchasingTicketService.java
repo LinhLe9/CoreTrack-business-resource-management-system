@@ -18,11 +18,11 @@ import org.springframework.data.domain.Pageable;
 public interface PurchasingTicketService {
     BulkCreatePurchasingTicketResponse bulkCreatePurchasingTicket(BulkCreatePurchasingTicketRequest request, User user);
 
-    PurchasingTicketResponse getPurchasingTicketById (Long id);
+    PurchasingTicketResponse getPurchasingTicketById (Long id, User user);
 
-    Page<PurchasingTicketCardResponse> getPurchasingTickets (String search, List<String> ticketStatus, Pageable pageable);
+    Page<PurchasingTicketCardResponse> getPurchasingTickets (String search, List<String> ticketStatus, Pageable pageable, User user);
 
-    List<PurchasingTicketCardResponse> getAutoComplete(String search);
+    List<PurchasingTicketCardResponse> getAutoComplete(String search, User user);
 
     List<PurchasingStatusTransitionRule> getStatusTransitionRules();
 
@@ -34,5 +34,5 @@ public interface PurchasingTicketService {
 
     PurchasingTicketDetailResponse cancelPurchasingTicketDetail(Long ticketId, Long detailId, String reason, User user);
 
-    PurchasingTicketDetailResponse getPurchasingTicketDetails (Long id, Long detailId);
+    PurchasingTicketDetailResponse getPurchasingTicketDetails (Long id, Long detailId, User user);
 }

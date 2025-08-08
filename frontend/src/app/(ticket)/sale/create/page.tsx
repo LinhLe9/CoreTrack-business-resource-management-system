@@ -32,6 +32,7 @@ import { createSaleTicket } from '../../../../services/saleService';
 import { getAllProductVariantsForAutocomplete } from '../../../../services/productService';
 import { SaleCreateRequest, SaleCreateDetailRequest } from '../../../../types/sale';
 import { ProductVariantAutoComplete } from '../../../../types/product';
+import { useUser } from '../../../../hooks/useUser';
 
 // Validation schema
 const createSaleSchema = z.object({
@@ -66,6 +67,49 @@ const CreateSalePage: React.FC = () => {
   
   const toast = useToast();
   const router = useRouter();
+  const { isOwner, isSaleStaff, user } = useUser();
+
+  // Check if user has permission to access this page
+  useEffect(() => {
+    console.log('=== Sale Create Page Debug ===');
+    console.log('User from useUser:', user);
+    console.log('isOwner():', isOwner());
+    console.log('isSaleStaff():', isSaleStaff());
+    console.log('User role:', user?.role);
+    console.log('==================================');
+    
+    const checkPermission = () => {
+      const hasOwnerPermission = isOwner();
+      const hasSaleStaffPermission = isSaleStaff();
+      const hasPermission = hasOwnerPermission || hasSaleStaffPermission;
+      
+      console.log('Permission check:');
+      console.log('- hasOwnerPermission:', hasOwnerPermission);
+      console.log('- hasSaleStaffPermission:', hasSaleStaffPermission);
+      console.log('- hasPermission:', hasPermission);
+      
+      if (user && !hasPermission) {
+        console.log('Access denied - redirecting to /sale');
+        toast({
+          title: 'Access Denied',
+          description: 'Only owners and sale staff can create sale tickets.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+        router.push('/sale');
+      } else if (user && hasPermission) {
+        console.log('Access granted - user has permission');
+      }
+    };
+
+    if (user) {
+      checkPermission();
+    } else {
+      const timer = setTimeout(checkPermission, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [user, isOwner, isSaleStaff, router, toast]);
 
   const {
     register,

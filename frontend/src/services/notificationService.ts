@@ -47,7 +47,16 @@ export const getUnreadCount = async (): Promise<number> => {
 
 // Mark notification as read
 export const markAsRead = async (notificationId: number): Promise<void> => {
-  await apiClient.post(`/notifications/${notificationId}/mark-read`);
+  console.log('markAsRead service called with notificationId:', notificationId);
+  console.log('Making API call to:', `/notifications/${notificationId}/mark-read`);
+  
+  try {
+    const response = await apiClient.post(`/notifications/${notificationId}/mark-read`);
+    console.log('markAsRead API response:', response.status, response.data);
+  } catch (error) {
+    console.error('markAsRead API error:', error);
+    throw error;
+  }
 };
 
 // Mark all notifications as read

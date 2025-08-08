@@ -29,7 +29,7 @@ public class MaterialInventory {
     private BigDecimal futureStock;
     private BigDecimal allocatedStock;
 
-    @OneToMany(mappedBy = "materialInventory")
+    @OneToMany(mappedBy = "materialInventory", cascade = CascadeType.ALL, orphanRemoval = true)
     List<MaterialInventoryLog> logs = new ArrayList<>();
 
     @Enumerated(EnumType.ORDINAL)

@@ -50,8 +50,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
+
+import jakarta.transaction.Transactional;
+
 import org.example.coretrack.model.notification.Notification;
 import org.example.coretrack.model.notification.NotificationType;
+import org.example.coretrack.service.NotificationService;
+import org.example.coretrack.service.NotificationTargetService;
+import org.example.coretrack.service.EmailSendingService;
 
 @Service
 public class PurchasingTicketServiceImpl implements PurchasingTicketService {
@@ -85,6 +91,12 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private NotificationTargetService notificationTargetService;
+
+    @Autowired
+    private EmailSendingService emailSendingService;
 
     @Override
     public BulkCreatePurchasingTicketResponse bulkCreatePurchasingTicket(BulkCreatePurchasingTicketRequest request, User user) {
@@ -120,14 +132,14 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
             String sku = purchasingTicketRequest.getMaterialVariantSku();
             try {
                 // Validate material variant
-                MaterialVariant materialVariant = materialVariantRepository.findBySku(sku)
+                MaterialVariant materialVariant = materialVariantRepository.findBySkuAndCompany(sku, user.getCompany())
                     .orElseThrow(() -> new RuntimeException("Material Variant not found with SKU: " + sku));
 
                 if (!materialVariant.isActive()) {
                     throw new RuntimeException("Material Variant is not active: " + sku);
                 }
 
-                Optional<MaterialInventory> inventory = materialInventoryRepository.findByMaterialVariant_Id(materialVariant.getId());
+                Optional<MaterialInventory> inventory = materialInventoryRepository.findByMaterialVariant_IdAndMaterialVariant_Material_Company(materialVariant.getId(), user.getCompany());
                 boolean needToCreateInventory = (inventory.isEmpty());
 
                 // Convert LocalDate to LocalDateTime with default time 00:00:00
@@ -308,8 +320,8 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
     }
 
     @Override
-    public PurchasingTicketResponse getPurchasingTicketById(Long id) {
-        PurchasingTicket ticket = purchasingTicketRepository.findByIdAndIsActiveTrue(id)
+    public PurchasingTicketResponse getPurchasingTicketById(Long id, User user) {
+        PurchasingTicket ticket = purchasingTicketRepository.findByIdAndIsActiveTrueAndCompany(id, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Purchasing ticket not found with id: " + id));
 
         User createdBy = ticket.getCreatedBy();
@@ -370,7 +382,7 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
     }
 
     @Override
-    public Page<PurchasingTicketCardResponse> getPurchasingTickets(String search, List<String> ticketStatus, Pageable pageable) {
+    public Page<PurchasingTicketCardResponse> getPurchasingTickets(String search, List<String> ticketStatus, Pageable pageable, User user) {
         // handle search
         String processedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
@@ -392,21 +404,13 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
                 processedStatuses = null;
             }
         }
-        Page<PurchasingTicket> tickets = purchasingTicketRepository.findBySearchAndStatus(processedSearch, processedStatuses, pageable);
+        Page<PurchasingTicket> tickets = purchasingTicketRepository.findBySearchAndStatusAndCompany(processedSearch, processedStatuses, user.getCompany(), pageable);
         
-        return tickets.map(ticket -> {
-            PurchasingTicketCardResponse response = new PurchasingTicketCardResponse();
-            response.setId(ticket.getId());
-            response.setName(ticket.getName());
-            response.setStatus(ticket.getStatus().name());
-            response.setCreatedAt(ticket.getCreatedAt());
-            return response;
-        });
+        return tickets.map(PurchasingTicketCardResponse::new);
     }
 
     @Override
-    public List<PurchasingTicketCardResponse> getAutoComplete(String search) {
-        // handle search
+    public List<PurchasingTicketCardResponse> getAutoComplete(String search, User user) {
         // Handle null or empty search
         if (search == null || search.trim().isEmpty()) {
             // Return empty list for null/empty search to avoid showing all tickets
@@ -414,21 +418,17 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
         }
         
         String processedSearch = search.trim();
-        try{
-            List<PurchasingTicket> tickets = purchasingTicketRepository.findBySearchForAutoComplete(processedSearch);
+        try {
+            // Use company-based query for multi-tenancy
+            List<PurchasingTicket> tickets = purchasingTicketRepository.findBySearchForAutoCompleteAndCompany(
+                processedSearch, user.getCompany());
             
             return tickets.stream()
-                .map(ticket -> new PurchasingTicketCardResponse(
-                    ticket.getId(),
-                    ticket.getName(),
-                    null,
-                    ticket.getStatus().getDisplayName(),
-                    ticket.getCreatedAt()
-                ))
+                .map(PurchasingTicketCardResponse::new)
                 .collect(Collectors.toList());
         } catch (Exception e) {
             // Log error and return empty list
-            System.err.println("Error in autocomplete search: " + e.getMessage());
+            System.err.println("Error in autocomplete search for user " + user.getId() + ": " + e.getMessage());
             return new ArrayList<>();
         }
     }
@@ -488,7 +488,7 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
         System.out.println("Ticket ID: " + ticketId + ", Detail ID: " + detailId);
         System.out.println("Request: " + request);
         
-        PurchasingTicket ticket = purchasingTicketRepository.findByIdAndIsActiveTrue(ticketId)
+        PurchasingTicket ticket = purchasingTicketRepository.findByIdAndIsActiveTrueAndCompany(ticketId, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Purchasing ticket not found with id: " + ticketId));
 
         PurchasingTicketDetail detail = purchasingTicketDetailRepository.findByIdAndIsActiveTrue(detailId)
@@ -534,6 +534,22 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
         }
         if (!oldTicketStatus.equals(ticket.getStatus())) {
             createPurchasingTicketNotification(user, ticket, oldTicketStatus, ticket.getStatus());
+        }
+
+        // Send email alerts for status changes
+        try {
+            if (!oldStatus.equals(request.getNewStatus())) {
+                emailSendingService.sendPurchasingTicketDetailStatusChangeAlert(detail, oldStatus.name(), request.getNewStatus().name());
+            }
+            if (!oldTicketStatus.equals(ticket.getStatus())) {
+                emailSendingService.sendPurchasingTicketStatusChangeAlert(ticket, oldTicketStatus.name(), ticket.getStatus().name());
+            }
+        } catch (Exception emailError) {
+            System.err.println("=== WARNING: Failed to send email alert ===");
+            System.err.println("Email error: " + emailError.getMessage());
+            System.err.println("But status update was successful");
+            System.err.println("===========================================");
+            // Don't re-throw the email error to avoid rolling back the status update
         }
 
         // Create response
@@ -687,7 +703,7 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
         System.out.println("Ticket ID: " + ticketId + ", Reason: " + reason);
         
         try {
-            PurchasingTicket ticket = purchasingTicketRepository.findByIdAndIsActiveTrue(ticketId)
+            PurchasingTicket ticket = purchasingTicketRepository.findByIdAndIsActiveTrueAndCompany(ticketId, user.getCompany())
                 .orElseThrow(() -> new RuntimeException("Purchasing ticket not found with id: " + ticketId));
 
             // Cancel all active details
@@ -727,6 +743,17 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
             
             // Create notification for ticket cancellation
             createPurchasingTicketNotification(user, ticket, oldStatus, PurchasingTicketStatus.CANCELLED);
+            
+            // Send email alert for ticket cancellation
+            try {
+                emailSendingService.sendPurchasingTicketStatusChangeAlert(ticket, oldStatus.name(), PurchasingTicketStatus.CANCELLED.name());
+            } catch (Exception emailError) {
+                System.err.println("=== WARNING: Failed to send email alert ===");
+                System.err.println("Email error: " + emailError.getMessage());
+                System.err.println("But ticket cancellation was successful");
+                System.err.println("===========================================");
+                // Don't re-throw the email error to avoid rolling back the ticket cancellation
+            }
 
             System.out.println("=== Completed cancelPurchasingTicket ===");
             return ticket;
@@ -744,7 +771,7 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
         System.out.println("=== Starting cancelPurchasingTicketDetail ===");
         System.out.println("Ticket ID: " + ticketId + ", Detail ID: " + detailId + ", Reason: " + reason);
         
-        PurchasingTicket ticket = purchasingTicketRepository.findByIdAndIsActiveTrue(ticketId)
+        PurchasingTicket ticket = purchasingTicketRepository.findByIdAndIsActiveTrueAndCompany(ticketId, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Purchasing ticket not found with id: " + ticketId));
 
         PurchasingTicketDetail detail = purchasingTicketDetailRepository.findByIdAndIsActiveTrue(detailId)
@@ -777,16 +804,30 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
             createPurchasingTicketNotification(user, ticket, oldTicketStatus, ticket.getStatus());
         }
 
+        // Send email alerts for status changes
+        try {
+            emailSendingService.sendPurchasingTicketDetailStatusChangeAlert(detail, oldStatus.name(), PurchasingTicketDetailStatus.CANCELLED.name());
+            if (!oldTicketStatus.equals(ticket.getStatus())) {
+                emailSendingService.sendPurchasingTicketStatusChangeAlert(ticket, oldTicketStatus.name(), ticket.getStatus().name());
+            }
+        } catch (Exception emailError) {
+            System.err.println("=== WARNING: Failed to send email alert ===");
+            System.err.println("Email error: " + emailError.getMessage());
+            System.err.println("But detail cancellation was successful");
+            System.err.println("===========================================");
+            // Don't re-throw the email error to avoid rolling back the detail cancellation
+        }
+
         System.out.println("=== Completed cancelPurchasingTicketDetail ===");
-        return getPurchasingTicketDetails(ticketId, detailId);
+        return getPurchasingTicketDetails(ticketId, detailId, user);
     }
 
     @Override
-    public PurchasingTicketDetailResponse getPurchasingTicketDetails(Long id, Long detailId) {
+    public PurchasingTicketDetailResponse getPurchasingTicketDetails(Long id, Long detailId, User user) {
         System.out.println("=== Starting getPurchasingTicketDetails ===");
         System.out.println("Ticket ID: " + id + ", Detail ID: " + detailId);
         
-        PurchasingTicket ticket = purchasingTicketRepository.findByIdAndIsActiveTrue(id)
+        PurchasingTicket ticket = purchasingTicketRepository.findByIdAndIsActiveTrueAndCompany(id, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Purchasing ticket not found with id: " + id));
 
         PurchasingTicketDetail detail = purchasingTicketDetailRepository.findByIdAndIsActiveTrue(detailId)
@@ -857,7 +898,7 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
 
     @Override
     public PurchasingTicketStatusesResponse getAllPurchasingTicketStatuses() {
-         List<PurchasingTicketStatusesResponse.StatusInfo> purchasingTicketStatuses = new ArrayList<>();
+        List<PurchasingTicketStatusesResponse.StatusInfo> purchasingTicketStatuses = new ArrayList<>();
         List<PurchasingTicketStatusesResponse.StatusInfo> purchasingTicketDetailStatuses = new ArrayList<>();
 
         // Add ProductionTicketStatus values
@@ -935,8 +976,9 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
             String title = getPurchasingTicketNotificationTitle(newStatus);
             String message = getPurchasingTicketNotificationMessage(ticket, oldStatus, newStatus);
             
-            Notification notification = new Notification(user, NotificationType.PURCHASING_TICKET_STATUS_CHANGE, title, message);
-            notificationService.createTicketNotification(notification);
+            Notification notification = new Notification(NotificationType.PURCHASING_TICKET_STATUS_CHANGE, title, message);
+            List<User> notificationTargets = notificationTargetService.getPurchasingNotificationTargets();
+            notificationService.createTicketNotification(notification, notificationTargets);
         }
     }
     
@@ -946,8 +988,9 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
             String title = getPurchasingTicketDetailNotificationTitle(newStatus);
             String message = getPurchasingTicketDetailNotificationMessage(detail, oldStatus, newStatus);
             
-            Notification notification = new Notification(user, NotificationType.PURCHASING_TICKET_DETAIL_STATUS_CHANGE, title, message);
-            notificationService.createTicketNotification(notification);
+            Notification notification = new Notification(NotificationType.PURCHASING_TICKET_DETAIL_STATUS_CHANGE, title, message);
+            List<User> notificationTargets = notificationTargetService.getPurchasingNotificationTargets();
+            notificationService.createTicketNotification(notification, notificationTargets);
         }
     }
     
@@ -1016,4 +1059,5 @@ public class PurchasingTicketServiceImpl implements PurchasingTicketService {
         return String.format("Purchasing Detail for material '%s' (Detail ID: %s) in ticket '%s' status changed from %s to %s", 
                            materialName, detailId, ticketName, oldStatus.name(), newStatus.name());
     }
+
 }

@@ -17,6 +17,8 @@ import org.example.coretrack.dto.product.inventory.SearchInventoryResponse;
 import org.example.coretrack.dto.product.inventory.StockModifyRequest;
 import org.example.coretrack.dto.product.inventory.StockSetRequest;
 import org.example.coretrack.dto.product.inventory.TransactionEnumsResponse;
+import org.example.coretrack.dto.product.inventory.SetMinMaxRequest;
+import org.example.coretrack.dto.product.inventory.SetMinMaxResponse;
 import org.example.coretrack.model.auth.User;
 import org.example.coretrack.model.material.MaterialVariant;
 import org.example.coretrack.model.material.inventory.MaterialInventory;
@@ -32,11 +34,11 @@ public interface MaterialInventoryService {
 
     InventoryTransactionResponse subtractStock (Long variantId, StockModifyRequest request, User user);
 
-    Page<SearchInventoryResponse> findMaterial (String search, List<String> groupMaterials, List<String> inventoryStatus, Pageable pageable);
+    Page<SearchInventoryResponse> findMaterial (String search, List<String> groupMaterials, List<String> inventoryStatus, Pageable pageable,User user);
     
-    List<AllSearchInventoryResponse> getAllForAutocomplete (String search);
+    List<AllSearchInventoryResponse> getAllForAutocomplete (String search, User user);
 
-    MaterialInventoryDetailResponse getMaterialInventoryById (Long variantId);
+    MaterialInventoryDetailResponse getMaterialInventoryById (Long variantId, User user);
 
     BulkInventoryTransactionResponse bulkSetStock (BulkStockSetRequest request, User user);
 
@@ -58,11 +60,19 @@ public interface MaterialInventoryService {
 
     MaterialInventory removeFromCurrentAndAllocatedStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
  
-    boolean isEnough(MaterialVariant variant, BigDecimal plannedQuantity);
+    boolean isEnough(MaterialVariant variant, BigDecimal plannedQuantity, User user);
 
     MaterialInventory addToAllocatedStock (Long variantId, BigDecimal quantity, User user, Long ticketId);
 
     MaterialInventory removeFromAllocatedStock (Long variantId, BigDecimal quantity, User user, Long ticketId);
 
-    Page<SearchInventoryResponse> getAlarmMaterial(String search, List<Long> groupMaterials, List<String> status, boolean sortByOldest, Pageable pageable);
+    // Get available stock for material variant
+    BigDecimal getAvailableStock(MaterialVariant variant, User user);
+
+    Page<SearchInventoryResponse> getAlarmMaterial(String search, List<Long> groupMaterials, List<String> status, boolean sortByOldest, Pageable pageable, User user);
+
+    // Set minimum and maximum stock levels
+    SetMinMaxResponse setMinimumAlertStock(Long variantId, SetMinMaxRequest request, User user);
+    
+    SetMinMaxResponse setMaximumStockLevel(Long variantId, SetMinMaxRequest request, User user);
 }

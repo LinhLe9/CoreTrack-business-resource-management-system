@@ -2,21 +2,20 @@
 import React from 'react';
 import {
   Box,
-  Card,
-  CardBody,
-  CardHeader,
-  Heading,
+  VStack,
+  HStack,
   Text,
   Badge,
-  HStack,
-  VStack,
-  Flex,
+  Button,
   IconButton,
+  Flex,
+  Divider,
   useColorModeValue,
 } from '@chakra-ui/react';
 import { ViewIcon, EditIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
 import { SaleCardResponse } from '../../types/sale';
+import { useUser } from '../../hooks/useUser';
 
 interface SaleCardProps {
   sale: SaleCardResponse;
@@ -26,8 +25,9 @@ interface SaleCardProps {
 
 const SaleCard: React.FC<SaleCardProps> = ({ sale, onView, onEdit }) => {
   const router = useRouter();
-  const cardBg = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const { isOwner, isSaleStaff } = useUser();
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.600');
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -65,59 +65,62 @@ const SaleCard: React.FC<SaleCardProps> = ({ sale, onView, onEdit }) => {
   };
 
   return (
-    <Card
-      bg={cardBg}
-      borderWidth="1px"
+    <Box
+      bg={bgColor}
+      border="1px"
       borderColor={borderColor}
       borderRadius="lg"
-      overflow="hidden"
-      _hover={{ shadow: 'md', transform: 'translateY(-2px)' }}
+      p={6}
+      shadow="sm"
+      _hover={{ shadow: "md" }}
       transition="all 0.2s"
     >
-      <CardHeader pb={2}>
-        <Flex justify="space-between" align="center">
-          <VStack align="start" spacing={1}>
-            <Heading size="md" color="blue.600">
+      <VStack spacing={4} align="stretch">
+        {/* Header */}
+        <Flex justify="space-between" align="start">
+          <VStack align="start" spacing={1} flex={1}>
+            <Text fontWeight="bold" fontSize="lg" noOfLines={1}>
               {sale.sku}
-            </Heading>
+            </Text>
             <Text fontSize="sm" color="gray.500">
-              {sale.customerName}
+              {sale.customerName || 'N/A'}
             </Text>
           </VStack>
+          
           <HStack spacing={2}>
-            <Badge colorScheme={getStatusColor(sale.status)}>
+            <Badge
+              colorScheme={getStatusColor(sale.status)}
+              px={3}
+              py={1}
+              borderRadius="full"
+              fontSize="xs"
+              fontWeight="medium"
+            >
               {sale.status}
             </Badge>
-            <HStack spacing={1}>
-              <IconButton
-                aria-label="View sale details"
-                icon={<ViewIcon />}
-                size="sm"
-                variant="ghost"
-                colorScheme="blue"
-                onClick={handleView}
-              />
+            {onEdit && (isOwner() || isSaleStaff()) && (
               <IconButton
                 aria-label="Edit sale"
                 icon={<EditIcon />}
                 size="sm"
+                colorScheme="yellow"
                 variant="ghost"
-                colorScheme="green"
                 onClick={handleEdit}
               />
-            </HStack>
+            )}
           </HStack>
         </Flex>
-      </CardHeader>
 
-      <CardBody pt={0}>
-        <VStack align="stretch" spacing={3}>
+        <Divider />
+
+        {/* Details */}
+        <VStack spacing={3} align="stretch">
           <HStack justify="space-between">
             <Text fontSize="sm" color="gray.600">
               Customer Email:
             </Text>
             <Text fontSize="sm" fontWeight="medium">
-              {sale.customerEmail}
+              {sale.customerEmail || 'N/A'}
             </Text>
           </HStack>
 
@@ -126,7 +129,7 @@ const SaleCard: React.FC<SaleCardProps> = ({ sale, onView, onEdit }) => {
               Customer Phone:
             </Text>
             <Text fontSize="sm" fontWeight="medium">
-              {sale.customerPhone}
+              {sale.customerPhone || 'N/A'}
             </Text>
           </HStack>
 
@@ -159,8 +162,24 @@ const SaleCard: React.FC<SaleCardProps> = ({ sale, onView, onEdit }) => {
             </Box>
           )}
         </VStack>
-      </CardBody>
-    </Card>
+
+        <Divider />
+
+        {/* Actions */}
+        <HStack spacing={2} justify="center">
+          <Button
+            leftIcon={<ViewIcon />}
+            size="sm"
+            colorScheme="blue"
+            variant="outline"
+            onClick={handleView}
+            flex={1}
+          >
+            View Details
+          </Button>
+        </HStack>
+      </VStack>
+    </Box>
   );
 };
 

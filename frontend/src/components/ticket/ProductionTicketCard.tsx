@@ -35,23 +35,23 @@ const ProductionTicketCard: React.FC<ProductionTicketCardProps> = ({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'NEW':
+      case 'New':
         return 'blue';
-      case 'IN_PROGRESS':
+      case 'In Progress':
         return 'yellow';
-      case 'PARTIAL_COMPLETE':
+      case 'Partial Complete':
         return 'orange';
-      case 'COMPLETE':
+      case 'Complete':
         return 'green';
-      case 'PARTIAL_CANCELLED':
+      case 'Partial Cancelled':
         return 'red';
-      case 'CANCELLED':
+      case 'Cancelled':
         return 'red';
-      case 'APPROVAL':
+      case 'Approved':
         return 'purple';
-      case 'READY':
+      case 'Ready':
         return 'green';
-      case 'CLOSED':
+      case 'Closed':
         return 'gray';
       default:
         return 'blue';
@@ -127,12 +127,23 @@ const ProductionTicketCard: React.FC<ProductionTicketCardProps> = ({
             </Text>
           </HStack>
 
+          {productionTicket.completed_date && (
+            <HStack justify="space-between">
+              <Text fontSize="sm" color="gray.600">
+                Completed:
+              </Text>
+              <Text fontSize="sm" fontWeight="medium">
+                {formatDate(productionTicket.completed_date)}
+              </Text>
+            </HStack>
+          )}
+
           <HStack justify="space-between">
             <Text fontSize="sm" color="gray.600">
               Created By:
             </Text>
             <Text fontSize="sm" fontWeight="medium">
-              {productionTicket.createdBy}
+              {productionTicket.createdBy || 'N/A'}
             </Text>
           </HStack>
 
@@ -141,7 +152,25 @@ const ProductionTicketCard: React.FC<ProductionTicketCardProps> = ({
               Role:
             </Text>
             <Text fontSize="sm" fontWeight="medium">
-              {productionTicket.createdByRole}
+              {productionTicket.createdByRole || 'N/A'}
+            </Text>
+          </HStack>
+
+          <HStack justify="space-between">
+            <Text fontSize="sm" color="gray.600">
+              Updated By:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {productionTicket.updatedBy || 'N/A'}
+            </Text>
+          </HStack>
+
+          <HStack justify="space-between">
+            <Text fontSize="sm" color="gray.600">
+              Updated By Role:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {productionTicket.updatedByRole || 'N/A'}
             </Text>
           </HStack>
         </VStack>

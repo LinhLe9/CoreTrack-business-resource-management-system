@@ -48,7 +48,7 @@ public class MaterialInventoryLog {
     private String note;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "reference_document_type") 
+    @Column(name = "reference_document_type", nullable = true) 
     private materialInventoryReferenceDocumentType referenceDocumentType;
 
     @Column(name = "reference_document_id")

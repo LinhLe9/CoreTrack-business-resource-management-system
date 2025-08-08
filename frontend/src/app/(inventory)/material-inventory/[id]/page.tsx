@@ -18,22 +18,37 @@ import {
   Grid,
   GridItem,
   Container,
+  Button,
+  IconButton,
+  Center,
+  Alert,
+  AlertIcon,
 } from '@chakra-ui/react';
+import { EditIcon } from '@chakra-ui/icons';
 import { useParams, useRouter } from 'next/navigation';
 import { getMaterialInventoryById } from '../../../../services/materialInventoryService';
 import { formatBigDecimal } from '../../../../lib/utils';
+import StockTransactionModal from '../../../../components/inventory/StockTransactionModal';
+import SetMinMaxModal from '../../../../components/inventory/SetMinMaxModal';
 import { MaterialInventoryDetailResponse } from '../../../../types/materialInventory';
 import { InventoryTransactionResponse } from '../../../../types/inventory';
+import { useUser } from '../../../../hooks/useUser';
 
 const MaterialInventoryDetailPage: React.FC = () => {
   const [materialInventory, setMaterialInventory] = useState<MaterialInventoryDetailResponse | null>(null);
   const [transactions, setTransactions] = useState<InventoryTransactionResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSetModalOpen, setIsSetModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSubtractModalOpen, setIsSubtractModalOpen] = useState(false);
+  const [isMinModalOpen, setIsMinModalOpen] = useState(false);
+  const [isMaxModalOpen, setIsMaxModalOpen] = useState(false);
   const toast = useToast();
   const params = useParams();
   const router = useRouter();
   const variantId = params.id as string;
+  const { user, isOwner, isWarehouseStaff } = useUser();
 
   useEffect(() => {
     const fetchMaterialInventoryDetail = async () => {
@@ -45,8 +60,14 @@ const MaterialInventoryDetailPage: React.FC = () => {
       try {
         // Fetch material inventory detail (includes logs)
         const detailResponse = await getMaterialInventoryById(parseInt(variantId));
+        console.log('=== FRONTEND DEBUG ===');
+        console.log('Detail Response:', detailResponse);
+        console.log('Current Stock:', detailResponse.currentStock);
+        console.log('Current Stock Type:', typeof detailResponse.currentStock);
+        console.log('Current Stock Value:', detailResponse.currentStock);
+        console.log('======================');
         setMaterialInventory(detailResponse);
-        setTransactions(detailResponse.transactions || []);
+        setTransactions(detailResponse.logs || []);
       } catch (err: any) {
         console.error('Error fetching material inventory detail:', err);
         setError('Failed to load material inventory details.');
@@ -59,15 +80,6 @@ const MaterialInventoryDetailPage: React.FC = () => {
             duration: 5000,
             isClosable: true,
           });
-          router.push('/material-inventory');
-        } else {
-          toast({
-            title: 'Error',
-            description: err.response?.data?.message || 'Failed to load material inventory details.',
-            status: 'error',
-            duration: 5000,
-            isClosable: true,
-          });
         }
       } finally {
         setLoading(false);
@@ -75,32 +87,32 @@ const MaterialInventoryDetailPage: React.FC = () => {
     };
 
     fetchMaterialInventoryDetail();
-  }, [variantId, toast, router]);
+  }, [variantId, toast]);
 
   const getInventoryStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'in_stock':
+    switch (status) {
+      case 'IN_STOCK':
         return 'green';
-      case 'low_stock':
-        return 'orange';
-      case 'out_of_stock':
+      case 'LOW_STOCK':
+        return 'yellow';
+      case 'OUT_OF_STOCK':
         return 'red';
-      case 'over_stock':
-        return 'purple';
+      case 'OVER_STOCK':
+        return 'orange';
       default:
         return 'gray';
     }
   };
 
   const getInventoryStatusDisplayName = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'in_stock':
+    switch (status) {
+      case 'IN_STOCK':
         return 'In Stock';
-      case 'low_stock':
+      case 'LOW_STOCK':
         return 'Low Stock';
-      case 'out_of_stock':
+      case 'OUT_OF_STOCK':
         return 'Out of Stock';
-      case 'over_stock':
+      case 'OVER_STOCK':
         return 'Over Stock';
       default:
         return status;
@@ -108,12 +120,12 @@ const MaterialInventoryDetailPage: React.FC = () => {
   };
 
   const getTransactionTypeColor = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'add':
+    switch (type) {
+      case 'IN':
         return 'green';
-      case 'subtract':
+      case 'OUT':
         return 'red';
-      case 'set':
+      case 'SET':
         return 'blue';
       default:
         return 'gray';
@@ -124,33 +136,35 @@ const MaterialInventoryDetailPage: React.FC = () => {
     return new Date(dateString).toLocaleString();
   };
 
+  const handleStockSuccess = () => {
+    // Refresh the data after successful stock operation
+    window.location.reload();
+  };
+
   if (loading) {
     return (
-      <Box p={8} display="flex" justifyContent="center" alignItems="center" minH="400px">
-        <Spinner size="xl" color="teal.500" />
-      </Box>
+      <Center minHeight="300px">
+        <Spinner size="xl" />
+      </Center>
     );
   }
 
   if (error || !materialInventory) {
     return (
-      <Box p={8} textAlign="center">
-        <Text fontSize="lg" color="red.500">{error || 'Material inventory not found'}</Text>
-      </Box>
+      <Center minHeight="300px">
+        <Text color="red.500" fontSize="lg">
+          {error || 'Material inventory not found.'}
+        </Text>
+      </Center>
     );
   }
 
   return (
-    <Container maxW="1200px" p={8}>
+    <Container maxW="6xl" py={8}>
       <VStack spacing={6} align="stretch">
-        {/* Header - Material Variant Name */}
-        <Box textAlign="center">
-          <Heading as="h1" size="xl" color="teal.700" mb={2}>
-            {materialInventory.materialVariantName || materialInventory.materialName}
-          </Heading>
-        </Box>
+        <Heading size="lg" mb={4}>Material Inventory Detail</Heading>
 
-        {/* Material Information and Image */}
+        {/* Material Information Card */}
         <Card>
           <CardBody>
             <Grid templateColumns={{ base: '1fr', md: '1fr 200px' }} gap={6}>
@@ -180,20 +194,36 @@ const MaterialInventoryDetailPage: React.FC = () => {
                           {formatBigDecimal(materialInventory.currentStock)}
                         </Text>
                       </HStack>
-                      <Text><strong>Allocated Stock:</strong> {formatBigDecimal(materialInventory.allocatedStock)}</Text>
-                      <Text><strong>Future Stock:</strong> {formatBigDecimal(materialInventory.futureStock)}</Text>
-                      <Text><strong>Min Alert Stock:</strong> {formatBigDecimal(materialInventory.minAlertStock)}</Text>
-                      <Text><strong>Max Stock Level:</strong> {formatBigDecimal(materialInventory.maxStockLevel)}</Text>
+                      <HStack>
+                        <Text><strong>Min Alert Stock:</strong> {formatBigDecimal(materialInventory.minAlertStock)}</Text>
+                        {(isOwner() || isWarehouseStaff()) && (
+                          <IconButton
+                            aria-label="Edit minimum alert stock"
+                            icon={<EditIcon />}
+                            size="sm"
+                            variant="ghost"
+                            colorScheme="blue"
+                            onClick={() => setIsMinModalOpen(true)}
+                          />
+                        )}
+                      </HStack>
+                      <HStack>
+                        <Text><strong>Max Stock Level:</strong> {formatBigDecimal(materialInventory.maxStockLevel)}</Text>
+                        {(isOwner() || isWarehouseStaff()) && (
+                          <IconButton
+                            aria-label="Edit maximum stock level"
+                            icon={<EditIcon />}
+                            size="sm"
+                            variant="ghost"
+                            colorScheme="blue"
+                            onClick={() => setIsMaxModalOpen(true)}
+                          />
+                        )}
+                      </HStack>
                       <HStack>
                         <Text><strong>Status:</strong></Text>
                         <Badge colorScheme={getInventoryStatusColor(materialInventory.inventoryStatus)}>
                           {getInventoryStatusDisplayName(materialInventory.inventoryStatus)}
-                        </Badge>
-                      </HStack>
-                      <HStack>
-                        <Text><strong>Material Status:</strong></Text>
-                        <Badge colorScheme={materialInventory.materialStatus === 'ACTIVE' ? 'green' : 'red'}>
-                          {materialInventory.materialStatus}
                         </Badge>
                       </HStack>
                     </VStack>
@@ -242,52 +272,44 @@ const MaterialInventoryDetailPage: React.FC = () => {
                                     {transaction.stockType}
                                   </Badge>
                                 )}
-                                {transaction.referenceDocumentType && (
-                                  <Badge colorScheme="purple" variant="outline">
-                                    {transaction.referenceDocumentType}
-                                  </Badge>
-                                )}
                               </HStack>
                               <Text fontSize="sm" color="gray.600">
-                                {formatDate(transaction.createdAt)}
+                                {transaction.note || 'No note provided'}
                               </Text>
-                              {transaction.note && (
-                                <Text fontSize="sm" color="gray.700" noOfLines={2}>
-                                  {transaction.note}
-                                </Text>
-                              )}
-                            </VStack>
-                          </GridItem>
-
-                          <GridItem>
-                            <VStack align="start" spacing={1}>
-                              <Text fontSize="sm" color="gray.600">Quantity</Text>
-                              <Text fontWeight="bold" color={getTransactionTypeColor(transaction.transactionType)}>
-                                {formatBigDecimal(transaction.quantity)}
+                              <Text fontSize="xs" color="gray.500">
+                                {transaction.createdBy && `By: ${transaction.createdBy}`}
                               </Text>
                             </VStack>
                           </GridItem>
-
+                          
                           <GridItem>
                             <VStack align="start" spacing={1}>
-                              <Text fontSize="sm" color="gray.600">Previous Stock</Text>
-                              <Text>{formatBigDecimal(transaction.previousStock)}</Text>
+                              <Text fontSize="sm" fontWeight="bold">Quantity</Text>
+                              <Text fontSize="sm">{formatBigDecimal(transaction.quantity)}</Text>
                             </VStack>
                           </GridItem>
-
+                          
                           <GridItem>
                             <VStack align="start" spacing={1}>
-                              <Text fontSize="sm" color="gray.600">New Stock</Text>
-                              <Text fontWeight="bold">{formatBigDecimal(transaction.newStock)}</Text>
+                              <Text fontSize="sm" fontWeight="bold">Previous</Text>
+                              <Text fontSize="sm">{formatBigDecimal(transaction.previousStock)}</Text>
+                            </VStack>
+                          </GridItem>
+                          
+                          <GridItem>
+                            <VStack align="start" spacing={1}>
+                              <Text fontSize="sm" fontWeight="bold">New Stock</Text>
+                              <Text fontSize="sm">{formatBigDecimal(transaction.newStock)}</Text>
+                            </VStack>
+                          </GridItem>
+                          
+                          <GridItem>
+                            <VStack align="start" spacing={1}>
+                              <Text fontSize="sm" fontWeight="bold">Date</Text>
+                              <Text fontSize="sm">{formatDate(transaction.createdAt)}</Text>
                             </VStack>
                           </GridItem>
                         </Grid>
-
-                        {transaction.createdBy && (
-                          <Text fontSize="xs" color="gray.500" mt={2}>
-                            By: {transaction.createdBy} ({transaction.user_role})
-                          </Text>
-                        )}
                       </CardBody>
                     </Card>
                   ))}
@@ -296,7 +318,119 @@ const MaterialInventoryDetailPage: React.FC = () => {
             )}
           </CardBody>
         </Card>
+
+        {/* Stock Operations Card */}
+        <Card>
+          <CardBody>
+            <Text fontWeight="bold" fontSize="lg" mb={4} textAlign="center">Stock Action</Text>
+            <VStack spacing={4}>
+              
+              {/* Role-based access control */}
+              {(isOwner() || isWarehouseStaff()) ? (
+                <HStack spacing={4} flexWrap="wrap" justify="center">
+                  <Button
+                    variant="outline"
+                    colorScheme="blue"
+                    borderWidth="2px"
+                    borderColor="blue.600"
+                    bg="white"
+                    _hover={{ bg: 'blue.50' }}
+                    onClick={() => setIsSetModalOpen(true)}
+                  >
+                    Set Stock
+                  </Button>
+                  <Button
+                    variant="outline"
+                    colorScheme="green"
+                    borderWidth="2px"
+                    borderColor="green.600"
+                    bg="white"
+                    _hover={{ bg: 'green.50' }}
+                    onClick={() => setIsAddModalOpen(true)}
+                  >
+                    Add Stock
+                  </Button>
+                  <Button
+                    variant="outline"
+                    colorScheme="red"
+                    borderWidth="2px"
+                    borderColor="red.600"
+                    bg="white"
+                    _hover={{ bg: 'red.50' }}
+                    onClick={() => setIsSubtractModalOpen(true)}
+                  >
+                    Subtract Stock
+                  </Button>
+                </HStack>
+              ) : (
+                <Alert status="info">
+                  <AlertIcon />
+                  Only OWNER and WAREHOUSE_STAFF can perform stock actions.
+                </Alert>
+              )}
+            </VStack>
+          </CardBody>
+        </Card>
       </VStack>
+
+      {/* Set Stock Modal */}
+      <StockTransactionModal
+        isOpen={isSetModalOpen}
+        onClose={() => setIsSetModalOpen(false)}
+        variantId={parseInt(variantId)}
+        variantSku={materialInventory.materialVariantSku}
+        variantName={materialInventory.materialVariantName || materialInventory.materialName}
+        transactionType="set"
+        onSuccess={handleStockSuccess}
+      />
+
+      {/* Add Stock Modal */}
+      <StockTransactionModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        variantId={parseInt(variantId)}
+        variantSku={materialInventory.materialVariantSku}
+        variantName={materialInventory.materialVariantName || materialInventory.materialName}
+        transactionType="add"
+        onSuccess={handleStockSuccess}
+      />
+
+      {/* Subtract Stock Modal */}
+      <StockTransactionModal
+        isOpen={isSubtractModalOpen}
+        onClose={() => setIsSubtractModalOpen(false)}
+        variantId={parseInt(variantId)}
+        variantSku={materialInventory.materialVariantSku}
+        variantName={materialInventory.materialVariantName || materialInventory.materialName}
+        transactionType="subtract"
+        onSuccess={handleStockSuccess}
+      />
+
+      {/* Set Minimum Alert Stock Modal */}
+      <SetMinMaxModal
+        isOpen={isMinModalOpen}
+        onClose={() => setIsMinModalOpen(false)}
+        variantId={parseInt(variantId)}
+        variantSku={materialInventory.materialVariantSku}
+        variantName={materialInventory.materialVariantName || materialInventory.materialName}
+        type="minimum"
+        currentValue={materialInventory.minAlertStock}
+        onSuccess={handleStockSuccess}
+        serviceType="material"
+      />
+
+      {/* Set Maximum Stock Level Modal */}
+      <SetMinMaxModal
+        isOpen={isMaxModalOpen}
+        onClose={() => setIsMaxModalOpen(false)}
+        variantId={parseInt(variantId)}
+        variantSku={materialInventory.materialVariantSku}
+        variantName={materialInventory.materialVariantName || materialInventory.materialName}
+        type="maximum"
+        currentValue={materialInventory.maxStockLevel}
+        onSuccess={handleStockSuccess}
+        serviceType="material"
+      />
     </Container>
   );
 };

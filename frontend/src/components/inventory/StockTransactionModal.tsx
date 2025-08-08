@@ -19,7 +19,7 @@ import {
   useToast,
   Spinner,
 } from '@chakra-ui/react';
-import { getTransactionEnums, addStock, subtractStock } from '../../services/productInventoryService';
+import { getMaterialTransactionEnums, addMaterialStock, subtractMaterialStock, setMaterialStock } from '../../services/materialInventoryService';
 import { TransactionEnumsResponse, EnumValue } from '../../types/productInventory';
 
 interface StockTransactionModalProps {
@@ -28,7 +28,7 @@ interface StockTransactionModalProps {
   variantId: number;
   variantSku: string;
   variantName: string;
-  transactionType: 'add' | 'subtract';
+  transactionType: 'add' | 'subtract' | 'set';
   onSuccess?: () => void;
 }
 
@@ -64,7 +64,7 @@ const StockTransactionModal: React.FC<StockTransactionModalProps> = ({
   const loadTransactionEnums = async () => {
     setEnumsLoading(true);
     try {
-      const enums = await getTransactionEnums();
+      const enums = await getMaterialTransactionEnums();
       setTransactionEnums(enums);
     } catch (error) {
       console.error('Error loading transaction enums:', error);
@@ -96,7 +96,7 @@ const StockTransactionModal: React.FC<StockTransactionModalProps> = ({
       const referenceId = referenceDocumentId ? parseInt(referenceDocumentId) : undefined;
 
       if (transactionType === 'add') {
-        await addStock(
+        await addMaterialStock(
           variantId,
           quantityNum,
           note || undefined,
@@ -104,8 +104,17 @@ const StockTransactionModal: React.FC<StockTransactionModalProps> = ({
           referenceId,
           transactionSource || undefined
         );
-      } else {
-        await subtractStock(
+      } else if (transactionType === 'subtract') {
+        await subtractMaterialStock(
+          variantId,
+          quantityNum,
+          note || undefined,
+          referenceDocumentType || undefined,
+          referenceId,
+          transactionSource || undefined
+        );
+      } else if (transactionType === 'set') {
+        await setMaterialStock(
           variantId,
           quantityNum,
           note || undefined,
@@ -117,7 +126,7 @@ const StockTransactionModal: React.FC<StockTransactionModalProps> = ({
 
       toast({
         title: 'Success',
-        description: `Stock ${transactionType === 'add' ? 'added' : 'subtracted'} successfully`,
+        description: `Stock ${transactionType === 'add' ? 'added' : transactionType === 'subtract' ? 'subtracted' : 'set'} successfully`,
         status: 'success',
         duration: 3000,
       });
@@ -147,7 +156,16 @@ const StockTransactionModal: React.FC<StockTransactionModalProps> = ({
   };
 
   const getDefaultTransactionType = () => {
-    return transactionType === 'add' ? 'IN' : 'OUT';
+    switch (transactionType) {
+      case 'add':
+        return 'IN';
+      case 'subtract':
+        return 'OUT';
+      case 'set':
+        return 'SET';
+      default:
+        return 'IN';
+    }
   };
 
   return (
@@ -155,7 +173,7 @@ const StockTransactionModal: React.FC<StockTransactionModalProps> = ({
       <ModalOverlay />
       <ModalContent>
         <ModalHeader>
-          {transactionType === 'add' ? 'Add Stock' : 'Subtract Stock'} - {variantName}
+          {transactionType === 'add' ? 'Add Stock' : transactionType === 'subtract' ? 'Subtract Stock' : 'Set Stock'} - {variantName}
         </ModalHeader>
         <ModalCloseButton />
         <ModalBody>
@@ -268,12 +286,12 @@ const StockTransactionModal: React.FC<StockTransactionModalProps> = ({
             Cancel
           </Button>
           <Button
-            colorScheme={transactionType === 'add' ? 'green' : 'red'}
+            colorScheme={transactionType === 'add' ? 'green' : transactionType === 'subtract' ? 'red' : 'blue'}
             onClick={handleSubmit}
             isLoading={loading}
             loadingText="Processing..."
           >
-            {transactionType === 'add' ? 'Add Stock' : 'Subtract Stock'}
+            {transactionType === 'add' ? 'Add Stock' : transactionType === 'subtract' ? 'Subtract Stock' : 'Set Stock'}
           </Button>
         </ModalFooter>
       </ModalContent>

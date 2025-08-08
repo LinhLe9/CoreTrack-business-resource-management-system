@@ -32,7 +32,9 @@ import org.example.coretrack.dto.product.UpdateProductResponse;
 import org.example.coretrack.dto.product.ChangeProductStatusRequest;
 import org.example.coretrack.dto.product.ChangeProductStatusResponse;
 import org.example.coretrack.dto.product.ProductStatusTransitionResponse;
+import org.example.coretrack.dto.product.DeleteProductResponse;
 import org.example.coretrack.model.auth.User;
+import org.example.coretrack.model.auth.Company;
 import org.example.coretrack.model.material.Material;
 import org.example.coretrack.model.product.BOM;
 import org.example.coretrack.model.product.BOMItem;
@@ -95,40 +97,38 @@ public class ProductServiceImpl implements ProductService{
         if (request.getProductGroupId() != null) {
             // Choose Existing Product Group (A5.1)
             Long ProductGroupId = Long.parseLong(request.getProductGroupId());
-            productGroup = productGroupRepository.findByIdAndIsActiveTrue(ProductGroupId)
+            productGroup = productGroupRepository.findByIdAndCompanyAndIsActiveTrue(ProductGroupId, createdByUser.getCompany())
                     .orElseThrow(() -> new RuntimeException("Product Group not found with ID: " + request.getProductGroupId()));
-        } else if (StringUtils.hasText(request.getNewProductGroupName())) {
-            // Create New Product Group (A5.2)
-            String newGroupName = request.getNewProductGroupName().trim();
-            // E4: Duplicate Group Name
-            if (productGroupRepository.findByNameAndIsActiveTrue(newGroupName).isPresent()) { 
-                    throw new IllegalArgumentException("Group name already exists: " + newGroupName);
-                }
-            productGroup = new ProductGroup(newGroupName,createdByUser);
-            productGroupRepository.save(productGroup); // Save new group first
         } else {
-            productGroup = null;
+            // Create New Product Group (A5.2)
+            if (StringUtils.hasText(request.getNewProductGroupName())) {
+                // Check if group name already exists in the same company
+                if (productGroupRepository.findByNameAndCompany(request.getNewProductGroupName(), createdByUser.getCompany()).isPresent()) {
+                    throw new RuntimeException("Product Group name already exists: " + request.getNewProductGroupName());
+                }
+                productGroup = new ProductGroup(request.getNewProductGroupName(), createdByUser, createdByUser.getCompany());
+                productGroupRepository.save(productGroup);
+            }
         }
 
-        // 2. Handle Product SKU (Main Flow - Step 2, A1, A2)
-        String sku = "";
+        // 2. Handle SKU Generation (Main Flow - Step 1)
+        String sku;
         if (StringUtils.hasText(request.getSku())) {
             // Manual SKU Input (A2)
             String manualSku = request.getSku().trim();
             // E2: Duplicate or Invalid SKU - uniqueness
-            if (productRepository.findBySku(manualSku).isPresent()) {
+            if (productRepository.findBySkuAndCompany(manualSku, createdByUser.getCompany()).isPresent()) {
                 throw new IllegalArgumentException("Product SKU already exists: " + manualSku);
             }
             // E2: Invalid SKU format - length (8-12 chars for tidy SKU)
             if (manualSku.length() < 8 || manualSku.length() > 12) {
                  throw new IllegalArgumentException("Manual SKU must be between 8 and 12 characters.");
             }
-            // product.setSku(manualSku);
             sku = manualSku;
         } else {
             // Automatic SKU Generation (A1)
             // Generate a 12-unit SKU
-            sku = generateUniqueProductSku(); 
+            sku = generateUniqueProductSku(createdByUser.getCompany()); 
         }
     
         // 3. Create Product Entity (Main Flow - Step 2)
@@ -138,19 +138,21 @@ public class ProductServiceImpl implements ProductService{
             request.getDescription(),
             request.getPrice(),
             request.getCurrency(),
+            request.getImageUrl(),
             productGroup,
-            createdByUser 
+            createdByUser,
+            createdByUser.getCompany()
         );
+
         if(StringUtils.hasText(request.getImageUrl())){
             product.setImageUrl(request.getImageUrl());
         }
+
         productRepository.save(product); // Save product to get its ID for relationships
 
         // 4. Define Variant(s) (Main Flow - Step 4)
         List<ProductVariant> allProductVariants = new java.util.ArrayList<>();
-
         if (request.getVariants() != null && !request.getVariants().isEmpty()) {
-            // Product has variants
             AtomicInteger skuCounter = new AtomicInteger(1);
             List<ProductVariant> variants = request.getVariants().stream()
                 .map(variantRequest -> {
@@ -167,7 +169,7 @@ public class ProductServiceImpl implements ProductService{
                         variant.setImageUrl(variantRequest.getImageUrl());
                     }
                     // Generate SKU for variant (e.g., adding "-1", "-2" suffixes)
-                    variant.setSku(generateVariantSku(product.getSku(), index));
+                    variant.setSku(generateVariantSku(product.getSku(), index, createdByUser.getCompany()));
                     return variant;
                 }).collect(Collectors.toList());
 
@@ -182,6 +184,8 @@ public class ProductServiceImpl implements ProductService{
 
                 if (variantRequest.getBomItems() != null && !variantRequest.getBomItems().isEmpty()) {
                 // Create a new BillOfMaterials for each variant
+                    // Save the variant first to ensure it's persisted before creating BOM
+                    variant = productVariantRepository.save(variant);
                     BOM bom = new BOM(variant, "1.0", createdByUser);
                     bomRepository.save(bom); // Save the BOM header
                     List<BOMItemRequest> bomItemRequest = variantRequest.getBomItems();
@@ -224,6 +228,8 @@ public class ProductServiceImpl implements ProductService{
             
             // Handle BOM items for default variant (from form.bomItems)
             if (request.getBomItems() != null && !request.getBomItems().isEmpty()) {
+                // Save the default variant first to ensure it's persisted before creating BOM
+                defaultVariant = productVariantRepository.save(defaultVariant);
                 BOM bom = new BOM(defaultVariant, "1.0", createdByUser);
                 bomRepository.save(bom);
                 
@@ -246,11 +252,11 @@ public class ProductServiceImpl implements ProductService{
                 defaultVariant.setBom(bom);
             }
         }
-        return mapProductToProductResponse(product) ; // Return the fully populated Product entity
+        return mapProductToProductResponse(product);
     }
 
     // --- Helper methods for SKU generation ---
-    private String generateUniqueProductSku() {
+    private String generateUniqueProductSku(Company company) {
         String newSku;
         Random random = new Random(); // Initialize Random
         do {
@@ -258,11 +264,11 @@ public class ProductServiceImpl implements ProductService{
             // 1000000 is the smallest 7-digit number, 9999999 is the largest
             int randomNumber = 1000000 + random.nextInt(9000000); // Generates number between 1,000,000 and 9,999,999
             newSku = "PROD-" + randomNumber; // Example: PROD-1234567
-        } while (productRepository.findBySku(newSku).isPresent());
+        } while (productRepository.findBySkuAndCompany(newSku, company).isPresent());
         return newSku;
     }
 
-    private String generateVariantSku(String baseProductSku, int variantIndex) {
+    private String generateVariantSku(String baseProductSku, int variantIndex, Company company) {
         // This is two layer to ensure that SKU of variant is unique in case 
         // some error happen while a lot of modify/ delete happened
         // Example: adding "-1", "-2" suffixes (Main Flow - Step 4)
@@ -281,7 +287,7 @@ public class ProductServiceImpl implements ProductService{
                 finalVariantSku += uniquePart; // No length truncation here
             }
             attempt++;
-        } while (productVariantRepository.findBySku(finalVariantSku).isPresent());
+        } while (productVariantRepository.findBySkuAndCompany(finalVariantSku, company).isPresent());
 
         return finalVariantSku;
     }
@@ -333,8 +339,8 @@ public class ProductServiceImpl implements ProductService{
      * To return all available products those were stored in database
      */
     @Override
-     public Page<SearchProductResponse> findAllProducts (Pageable pageable){
-        Page<Product> products = productRepository.findAllActive(pageable);
+     public Page<SearchProductResponse> findAllProducts (Pageable pageable, User currentUser){
+        Page<Product> products = productRepository.findAllActiveByCompany(currentUser.getCompany(), pageable);
         return products.map(SearchProductResponse::new);
      }
 
@@ -343,6 +349,7 @@ public class ProductServiceImpl implements ProductService{
      * @param search search by (SKU, Name, ShortDescription) + recommend drop down
      * @param groupProducts filter by group
      * @param statuses fiter by status
+     * @param currentUser current user for company context
      * @return Page<SearchProductResponse>
      */
 
@@ -351,7 +358,8 @@ public class ProductServiceImpl implements ProductService{
             String search,
             List<String> groupProducts,
             List<String> statuses,
-            Pageable pageable) {
+            Pageable pageable,
+            User currentUser) {
 
         // handle search
         String processedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
@@ -399,11 +407,12 @@ public class ProductServiceImpl implements ProductService{
         System.out.println("Search: " + processedSearch);
         System.out.println("GroupProduct IDs: " + processedGroupProductIds);
         System.out.println("Statuses: " + processedStatuses);
-        // call repository
-        Page<Product> products = productRepository.findByCriteria(
+        // call repository with company context
+        Page<Product> products = productRepository.findByCriteriaAndCompany(
             processedSearch,
             processedGroupProductIds, 
             processedStatuses,
+            currentUser.getCompany(),
             pageable
         );
 
@@ -415,8 +424,8 @@ public class ProductServiceImpl implements ProductService{
      */
 
     @Override
-    public List<AllProductSearchResponse> getAllProductsForAutocomplete(String search) {
-        return productRepository.findBySearchKeyword(search).stream()
+    public List<AllProductSearchResponse> getAllProductsForAutocomplete(String search, User currentUser) {
+        return productRepository.findBySearchKeywordAndCompany(search, currentUser.getCompany()).stream()
                 .map(AllProductSearchResponse::new)
                 .collect(Collectors.toList());
     }
@@ -424,58 +433,9 @@ public class ProductServiceImpl implements ProductService{
     /**
      * get Product by ID.
      */
-    // @Override
-    // public ProductDetailResponse getProductById(Long id) {
-    //     product product = productRepository.findById(id)
-    //                     .orElseThrow(() -> new RuntimeException("Product not found with ID: " + id));
-    //     List<ProductVariantInventoryResponse> variantInventory = product.getVariants() != null ?
-    //             product.getVariants().stream()
-    //                     .map(variant -> {
-    //                         // Map BOM Items for EACH variant
-    //                         List<BOMItemResponse> bomItemResponses = variant.getBom() != null ?
-    //                             variant.getBom().getBomItems().stream()
-    //                                     .map(item -> new BOMItemResponse(
-    //                                             item.getId(),
-    //                                             item.getMaterial().getId(),
-    //                                             item.getMaterial().getName(),
-    //                                             item.getQuantity(),
-    //                                             item.getUom().getDisplayName(),
-    //                                             item.getNotes()
-    //                                         )
-    //                                     ).toList(): List.of();
-    //                         ProductVariantResponse variantResponse = new ProductVariantResponse(
-    //                                 variant.getId(),
-    //                                 variant.getSku(),
-    //                                 variant.getName(),
-    //                                 variant.getDescription(),
-    //                                 variant.getImageUrl(),
-    //                                 bomItemResponses // Pass BOM items to variant response
-    //                         );
-
-    //                         // map inventory if available
-    //                         InventoryResponse inventoryResponse = null;
-    //                         if(variant.getProductInventory() !=null) {
-    //                             inventoryResponse  = new InventoryResponse(variant.getProductInventory());
-    //                         }
-    //                         return new ProductVariantInventoryResponse(variantResponse, inventoryResponse);
-    //                     }).toList() : List.of();   
-    //     ProductDetailResponse response = new ProductDetailResponse(
-    //                     product.getId(),
-    //                     product.getSku(),
-    //                     product.getName(),
-    //                     product.getDescription(),
-    //                     product.getGroup().getName(),
-    //                     product.getStatus().name(),
-    //                     product.getPrice(),
-    //                     product.getImageUrl(),
-    //                     variantInventory
-    //             );
-    //     return response;            
-    // }
-
     @Override
-    public ProductDetailResponse getProductById(Long id) {
-    Product product = productRepository.findByIdWithVariantsAndInventory(id)
+    public ProductDetailResponse getProductById(Long id, User currentUser) {
+    Product product = productRepository.findByIdWithVariantsAndInventoryAndCompany(id, currentUser.getCompany())
             .orElseThrow(() -> new RuntimeException("Product not found with ID: " + id));
 
     List<ProductVariantInventoryResponse> variantInventory = product.getVariants() != null
@@ -508,8 +468,8 @@ public class ProductServiceImpl implements ProductService{
     }
 
     @Override
-    public List<ProductGroupResponse> getAllGroupName(){
-        return productGroupRepository.findByIsActiveTrueAndNameIsNotNull().stream()
+    public List<ProductGroupResponse> getAllGroupName(User currentUser){
+        return productGroupRepository.findByCompanyAndIsActiveTrue(currentUser.getCompany()).stream()
                 .map(ProductGroupResponse::new)
                 .collect(Collectors.toList());
     }
@@ -519,7 +479,7 @@ public class ProductServiceImpl implements ProductService{
     @PreAuthorize("hasRole('OWNER')")
     public UpdateProductResponse updateProduct(Long id, UpdateProductRequest request, User updatedByUser) {
         // Step 1: Find the product
-        Product product = productRepository.findById(id)
+        Product product = productRepository.findByIdAndCompany(id, updatedByUser.getCompany())
                 .orElseThrow(() -> new RuntimeException("Product not found with ID: " + id));
 
         // Step 2: Update basic product information (only if provided)
@@ -545,16 +505,16 @@ public class ProductServiceImpl implements ProductService{
         if (request.getProductGroupId() != null) {
             // Choose Existing Product Group
             Long productGroupId = Long.parseLong(request.getProductGroupId());
-            ProductGroup productGroup = productGroupRepository.findByIdAndIsActiveTrue(productGroupId)
+            ProductGroup productGroup = productGroupRepository.findByIdAndCompanyAndIsActiveTrue(productGroupId, updatedByUser.getCompany())
                     .orElseThrow(() -> new RuntimeException("Product Group not found with ID: " + request.getProductGroupId()));
             product.setGroup(productGroup);
         } else if (StringUtils.hasText(request.getNewProductGroupName())) {
             // Create New Product Group
             String newGroupName = request.getNewProductGroupName().trim();
-            if (productGroupRepository.findByNameAndIsActiveTrue(newGroupName).isPresent()) {
+            if (productGroupRepository.findByNameAndCompanyAndIsActiveTrue(newGroupName, updatedByUser.getCompany()).isPresent()) {
                 throw new IllegalArgumentException("Group name already exists: " + newGroupName);
             }
-            ProductGroup productGroup = new ProductGroup(newGroupName, updatedByUser);
+            ProductGroup productGroup = new ProductGroup(newGroupName, updatedByUser, updatedByUser.getCompany());
             productGroupRepository.save(productGroup);
             product.setGroup(productGroup);
         }
@@ -619,11 +579,16 @@ public class ProductServiceImpl implements ProductService{
                         variant = new ProductVariant(
                             product,
                             variantRequest.getName(),
-                            generateVariantSku(product.getSku(), product.getVariants().size() + updatedVariants.size() + 1),
+                            generateVariantSku(product.getSku(), product.getVariants().size() + updatedVariants.size() + 1, product.getCompany()),
                             variantRequest.getDescription(),
                             product.getPrice(),
                             updatedByUser
                         );
+                    }
+                    
+                    // Save the variant if it's new (has no ID) to ensure it's persisted before creating BOM
+                    if (variant.getId() == null) {
+                        variant = productVariantRepository.save(variant);
                     }
                 
                 // Handle BOM items for this variant
@@ -751,7 +716,7 @@ public class ProductServiceImpl implements ProductService{
     @PreAuthorize("hasAnyRole('OWNER', 'WAREHOUSE_STAFF')")
     public ChangeProductStatusResponse changeProductStatus(Long productId, ChangeProductStatusRequest request, User changedByUser) {
         // Step 1: Find the product
-        Product product = productRepository.findById(productId)
+        Product product = productRepository.findByIdAndCompany(productId, changedByUser.getCompany())
                 .orElseThrow(() -> new RuntimeException("Product not found with ID: " + productId));
 
         // Step 2: Validate the status transition
@@ -789,9 +754,9 @@ public class ProductServiceImpl implements ProductService{
     }
 
     @Override
-    public ProductStatusTransitionResponse getAvailableStatusTransitions(Long productId) {
+    public ProductStatusTransitionResponse getAvailableStatusTransitions(Long productId, User currentUser) {
         // Step 1: Find the product
-        Product product = productRepository.findById(productId)
+        Product product = productRepository.findByIdAndCompany(productId, currentUser.getCompany())
                 .orElseThrow(() -> new RuntimeException("Product not found with ID: " + productId));
 
         // Step 2: Get current status and available transitions
@@ -804,15 +769,15 @@ public class ProductServiceImpl implements ProductService{
     }
 
     @Override
-    public List<ProductVariantAutoCompleteResponse> getAllProductVariantsForAutocomplete(String search) {
+    public List<ProductVariantAutoCompleteResponse> getAllProductVariantsForAutocomplete(String search, User currentUser) {
         List<ProductVariant> variants;
         
         if (StringUtils.hasText(search)) {
             // Search by product name, product SKU, variant SKU, or variant name
-            variants = productVariantRepository.findByProductNameContainingIgnoreCaseOrProductSkuContainingIgnoreCaseOrSkuContainingIgnoreCaseOrNameContainingIgnoreCase(search);
+            variants = productVariantRepository.findBySearchKeywordAndCompany(search, currentUser.getCompany());
         } else {
             // Get all active variants
-            variants = productVariantRepository.findByProductStatusAndProductIsActiveTrue(ProductStatus.ACTIVE);
+            variants = productVariantRepository.findByCompanyAndIsActiveTrue(currentUser.getCompany());
         }
         
         return variants.stream()
@@ -828,12 +793,16 @@ public class ProductServiceImpl implements ProductService{
                 .collect(Collectors.toList());
     }
 
-    public List<BOMItemResponse> getBomItem (Long id, Long variantId){
-        Product product = productRepository.findById(id)
-                        .orElseThrow(() -> new RuntimeException("Product not found with ID: " + id));
-        ProductVariant variant = productVariantRepository.findById(variantId)
-                        .orElseThrow(() -> new RuntimeException("Product Variant not found with ID: " + variantId));
-        // Verify the variant belongs to the product
+    @Override
+    public List<BOMItemResponse> getBomItem(Long id, Long variantId, User currentUser) {
+        Product product = productRepository.findByIdAndCompany(id, currentUser.getCompany())
+                .orElseThrow(() -> new RuntimeException("Product not found with ID: " + id));
+        
+        ProductVariant variant = product.getVariants().stream()
+                .filter(v -> v.getId().equals(variantId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Product Variant not found with ID: " + variantId));
+        
         if (!variant.getProduct().getId().equals(id)) {
             throw new RuntimeException("Product Variant does not belong to the specified Product");
         }
@@ -855,5 +824,39 @@ public class ProductServiceImpl implements ProductService{
             } 
         }
         return response;
+    }
+
+    @Override
+    @Transactional
+    @PreAuthorize("hasRole('OWNER')")
+    public DeleteProductResponse deleteProduct(Long id, User deletedByUser) {
+        // Step 1: Find the product with company context
+        Product product = productRepository.findByIdAndCompany(id, deletedByUser.getCompany())
+                .orElseThrow(() -> new RuntimeException("Product not found with ID: " + id));
+
+        // Step 2: Check if product is already deleted
+        if (product.getStatus() == ProductStatus.DELETED) {
+            throw new RuntimeException("Product is already deleted");
+        }
+
+        // Step 3: Soft delete the product
+        product.setStatus(ProductStatus.DELETED);
+        product.setActive(false);
+        product.setUpdated_by(deletedByUser);
+        product.setUpdatedAt(java.time.LocalDateTime.now());
+
+        // Step 4: Save the updated product
+        productRepository.save(product);
+
+        // Step 5: Return success response
+        return new DeleteProductResponse(
+            product.getId(),
+            product.getSku(),
+            product.getName(),
+            product.getStatus().name(),
+            product.isActive(),
+            product.getUpdatedAt(),
+            deletedByUser.getUsername()
+        );
     }
 }

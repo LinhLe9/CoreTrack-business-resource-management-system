@@ -2,10 +2,12 @@ package org.example.coretrack.controller;
 
 import org.example.coretrack.dto.auth.CreateUserRequest;
 import org.example.coretrack.dto.auth.UserDetailResponse;
+import org.example.coretrack.model.auth.User;
 import org.example.coretrack.service.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize; 
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -35,8 +37,17 @@ public class AdminController {
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<List<UserDetailResponse>> getAllUsers() {
         try {
-            List<UserDetailResponse> users = userService.getAllUsers();
+            // Get current authenticated user
+            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            if (!(principal instanceof User)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            
+            User currentUser = (User) principal;
+            List<UserDetailResponse> users = userService.getAllUsers(currentUser);
             return ResponseEntity.ok(users);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }

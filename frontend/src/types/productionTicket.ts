@@ -137,6 +137,7 @@ export interface ProductionTicketResponse {
 export interface ProductionTicketCardResponse {
   id: number;
   name: string;
+  completed_date?: string;
   status: string;
   createdAt: string;
   createdBy: string;

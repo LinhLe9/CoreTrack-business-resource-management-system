@@ -28,9 +28,11 @@ import {
   TabPanels,
   Tab,
   TabPanel,
+  Link,
 } from '@chakra-ui/react';
 import { getProductInventoryFilter } from '@/services/productInventoryService';
 import { getMaterialInventoryFilter } from '@/services/materialInventoryService';
+import { useRouter } from 'next/navigation';
 
 const AlarmPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -41,6 +43,7 @@ const AlarmPage: React.FC = () => {
   const [lowStockMaterials, setLowStockMaterials] = useState<any[]>([]);
   const [overStockMaterials, setOverStockMaterials] = useState<any[]>([]);
   const toast = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     fetchAllAlarmData();
@@ -125,125 +128,134 @@ const AlarmPage: React.FC = () => {
   };
 
   const renderProductCard = (product: any, borderColor: string) => (
-    <Card key={product.id} variant="outline" borderColor={borderColor}>
-      <CardBody>
-        <Flex justify="space-between" align="start">
-          <Box flex="1">
+    <Box
+      key={product.id}
+      p={4}
+      border="1px"
+      borderColor={borderColor}
+      borderRadius="md"
+      bg="white"
+      _hover={{ shadow: "md" }}
+    >
+      <VStack align="start" spacing={3}>
+        <HStack justify="space-between" w="100%">
+          <VStack align="start" spacing={1}>
             <Text fontWeight="bold" fontSize="lg">
               {product.name}
             </Text>
             <Text fontSize="sm" color="gray.600" mb={2}>
               SKU: {product.sku}
             </Text>
-            {product.group && (
-              <Text fontSize="sm" color="gray.500" mb={2}>
-                Group: {product.group}
-              </Text>
-            )}
-            <HStack spacing={4} mt={2}>
-              <Text fontSize="sm">
-                <strong>Current Stock:</strong> 
-                <Badge colorScheme={borderColor === 'red.200' ? 'red' : borderColor === 'orange.200' ? 'orange' : 'blue'} ml={2}>
-                  {parseFloat(product.currentStock || '0')}
-                </Badge>
-              </Text>
-              {product.minAlertStock && (
-                <Text fontSize="sm">
-                  <strong>Min Alert:</strong> 
-                  <Badge colorScheme="orange" ml={2}>
-                    {parseFloat(product.minAlertStock)}
-                  </Badge>
-                </Text>
-              )}
-              {product.maxStockLevel && (
-                <Text fontSize="sm">
-                  <strong>Max Level:</strong> 
-                  <Badge colorScheme="blue" ml={2}>
-                    {parseFloat(product.maxStockLevel)}
-                  </Badge>
-                </Text>
-              )}
-            </HStack>
-          </Box>
-          <Box textAlign="right">
-            {product.updatedAt && (
-              <>
-                <Text fontSize="xs" color="gray.500" mb={1}>
-                  Last Updated
-                </Text>
-                <Text fontSize="sm" fontWeight="medium">
-                  {formatDate(product.updatedAt)}
-                </Text>
-              </>
-            )}
-            <Badge colorScheme={borderColor === 'red.200' ? 'red' : borderColor === 'orange.200' ? 'orange' : 'blue'} variant="outline" mt={2}>
+          </VStack>
+          <VStack align="end" spacing={1}>
+            <Badge colorScheme={borderColor === 'red.200' ? 'red' : borderColor === 'orange.200' ? 'orange' : 'blue'}>
               {product.inventoryStatus}
             </Badge>
-          </Box>
-        </Flex>
-      </CardBody>
-    </Card>
+            <Text fontSize="sm" color="gray.500">
+              {formatDate(product.updatedAt)}
+            </Text>
+          </VStack>
+        </HStack>
+
+        <HStack justify="space-between" w="100%">
+          <VStack align="start" spacing={1}>
+            <Text fontSize="sm">
+              <strong>Current Stock:</strong> {product.currentStock}
+            </Text>
+            <Text fontSize="sm">
+              <strong>Min Alert:</strong> {product.minAlertStock}
+            </Text>
+            <Text fontSize="sm">
+              <strong>Max Level:</strong> {product.maxStockLevel}
+            </Text>
+          </VStack>
+          <Link
+            color="blue.500"
+            textDecoration="underline"
+            cursor="pointer"
+            onClick={() => {
+              const singleVariantData = encodeURIComponent(JSON.stringify([product]));
+              router.push(`/production/create?lowStockData=${singleVariantData}`);
+            }}
+            _hover={{ color: 'blue.700' }}
+            fontSize="sm"
+            fontWeight="medium"
+          >
+            Create production
+          </Link>
+        </HStack>
+      </VStack>
+    </Box>
   );
 
   const renderMaterialCard = (material: any, borderColor: string) => (
-    <Card key={material.id} variant="outline" borderColor={borderColor}>
-      <CardBody>
-        <Flex justify="space-between" align="start">
-          <Box flex="1">
+    <Box
+      key={material.id}
+      p={4}
+      border="1px"
+      borderColor={borderColor}
+      borderRadius="md"
+      bg="white"
+      _hover={{ shadow: "md" }}
+    >
+      <VStack align="start" spacing={3}>
+        <HStack justify="space-between" w="100%">
+          <VStack align="start" spacing={1}>
             <Text fontWeight="bold" fontSize="lg">
               {material.name}
             </Text>
-            <Text fontSize="sm" color="gray.600" mb={2}>
+            <Text fontSize="sm" color="gray.600">
               SKU: {material.sku}
             </Text>
             {material.group && (
-              <Text fontSize="sm" color="gray.500" mb={2}>
+              <Text fontSize="sm" color="gray.500">
                 Group: {material.group}
               </Text>
             )}
-            <HStack spacing={4} mt={2}>
-              <Text fontSize="sm">
-                <strong>Current Stock:</strong> 
-                <Badge colorScheme={borderColor === 'red.200' ? 'red' : borderColor === 'orange.200' ? 'orange' : 'blue'} ml={2}>
-                  {parseFloat(material.currentStock || '0')}
-                </Badge>
-              </Text>
-              {material.minAlertStock && (
-                <Text fontSize="sm">
-                  <strong>Min Alert:</strong> 
-                  <Badge colorScheme="orange" ml={2}>
-                    {parseFloat(material.minAlertStock)}
-                  </Badge>
-                </Text>
-              )}
-              {material.maxStockLevel && (
-                <Text fontSize="sm">
-                  <strong>Max Level:</strong> 
-                  <Badge colorScheme="blue" ml={2}>
-                    {parseFloat(material.maxStockLevel)}
-                  </Badge>
-                </Text>
-              )}
-            </HStack>
-          </Box>
-          <Box textAlign="right">
-            {material.updatedAt && (
-              <>
-                <Text fontSize="xs" color="gray.500" mb={1}>
-                  Last Updated
-                </Text>
-                <Text fontSize="sm" fontWeight="medium">
-                  {formatDate(material.updatedAt)}
-                </Text>
-              </>
-            )}
-            <Badge colorScheme={borderColor === 'red.200' ? 'red' : borderColor === 'orange.200' ? 'orange' : 'blue'} variant="outline" mt={2}>
+          </VStack>
+          <VStack align="end" spacing={1}>
+            <Badge colorScheme={borderColor === 'red.200' ? 'red' : borderColor === 'orange.200' ? 'orange' : 'blue'}>
               {material.inventoryStatus}
             </Badge>
-          </Box>
-        </Flex>
-      </CardBody>
-    </Card>
+            <Text fontSize="sm" color="gray.500">
+              {formatDate(material.updatedAt)}
+            </Text>
+          </VStack>
+        </HStack>
+
+        <HStack justify="space-between" w="100%">
+          <VStack align="start" spacing={1}>
+            <Text fontSize="sm">
+              <strong>Current Stock:</strong> {parseFloat(material.currentStock || '0')}
+            </Text>
+            {material.minAlertStock && (
+              <Text fontSize="sm">
+                <strong>Min Alert:</strong> {parseFloat(material.minAlertStock)}
+              </Text>
+            )}
+            {material.maxStockLevel && (
+              <Text fontSize="sm">
+                <strong>Max Level:</strong> {parseFloat(material.maxStockLevel)}
+              </Text>
+            )}
+          </VStack>
+          <Link
+            color="blue.500"
+            textDecoration="underline"
+            cursor="pointer"
+            onClick={() => {
+              const singleMaterialData = encodeURIComponent(JSON.stringify([material]));
+              router.push(`/purchasing/create?lowStockData=${singleMaterialData}`);
+            }}
+            _hover={{ color: 'blue.700' }}
+            fontSize="sm"
+            fontWeight="medium"
+          >
+            Create purchasing
+          </Link>
+        </HStack>
+      </VStack>
+    </Box>
   );
 
   const renderProductAlarms = () => (
@@ -256,9 +268,27 @@ const AlarmPage: React.FC = () => {
               <Heading size="md" color="red.700">
                 OUT OF STOCK
               </Heading>
-              <Badge colorScheme="red" fontSize="md">
-                {outOfStockProducts.length} items
-              </Badge>
+              <HStack spacing={4}>
+                {outOfStockProducts.length > 0 && (
+                  <Link
+                    color="blue.500"
+                    textDecoration="underline"
+                    cursor="pointer"
+                    onClick={() => {
+                      const outOfStockData = encodeURIComponent(JSON.stringify(outOfStockProducts));
+                      router.push(`/production/create?lowStockData=${outOfStockData}`);
+                    }}
+                    _hover={{ color: 'blue.700' }}
+                    fontSize="sm"
+                    fontWeight="medium"
+                  >
+                    Create production
+                  </Link>
+                )}
+                <Badge colorScheme="red" fontSize="md">
+                  {outOfStockProducts.length} items
+                </Badge>
+              </HStack>
             </Flex>
           </CardHeader>
           <CardBody>
@@ -289,9 +319,27 @@ const AlarmPage: React.FC = () => {
               <Heading size="md" color="orange.700">
                 LOW STOCK
               </Heading>
-              <Badge colorScheme="orange" fontSize="md">
-                {lowStockProducts.length} items
-              </Badge>
+              <HStack spacing={4}>
+                {lowStockProducts.length > 0 && (
+                  <Link
+                    color="blue.500"
+                    textDecoration="underline"
+                    cursor="pointer"
+                    onClick={() => {
+                      const lowStockData = encodeURIComponent(JSON.stringify(lowStockProducts));
+                      router.push(`/production/create?lowStockData=${lowStockData}`);
+                    }}
+                    _hover={{ color: 'blue.700' }}
+                    fontSize="sm"
+                    fontWeight="medium"
+                  >
+                    Create production
+                  </Link>
+                )}
+                <Badge colorScheme="orange" fontSize="md">
+                  {lowStockProducts.length} items
+                </Badge>
+              </HStack>
             </Flex>
           </CardHeader>
           <CardBody>
@@ -359,9 +407,27 @@ const AlarmPage: React.FC = () => {
               <Heading size="md" color="red.700">
                 OUT OF STOCK
               </Heading>
-              <Badge colorScheme="red" fontSize="md">
-                {outOfStockMaterials.length} items
-              </Badge>
+              <HStack spacing={4}>
+                {outOfStockMaterials.length > 0 && (
+                  <Link
+                    color="blue.500"
+                    textDecoration="underline"
+                    cursor="pointer"
+                    onClick={() => {
+                      const outOfStockMaterialData = encodeURIComponent(JSON.stringify(outOfStockMaterials));
+                      router.push(`/purchasing/create?lowStockData=${outOfStockMaterialData}`);
+                    }}
+                    _hover={{ color: 'blue.700' }}
+                    fontSize="sm"
+                    fontWeight="medium"
+                  >
+                    Create purchasing
+                  </Link>
+                )}
+                <Badge colorScheme="red" fontSize="md">
+                  {outOfStockMaterials.length} items
+                </Badge>
+              </HStack>
             </Flex>
           </CardHeader>
           <CardBody>
@@ -392,9 +458,27 @@ const AlarmPage: React.FC = () => {
               <Heading size="md" color="orange.700">
                 LOW STOCK
               </Heading>
-              <Badge colorScheme="orange" fontSize="md">
-                {lowStockMaterials.length} items
-              </Badge>
+              <HStack spacing={4}>
+                {lowStockMaterials.length > 0 && (
+                  <Link
+                    color="blue.500"
+                    textDecoration="underline"
+                    cursor="pointer"
+                    onClick={() => {
+                      const lowStockMaterialData = encodeURIComponent(JSON.stringify(lowStockMaterials));
+                      router.push(`/purchasing/create?lowStockData=${lowStockMaterialData}`);
+                    }}
+                    _hover={{ color: 'blue.700' }}
+                    fontSize="sm"
+                    fontWeight="medium"
+                  >
+                    Create purchasing
+                  </Link>
+                )}
+                <Badge colorScheme="orange" fontSize="md">
+                  {lowStockMaterials.length} items
+                </Badge>
+              </HStack>
             </Flex>
           </CardHeader>
           <CardBody>

@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.example.coretrack.model.auth.User;
+import org.example.coretrack.model.auth.Company;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Pattern;
@@ -50,6 +51,11 @@ public class Product {
     @JoinColumn(name = "productGroup_id")
     private ProductGroup group;
 
+    // Multi-tenancy: Company relationship
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
     // logging elements
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_user_id", nullable = false)
@@ -68,7 +74,7 @@ public class Product {
     }
 
     public Product(String name, String sku, String description, BigDecimal price, 
-                    String currency, ProductGroup productGroup, User createdBy) {
+                    String currency, ProductGroup productGroup, User createdBy, Company company) {
         this.name = name;
         this.sku = sku;
         this.description = description;
@@ -77,6 +83,25 @@ public class Product {
         this.currency = currency;
         this.group = productGroup;
         this.created_by = createdBy;
+        this.company = company;
+        this.isActive = true;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+        this.updated_by = createdBy;
+    }
+    
+    public Product(String name, String sku, String description, BigDecimal price, 
+                    String currency, String imageUrl, ProductGroup productGroup, User createdBy, Company company) {
+        this.name = name;
+        this.sku = sku;
+        this.description = description;
+        this.status = ProductStatus.ACTIVE;
+        this.price = price;
+        this.currency = currency;
+        this.imageUrl = imageUrl;
+        this.group = productGroup;
+        this.created_by = createdBy;
+        this.company = company;
         this.isActive = true;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -106,6 +131,14 @@ public class Product {
     
     public void setProductGroup(ProductGroup productGroup) { 
         this.group = productGroup; 
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
     }
 
     public User getCreatedBy() { 

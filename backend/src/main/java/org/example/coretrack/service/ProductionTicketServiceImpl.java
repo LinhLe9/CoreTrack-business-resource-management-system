@@ -8,8 +8,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import javax.management.RuntimeErrorException;
-
 import org.example.coretrack.dto.productionTicket.BomItemProductionTicketRequest;
 import org.example.coretrack.dto.productionTicket.BomItemProductionTicketResponse;
 import org.example.coretrack.dto.productionTicket.BulkCreateProductionTicketRequest;
@@ -58,6 +56,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.example.coretrack.model.notification.Notification;
 import org.example.coretrack.model.notification.NotificationType;
+import org.example.coretrack.service.NotificationService;
+import org.example.coretrack.service.NotificationTargetService;
+import org.example.coretrack.service.EmailSendingService;
 
 @Service
 public class ProductionTicketServiceImpl implements ProductionTicketService{
@@ -94,6 +95,12 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired
+    private NotificationTargetService notificationTargetService;
+
+    @Autowired
+    private EmailSendingService emailSendingService;
+
     /*
      * This use for user to create a production ticket for one productVariant by choose directly its sku from alarm
      */
@@ -116,7 +123,7 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
             throw new RuntimeException("Name is required");
         }
         
-        ProductVariant variant = productVariantRepository.findBySku(request.getVariantSku())
+        ProductVariant variant = productVariantRepository.findBySkuAndCompany(request.getVariantSku(), user.getCompany())
                                 .orElseThrow(() -> new RuntimeException("Product Variant is not found with SKU: " + request.getVariantSku()));
         
         // Check if variant is active
@@ -125,7 +132,7 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         }
 
         // Check if ProductInventory exists, if not create default one
-        ProductInventory inventory = productInventoryService.getByProductVariantId(variant.getId());
+         ProductInventory inventory = productInventoryService.getByProductVariantId(variant.getId(), user);
         if (inventory == null) {
             // We'll create the ProductInventory after the ProductionTicket is saved
             // so we can use the ticket ID as referenceDocumentId
@@ -134,9 +141,10 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         // check if material is enough 
         if (request.getBoms() != null && !request.getBoms().isEmpty()) {
             for (BomItemProductionTicketRequest bomRequest : request.getBoms()) {
-                MaterialVariant materialVariant = materialVariantRepository.findBySku(bomRequest.getMaterialVariantSku())
+                MaterialVariant materialVariant = materialVariantRepository.findBySkuAndCompany(bomRequest.getMaterialVariantSku(), user.getCompany())
                     .orElseThrow(() -> new RuntimeException("Material Variant not found with SKU: " + bomRequest.getMaterialVariantSku()));
-                boolean check = materialInventoryService.isEnough(materialVariant, bomRequest.getPlannedQuantity());
+                BigDecimal neededQuantity = bomRequest.getPlannedQuantity().multiply(request.getQuantity());
+                boolean check = materialInventoryService.isEnough(materialVariant, neededQuantity,user);
                 if(check == false){
                     throw new RuntimeException("Material Variant Stock for material variant sku " + materialVariant.getSku() + " for create production ticket");
                 }
@@ -160,6 +168,7 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         detail.setStatus(ProductionTicketDetailStatus.NEW);
         detail.setExpected_complete_date(request.getExpected_complete_date());
         detail.setCompleted_date(null);
+        detail.setActive(true);
         detail.setCreatedAt(LocalDateTime.now());
         detail.setUpdatedAt(LocalDateTime.now());
         detail.setCreatedBy(user);
@@ -169,7 +178,7 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         // Add BOM items if provided
         if (request.getBoms() != null && !request.getBoms().isEmpty()) {
             for (BomItemProductionTicketRequest bomRequest : request.getBoms()) {
-                MaterialVariant materialVariant = materialVariantRepository.findBySku(bomRequest.getMaterialVariantSku())
+                MaterialVariant materialVariant = materialVariantRepository.findBySkuAndCompany(bomRequest.getMaterialVariantSku(), user.getCompany())
                     .orElseThrow(() -> new RuntimeException("Material Variant not found with SKU: " + bomRequest.getMaterialVariantSku()));
                 
                 if (!materialVariant.isActive()) {
@@ -272,24 +281,45 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
 
                     // Get ProductVariant
                     System.out.println("Looking for ProductVariant with SKU: " + sku);
-                    ProductVariant variant = productVariantRepository.findBySku(sku)
-                        .orElseThrow(() -> new RuntimeException("Product Variant not found with SKU: " + sku));
+                    ProductVariant variant = productVariantRepository.findBySkuAndCompany(sku, user.getCompany())
+                        .orElseThrow(() -> new RuntimeException("Product Variant not found with SKU: " + sku + " for company: " + user.getCompany().getName()));
                     System.out.println("Found ProductVariant: " + variant.getName() + " (ID: " + variant.getId() + ")");
 
                     // Check if ProductInventory exists, if not we'll create it after ticket creation
-                    ProductInventory inventory = productInventoryService.getByProductVariantId(variant.getId());
+                    ProductInventory inventory = productInventoryService.getByProductVariantId(variant.getId(), user);
                     boolean needToCreateInventory = (inventory == null);
                     System.out.println("ProductInventory exists: " + (inventory != null) + ", needToCreateInventory: " + needToCreateInventory);
 
-                    // check if material is enough 
+                    // Check if material is enough and collect insufficient materials
+                    List<String> insufficientMaterials = new ArrayList<>();
                     if (boms != null && !boms.isEmpty()) {
                         for (BomItemProductionTicketRequest bomRequest : boms) {
-                            MaterialVariant materialVariant = materialVariantRepository.findBySku(bomRequest.getMaterialVariantSku())
+                            MaterialVariant materialVariant = materialVariantRepository.findBySkuAndCompany(bomRequest.getMaterialVariantSku(), user.getCompany())
                                 .orElseThrow(() -> new RuntimeException("Material Variant not found with SKU: " + bomRequest.getMaterialVariantSku()));
-                            boolean check = materialInventoryService.isEnough(materialVariant, bomRequest.getPlannedQuantity());
+                            BigDecimal neededQuantity = bomRequest.getPlannedQuantity().multiply(quantity);
+                            
+                            // Check if material has sufficient stock
+                            boolean check = materialInventoryService.isEnough(materialVariant, neededQuantity, user);
                             if(check == false){
-                                throw new RuntimeException("Material Variant Stock for material variant sku " + materialVariant.getSku() + " for create production ticket");
+                                BigDecimal availableStock = materialInventoryService.getAvailableStock(materialVariant, user);
+                                String insufficientMaterialInfo = String.format("Material Variant '%s' (SKU: %s) - Needed: %s, Available: %s", 
+                                    materialVariant.getName(), 
+                                    materialVariant.getSku(), 
+                                    neededQuantity,
+                                    availableStock);
+                                insufficientMaterials.add(insufficientMaterialInfo);
+                                System.out.println("Insufficient stock for material " + materialVariant.getSku() + 
+                                                 ". Needed: " + neededQuantity + 
+                                                 ". Available: " + availableStock);
                             }
+                        }
+                        
+                        // If there are insufficient materials, add detailed error message
+                        if (!insufficientMaterials.isEmpty()) {
+                            String errorMsg = String.format("Insufficient material stock for product variant '%s' (SKU: %s). Insufficient materials: %s", 
+                                variant.getName(), sku, String.join("; ", insufficientMaterials));
+                            System.out.println(errorMsg);
+                            throw new RuntimeException(errorMsg);
                         }
                     }
 
@@ -321,7 +351,7 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
                             }
                             
                             try {
-                                MaterialVariant materialVariant = materialVariantRepository.findBySku(materialSku)
+                                MaterialVariant materialVariant = materialVariantRepository.findBySkuAndCompany(materialSku, user.getCompany())
                                     .orElseThrow(() -> new RuntimeException("Material Variant not found with SKU: " + materialSku));
                                 
                                 System.out.println("Found material variant: " + materialVariant.getName() + ", active: " + materialVariant.isActive());
@@ -361,9 +391,14 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
                     System.out.println("Successfully processed SKU: " + sku + ", totalCreated: " + totalCreated);
 
                 } catch (Exception e) {
-                    String error = "Failed to create production ticket detail for SKU " + 
-                                 productVariantRequest.getProductVariantSku() + ": " + e.getMessage();
+                    String error = String.format("Failed to create production ticket detail for SKU '%s' (Product: %s): %s", 
+                                 productVariantRequest.getProductVariantSku(),
+                                 productVariantRequest.getProductVariantSku(), // You can enhance this with product name if available
+                                 e.getMessage());
                     System.err.println("=== ERROR in bulk create for productVariant " + (i + 1) + " ===");
+                    System.err.println("Product Variant SKU: " + productVariantRequest.getProductVariantSku());
+                    System.err.println("Quantity: " + productVariantRequest.getQuantity());
+                    System.err.println("Expected Complete Date: " + productVariantRequest.getExpectedCompleteDate());
                     System.err.println("Error: " + error);
                     e.printStackTrace();
                     errors.add(error);
@@ -426,6 +461,16 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
             e.printStackTrace();
             errors.add(error);
             totalFailed = totalRequested;
+        }
+
+        // Check if all details failed
+        if (totalFailed == totalRequested) {
+            String errorMessage = String.format("Bulk creation failed: All %d production ticket details failed to create. Errors: %s", 
+                totalRequested, String.join("; ", errors));
+            System.err.println("=== BULK CREATION FAILED ===");
+            System.err.println(errorMessage);
+            System.err.println("=== END BULK CREATION FAILED ===");
+            throw new RuntimeException(errorMessage);
         }
 
         // Determine overall success
@@ -497,8 +542,8 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
     }
 
     @Override
-    public ProductionTicketResponse getProductionTicketById(Long id) {
-        ProductionTicket ticket = productionTicketRepository.findByIdAndIsActive(id, true)
+    public ProductionTicketResponse getProductionTicketById(Long id, User user) {
+        ProductionTicket ticket = productionTicketRepository.findByIdAndIsActiveAndCompany(id, true, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Production Ticket not found with id: " + id));
 
         List<ProductionTicketDetailShortResponse> response = 
@@ -557,7 +602,7 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
 
 
     @Override
-    public Page<ProductionTicketCardResponse> getProductionTickets(String search, List<String> ticketStatus,Pageable pageable) {
+    public Page<ProductionTicketCardResponse> getProductionTickets(String search, List<String> ticketStatus,Pageable pageable, User user) {
         // handle search
         String processedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
@@ -581,12 +626,12 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
             }
         }
 
-        Page<ProductionTicket> response = productionTicketRepository.findAllActiveByCriteria(processedSearch,processedStatuses,pageable);
+        Page<ProductionTicket> response = productionTicketRepository.findAllActiveByCriteriaAndCompany(processedSearch,processedStatuses,user.getCompany(),pageable);
         return response.map(ProductionTicketCardResponse::new);
     }
 
     @Override
-    public List<ProductionTicketCardResponse> getAutoComplete(String search){
+    public List<ProductionTicketCardResponse> getAutoComplete(String search, User user){
         // Handle null or empty search
         if (search == null || search.trim().isEmpty()) {
             // Return empty list for null/empty search to avoid showing all tickets
@@ -596,7 +641,7 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         String processedSearch = search.trim();
         
         try {
-            List<ProductionTicket> tickets = productionTicketRepository.findAllBySearch(processedSearch);
+            List<ProductionTicket> tickets = productionTicketRepository.findAllBySearchAndCompany(processedSearch, user.getCompany());
             return tickets.stream()
                 .map(ProductionTicketCardResponse::new)
                 .collect(Collectors.toList());
@@ -611,11 +656,11 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
      * To return the detailed info of a production ticket detail
      */
     @Override
-    public ProductionTicketDetailResponse getProductionTicketDetails(Long id, Long detailId) {
+    public ProductionTicketDetailResponse getProductionTicketDetails(Long id, Long detailId, User user) {
         System.out.println("getProductionTicketDetails called with ticketId: " + id + ", detailId: " + detailId);
         
-        // First verify the production ticket exists
-        ProductionTicket ticket = productionTicketRepository.findByIdAndIsActive(id, true)
+        // First verify the production ticket exists (using company-based query)
+        ProductionTicket ticket = productionTicketRepository.findByIdAndIsActiveAndCompany(id, true, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Production Ticket not found with id: " + id));
         System.out.println("Found production ticket: " + ticket.getName());
         
@@ -755,7 +800,7 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
     @Override
     public ProductionTicketDetailResponse updateDetailStatus(Long ticketId, Long detailId, UpdateDetailStatusRequest request, User user) {
         // Verify the production ticket exists
-        ProductionTicket ticket = productionTicketRepository.findByIdAndIsActive(ticketId, true)
+        ProductionTicket ticket = productionTicketRepository.findByIdAndIsActiveAndCompany(ticketId, true, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Production Ticket not found with id: " + ticketId));
         
         // Find the specific detail
@@ -804,8 +849,24 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
             createProductionTicketNotification(user, ticket, oldTicketStatus, ticket.getStatus());
         }
         
+        // Send email alerts for status changes
+        try {
+            if (!oldStatus.equals(request.getNewStatus())) {
+                emailSendingService.sendProductionTicketDetailStatusChangeAlert(detail, oldStatus.name(), request.getNewStatus().name());
+            }
+            if (!oldTicketStatus.equals(ticket.getStatus())) {
+                emailSendingService.sendProductionTicketStatusChangeAlert(ticket, oldTicketStatus.name(), ticket.getStatus().name());
+            }
+        } catch (Exception emailError) {
+            System.err.println("=== WARNING: Failed to send email alert ===");
+            System.err.println("Email error: " + emailError.getMessage());
+            System.err.println("But status update was successful");
+            System.err.println("===========================================");
+            // Don't re-throw the email error to avoid rolling back the status update
+        }
+        
         // Return updated detail response
-        return getProductionTicketDetails(ticketId, detailId);
+        return getProductionTicketDetails(ticketId, detailId, user);
     }
 
     @Override
@@ -816,7 +877,7 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         System.out.println("User: " + user.getUsername());
         
         try {
-            ProductionTicket ticket = productionTicketRepository.findByIdAndIsActive(ticketId, true)
+            ProductionTicket ticket = productionTicketRepository.findByIdAndIsActiveAndCompany(ticketId, true, user.getCompany())
                 .orElseThrow(() -> new RuntimeException("Production Ticket not found with id: " + ticketId));
             
             System.out.println("Found ticket: " + ticket.getName() + " (ID: " + ticket.getId() + ")");
@@ -846,7 +907,10 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
                     
                     // Log the detail status change
                     logDetailStatusChange(detail, oldDetailStatus, ProductionTicketDetailStatus.CANCELLED, 
-                        "Cancelled due to production ticket cancellation: " + reason, user);
+                        "Production ticket detail cancelled: " + reason, user);
+                    
+                    // Create notification for detail cancellation
+                    createProductionTicketDetailNotification(user, detail, oldDetailStatus, ProductionTicketDetailStatus.CANCELLED);
                 } else {
                     System.out.println("Detail ID: " + detail.getId() + " is already cancelled, skipping...");
                 }
@@ -866,6 +930,18 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
             
             // Create notification for ticket cancellation
             createProductionTicketNotification(user, ticket, oldTicketStatus, ProductionTicketStatus.CANCELLED);
+
+            
+            // Send email alert for ticket cancellation
+            try {
+                emailSendingService.sendProductionTicketStatusChangeAlert(ticket, oldTicketStatus.name(), ProductionTicketStatus.CANCELLED.name());
+            } catch (Exception emailError) {
+                System.err.println("=== WARNING: Failed to send email alert ===");
+                System.err.println("Email error: " + emailError.getMessage());
+                System.err.println("But ticket cancellation was successful");
+                System.err.println("===========================================");
+                // Don't re-throw the email error to avoid rolling back the ticket cancellation
+            }
             
             System.out.println("=== Successfully cancelled production ticket ===");
             return ticket;
@@ -882,7 +958,7 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
     @Override
     public ProductionTicketDetailResponse cancelProductionTicketDetail(Long ticketId, Long detailId, String reason, User user) {
         // Verify the production ticket exists
-        ProductionTicket ticket = productionTicketRepository.findByIdAndIsActive(ticketId, true)
+        ProductionTicket ticket = productionTicketRepository.findByIdAndIsActiveAndCompany(ticketId, true, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Production Ticket not found with id: " + ticketId));
         
         // Find the specific detail
@@ -916,14 +992,36 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         ProductionTicketStatus oldTicketStatus = ticket.getStatus();
         updateProductionTicketStatusBasedOnDetails(ticket, user);
         
-        // Create notification for status changes
-        createProductionTicketDetailNotification(user, detail, oldDetailStatus, ProductionTicketDetailStatus.CANCELLED);
-        if (!oldTicketStatus.equals(ticket.getStatus())) {
-            createProductionTicketNotification(user, ticket, oldTicketStatus, ticket.getStatus());
+        // Create notification for status changes (handle separately to avoid transaction rollback)
+        try {
+            createProductionTicketDetailNotification(user, detail, oldDetailStatus, ProductionTicketDetailStatus.CANCELLED);
+            if (!oldTicketStatus.equals(ticket.getStatus())) {
+                createProductionTicketNotification(user, ticket, oldTicketStatus, ticket.getStatus());
+            }
+        } catch (Exception notificationError) {
+            System.err.println("=== WARNING: Failed to create notification ===");
+            System.err.println("Notification error: " + notificationError.getMessage());
+            System.err.println("But detail cancellation was successful");
+            System.err.println("=============================================");
+            // Don't re-throw the notification error to avoid rolling back the detail cancellation
+        }
+        
+        // Send email alerts for status changes (handle separately to avoid transaction rollback)
+        try {
+            emailSendingService.sendProductionTicketDetailStatusChangeAlert(detail, oldDetailStatus.name(), ProductionTicketDetailStatus.CANCELLED.name());
+            if (!oldTicketStatus.equals(ticket.getStatus())) {
+                emailSendingService.sendProductionTicketStatusChangeAlert(ticket, oldTicketStatus.name(), ticket.getStatus().name());
+            }
+        } catch (Exception emailError) {
+            System.err.println("=== WARNING: Failed to send email alert ===");
+            System.err.println("Email error: " + emailError.getMessage());
+            System.err.println("But detail cancellation was successful");
+            System.err.println("===========================================");
+            // Don't re-throw the email error to avoid rolling back the detail cancellation
         }
         
         // Return updated detail response
-        return getProductionTicketDetails(ticketId, detailId);
+        return getProductionTicketDetails(ticketId, detailId, user);
     }
 
     // helper method to validate the status change 
@@ -1035,18 +1133,31 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
         BigDecimal quantity = detail.getQuantity();
         Long variantId = productVariant.getId();
         Long ticketId = detail.getProductionTicket().getId();
+        List<BomItemProductionTicketDetail> boms = detail.getBomItem();
 
         // ProductInventory is guaranteed to exist at this point since it's created during ticket creation
         if (oldStatus == ProductionTicketDetailStatus.NEW && newStatus == ProductionTicketDetailStatus.APPROVAL) {
             // When status changes from NEW to APPROVAL, add to futureStock
             // This indicates the product is planned for production
             productInventoryService.addToFutureStock(variantId, quantity, user, ticketId);
-            materialInventoryService.addToAllocatedStock(variantId, quantity, user, ticketId);
+            for (BomItemProductionTicketDetail bom : boms){
+                 materialInventoryService.addToAllocatedStock(
+                    bom.getId(), 
+                    bom.getPlannedQuantity().multiply(quantity), 
+                    user, 
+                    ticketId);
+            };
 
         }  else if (oldStatus == ProductionTicketDetailStatus.APPROVAL && newStatus == ProductionTicketDetailStatus.COMPLETE){
             // When status change from APPROVEL to COMPLETE, move from allocatedStock, substract currentStock
             // This indicates the material is comsumpt by production 
-            materialInventoryService.removeFromCurrentAndAllocatedStock(variantId, quantity, user, ticketId);
+            for (BomItemProductionTicketDetail bom : boms){
+                materialInventoryService.removeFromCurrentAndAllocatedStock(
+                    bom.getId(), 
+                    bom.getPlannedQuantity().multiply(quantity), 
+                    user, 
+                    ticketId);
+            };
 
         } else if (oldStatus == ProductionTicketDetailStatus.COMPLETE && newStatus == ProductionTicketDetailStatus.READY) {
             // When status changes from COMPLETE to READY, move from futureStock to currentStock
@@ -1055,7 +1166,14 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
 
         } else if (oldStatus == ProductionTicketDetailStatus.APPROVAL && newStatus == ProductionTicketDetailStatus.CANCELLED) {
             // cancel ticket, remove material from allocated
-            materialInventoryService.removeFromAllocatedStock(variantId, quantity, user, ticketId);
+            for (BomItemProductionTicketDetail bom : boms){
+                materialInventoryService.removeFromAllocatedStock(
+                    bom.getId(), 
+                    bom.getPlannedQuantity().multiply(quantity), 
+                    user, 
+                    ticketId
+                );
+            };
             // remove product from future stock as well
             productInventoryService.removeFromFutureStock(variantId, quantity, user, ticketId);
 
@@ -1182,8 +1300,9 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
             String title = getProductionTicketNotificationTitle(newStatus);
             String message = getProductionTicketNotificationMessage(ticket, oldStatus, newStatus);
             
-            Notification notification = new Notification(user, NotificationType.PRODUCTION_TICKET_STATUS_CHANGE, title, message);
-            notificationService.createTicketNotification(notification);
+            Notification notification = new Notification(NotificationType.PRODUCTION_TICKET_STATUS_CHANGE, title, message);
+            List<User> notificationTargets = notificationTargetService.getProductionNotificationTargets();
+            notificationService.createTicketNotification(notification, notificationTargets);
         }
     }
     
@@ -1193,8 +1312,9 @@ public class ProductionTicketServiceImpl implements ProductionTicketService{
             String title = getProductionTicketDetailNotificationTitle(newStatus);
             String message = getProductionTicketDetailNotificationMessage(detail, oldStatus, newStatus);
             
-            Notification notification = new Notification(user, NotificationType.PRODUCTION_TICKET_DETAIL_STATUS_CHANGE, title, message);
-            notificationService.createTicketNotification(notification);
+            Notification notification = new Notification(NotificationType.PRODUCTION_TICKET_DETAIL_STATUS_CHANGE, title, message);
+            List<User> notificationTargets = notificationTargetService.getProductionNotificationTargets();
+            notificationService.createTicketNotification(notification, notificationTargets);
         }
     }
     

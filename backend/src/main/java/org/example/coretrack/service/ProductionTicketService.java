@@ -20,13 +20,13 @@ import org.springframework.data.domain.Pageable;
 public interface ProductionTicketService {
     CreateProductionTicketResponse createProductionTicket(CreateProductionTicketRequest request, User user);
     
-    ProductionTicketResponse getProductionTicketById(Long id);
+    ProductionTicketResponse getProductionTicketById(Long id, User user);
     
-    Page<ProductionTicketCardResponse> getProductionTickets(String search, List<String> ticketStatus, Pageable pageable);
+    Page<ProductionTicketCardResponse> getProductionTickets(String search, List<String> ticketStatus, Pageable pageable, User user);
 
-    List<ProductionTicketCardResponse> getAutoComplete (String search);
+    List<ProductionTicketCardResponse> getAutoComplete (String search, User user);
     
-    ProductionTicketDetailResponse getProductionTicketDetails(Long id, Long detailId);
+    ProductionTicketDetailResponse getProductionTicketDetails(Long id, Long detailId, User user);
         
     // New methods for status management
     BulkCreateProductionTicketResponse bulkCreateProductionTicket(BulkCreateProductionTicketRequest request, User user);

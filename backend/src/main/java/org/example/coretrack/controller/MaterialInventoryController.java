@@ -18,6 +18,8 @@ import org.example.coretrack.dto.product.inventory.SearchInventoryResponse;
 import org.example.coretrack.dto.product.inventory.StockModifyRequest;
 import org.example.coretrack.dto.product.inventory.StockSetRequest;
 import org.example.coretrack.dto.product.inventory.TransactionEnumsResponse;
+import org.example.coretrack.dto.product.inventory.SetMinMaxRequest;
+import org.example.coretrack.dto.product.inventory.SetMinMaxResponse;
 import org.example.coretrack.model.auth.User;
 import org.example.coretrack.repository.UserRepository;
 import org.example.coretrack.service.MaterialInventoryService;
@@ -99,7 +101,7 @@ public class MaterialInventoryController {
     /*
      * Endpoint to add stock to a specific product variant
      */
-    @PutMapping("/{variantId}/add")
+    @PostMapping("/{variantId}/add")
     @PreAuthorize("hasAnyRole('OWNER', 'WAREHOUSE_STAFF')")
     public ResponseEntity<InventoryTransactionResponse> addStock(
         @PathVariable Long variantId,
@@ -113,7 +115,7 @@ public class MaterialInventoryController {
     /*
      * Endpoint to subtract stock from a specific product variant
      */
-    @PutMapping("/{variantId}/subtract")
+    @PostMapping("/{variantId}/subtract")
     @PreAuthorize("hasAnyRole('OWNER', 'WAREHOUSE_STAFF')")
     public ResponseEntity<InventoryTransactionResponse> subtractStock(
         @PathVariable Long variantId,
@@ -138,8 +140,8 @@ public class MaterialInventoryController {
         if (search != null && search.length() > 255) { // maximum 255 characters
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
         }
-
-        Page<SearchInventoryResponse> productInventory = materialInventoryService.findMaterial(search, groupMaterials, inventoryStatus, pageable);
+        User currentUser = getCurrentUserFromSecurityContext();
+        Page<SearchInventoryResponse> productInventory = materialInventoryService.findMaterial(search, groupMaterials, inventoryStatus, pageable, currentUser);
 
         // A2: No matching results - frontend solves
         return ResponseEntity.ok(productInventory);
@@ -154,8 +156,8 @@ public class MaterialInventoryController {
             if (search != null && search.length() > 255) { // maximum 255 characters
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
         }
-
-        List<AllSearchInventoryResponse> materialInventory = materialInventoryService.getAllForAutocomplete(search);
+        User currentUser = getCurrentUserFromSecurityContext();
+        List<AllSearchInventoryResponse> materialInventory = materialInventoryService.getAllForAutocomplete(search, currentUser);
 
         // A2: No matching results - frontend solves
         return ResponseEntity.ok(materialInventory);
@@ -166,7 +168,8 @@ public class MaterialInventoryController {
      */
     @GetMapping("/{variantId}")
     public ResponseEntity<MaterialInventoryDetailResponse> getMaterialInventoryById(@PathVariable Long variantId) {
-        MaterialInventoryDetailResponse material = materialInventoryService.getMaterialInventoryById(variantId);
+        User currentUser = getCurrentUserFromSecurityContext();
+        MaterialInventoryDetailResponse material = materialInventoryService.getMaterialInventoryById(variantId,currentUser);
         if (material == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Material variant Inventory not found with ID: " + variantId);
         }
@@ -262,10 +265,38 @@ public class MaterialInventoryController {
                 .map(Long::valueOf)
                 .collect(Collectors.toList());
         }
-
-        Page<SearchInventoryResponse> materialInventory = materialInventoryService.getAlarmMaterial(search, groupMaterialIds, status, sortByOldest, pageable);
+         User currentUser = getCurrentUserFromSecurityContext();
+        Page<SearchInventoryResponse> materialInventory = materialInventoryService.getAlarmMaterial(search, groupMaterialIds, status, sortByOldest, pageable,currentUser);
 
         // A2: No matching results - frontend solves
         return ResponseEntity.ok(materialInventory);
+    }
+
+    /*
+     * Endpoint to set minimum alert stock for a specific material variant
+     */
+    @PutMapping("/{variantId}/set-minimum")
+    @PreAuthorize("hasAnyRole('OWNER')")
+    public ResponseEntity<SetMinMaxResponse> setMinimumAlertStock(
+        @PathVariable Long variantId,
+        @RequestBody SetMinMaxRequest request
+    ) {
+        User currentUser = getCurrentUserFromSecurityContext();
+        SetMinMaxResponse response = materialInventoryService.setMinimumAlertStock(variantId, request, currentUser);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    /*
+     * Endpoint to set maximum stock level for a specific material variant
+     */
+    @PutMapping("/{variantId}/set-maximum")
+    @PreAuthorize("hasAnyRole('OWNER')")
+    public ResponseEntity<SetMinMaxResponse> setMaximumStockLevel(
+        @PathVariable Long variantId,
+        @RequestBody SetMinMaxRequest request
+    ) {
+        User currentUser = getCurrentUserFromSecurityContext();
+        SetMinMaxResponse response = materialInventoryService.setMaximumStockLevel(variantId, request, currentUser);
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 }

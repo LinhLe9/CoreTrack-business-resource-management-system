@@ -16,20 +16,26 @@ import {
   Button,
   Flex,
   HStack,
+  useToast,
 } from '@chakra-ui/react';
-import { getProductById } from '@/services/productService';
+import { ChevronLeftIcon } from '@chakra-ui/icons';
+import { getProductById, deleteProduct } from '@/services/productService';
 import { ProductDetailResponse } from '@/types/product';
 import VariantTable from '@/components/product/VariantTable';
-import ProductStatusMenu from '@/components/product/ProductStatusMenu'; 
+import ProductStatusMenu from '@/components/product/ProductStatusMenu';
+import { useUser } from '@/hooks/useUser';
 
 const ProductDetailPage = () => {
   const router = useRouter();
   const params = useParams(); 
   const id = params?.id;
+  const toast = useToast();
+  const { isOwner } = useUser();
   
   const [product, setProduct] = useState<ProductDetailResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
 
   const refreshProduct = async () => {
     if (!id) return;
@@ -62,6 +68,37 @@ const ProductDetailPage = () => {
         return 'red';
       default:
         return 'gray';
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!id || !product) return;
+    
+    if (!confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await deleteProduct(Number(id));
+      toast({
+        title: 'Product deleted successfully!',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+      router.push('/product');
+    } catch (err: any) {
+      console.error('Error deleting product:', err);
+      toast({
+        title: 'Failed to delete product',
+        description: err.response?.data?.message || 'Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -124,19 +161,43 @@ const ProductDetailPage = () => {
         Variants & Inventory
       </Heading>
 
-      <VariantTable variants={product.variants} />
+      <VariantTable variants={product.variants} productId={Number(id)} />
 
       <Divider my={6} />
 
-      {/* Edit Button */}
+      {/* Action Buttons */}
       <Box textAlign="center">
-        <Button 
-          colorScheme="blue" 
-          size="lg"
-          onClick={() => router.push(`/product/${id}/edit`)}
-        >
-          Edit Product
-        </Button>
+        <HStack spacing={4} justify="center">
+          <Button 
+            variant="outline"
+            leftIcon={<ChevronLeftIcon />}
+            size="lg"
+            onClick={() => router.push('/product')}
+          >
+            Back to Catalog
+          </Button>
+          {isOwner() && (
+            <>
+              <Button 
+                colorScheme="blue" 
+                size="lg"
+                onClick={() => router.push(`/product/${id}/edit`)}
+              >
+                Edit Product
+              </Button>
+              <Button 
+                colorScheme="red" 
+                size="lg"
+                onClick={handleDelete}
+                isLoading={deleting}
+                loadingText="Deleting..."
+                isDisabled={product.status === 'DELETED'}
+              >
+                Delete Product
+              </Button>
+            </>
+          )}
+        </HStack>
       </Box>
     </Box>
   );

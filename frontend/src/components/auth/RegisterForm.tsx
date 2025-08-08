@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from "next/navigation";
 import {
-  Box, Button, FormControl, FormLabel, Input, Heading, VStack, useToast
+  Box, Button, FormControl, FormLabel, Input, Heading, VStack, useToast, Text, Link
 } from '@chakra-ui/react';
 import api from '@/lib/axios'; 
 
@@ -11,6 +11,7 @@ export default function RegisterForm() {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const toast = useToast();
   const router = useRouter();
 
@@ -21,6 +22,7 @@ export default function RegisterForm() {
         email,
         username,
         password,
+        companyName,
       });
 
       toast({
@@ -62,9 +64,18 @@ export default function RegisterForm() {
           </FormControl>
 
           <FormControl isRequired>
-            <FormLabel>username</FormLabel>
+            <FormLabel>Username</FormLabel>
             <Input value={username} onChange={(e) => setUsername(e.target.value)} />
             {/* <Input type="username" /> */}
+          </FormControl>
+
+          <FormControl isRequired>
+            <FormLabel>Company Name</FormLabel>
+            <Input 
+              value={companyName} 
+              onChange={(e) => setCompanyName(e.target.value)} 
+              placeholder="Enter your company name"
+            />
           </FormControl>
 
           <FormControl isRequired>
@@ -78,6 +89,13 @@ export default function RegisterForm() {
           </Button>
         </VStack>
       </form>
+      
+      <Text mt={4} textAlign="center" fontSize="sm" color="gray.600">
+        Already activate an account,{' '}
+        <Link color="blue.500" href="/login" textDecoration="underline">
+          Login here
+        </Link>
+      </Text>
     </Box>
   );
 }

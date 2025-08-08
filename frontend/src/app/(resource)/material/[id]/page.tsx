@@ -23,38 +23,74 @@ import {
   TableContainer,
   Button,
   Flex,
+  useToast,
 } from '@chakra-ui/react';
-import { getMaterialById } from '@/services/materialService';
+import { ChevronLeftIcon } from '@chakra-ui/icons';
+import { getMaterialById, deleteMaterial } from '@/services/materialService';
 import { MaterialDetailResponse } from '@/types/material';
 import MaterialStatusMenu from '@/components/material/MaterialStatusMenu';
+import { useUser } from '@/hooks/useUser';
 
 const MaterialDetailPage = () => {
   const router = useRouter();
   const params = useParams(); 
   const id = params?.id;
+  const toast = useToast();
+  const { isOwner } = useUser();
   
   const [material, setMaterial] = useState<MaterialDetailResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<boolean>(false);
+
+  const fetchMaterial = async () => {
+    if (!id) return;
+    setLoading(true);
+    try {
+      const data = await getMaterialById(Number(id));
+      setMaterial(data);
+    } catch (err: any) {
+      setError('Failed to load material detail.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!id) return;
-
-    const fetchMaterial = async () => {
-      setLoading(true);
-      try {
-        const data = await getMaterialById(Number(id));
-        setMaterial(data);
-      } catch (err: any) {
-        setError('Failed to load material detail.');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchMaterial();
   }, [id]);
+
+  const handleDelete = async () => {
+    if (!id || !material) return;
+    
+    if (!confirm('Are you sure you want to delete this material? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await deleteMaterial(Number(id));
+      toast({
+        title: 'Material deleted successfully!',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+      router.push('/material');
+    } catch (err: any) {
+      console.error('Error deleting material:', err);
+      toast({
+        title: 'Failed to delete material',
+        description: err.response?.data?.message || 'Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -93,14 +129,22 @@ const MaterialDetailPage = () => {
           }}
           onStatusChange={() => {
             // Refresh the material data after status change
-            if (id) {
-              getMaterialById(Number(id)).then(setMaterial).catch(console.error);
-            }
+            fetchMaterial();
           }}
         />
       </Flex>
 
-      <VStack align="start" spacing={4}>
+      <HStack align="start" spacing={6} mb={6}>
+        <VStack align="start" spacing={4} flex={1}>
+          <Text><strong>SKU:</strong> {material.sku}</Text>
+          <Text><strong>Group:</strong> {material.groupMaterial}</Text>
+          <Text><strong>Description:</strong> {material.shortDes}</Text>
+          <Text><strong>UOM:</strong> {material.uom}</Text>
+          <Badge colorScheme={getStatusColor(material.status)}>
+            {material.status}
+          </Badge>
+        </VStack>
+        
         {material.imageUrl && (
           <Image 
             src={material.imageUrl} 
@@ -110,15 +154,7 @@ const MaterialDetailPage = () => {
             borderRadius="md" 
           />
         )}
-
-        <Text><strong>SKU:</strong> {material.sku}</Text>
-        <Text><strong>Group:</strong> {material.groupMaterial}</Text>
-        <Text><strong>Description:</strong> {material.shortDes}</Text>
-        <Text><strong>UOM:</strong> {material.uom}</Text>
-        <Badge colorScheme={material.status.toLowerCase() === 'active' ? 'green' : 'gray'}>
-          {material.status}
-        </Badge>
-      </VStack>
+      </HStack>
 
       <Divider my={6} />
 
@@ -202,24 +238,63 @@ const MaterialDetailPage = () => {
                 ))}
               </Tbody>
             </Table>
-                       </TableContainer>
-           </>
-         )}
+          </TableContainer>
+        </>
+      )}
 
-         <Divider my={6} />
+      <Divider my={6} />
 
-         {/* Edit Button */}
-         <Box textAlign="center">
-           <Button 
-             colorScheme="blue" 
-             size="lg"
-             onClick={() => router.push(`/material/${id}/edit`)}
-           >
-             Edit Material
-           </Button>
-         </Box>
-       </Box>
-     );
+      {/* Action Buttons */}
+      <Box textAlign="center">
+        <HStack spacing={4} justify="center">
+          <Button 
+            variant="outline"
+            leftIcon={<ChevronLeftIcon />}
+            size="lg"
+            onClick={() => router.push('/material')}
+          >
+            Back to Catalog
+          </Button>
+          {isOwner() && (
+            <>
+              <Button 
+                colorScheme="blue" 
+                size="lg"
+                onClick={() => router.push(`/material/${id}/edit`)}
+              >
+                Edit Material
+              </Button>
+              <Button 
+                colorScheme="red" 
+                size="lg"
+                onClick={handleDelete}
+                isLoading={deleting}
+                loadingText="Deleting..."
+                isDisabled={material.status === 'DELETED'}
+              >
+                Delete Material
+              </Button>
+            </>
+          )}
+        </HStack>
+      </Box>
+    </Box>
+  );
+};
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'ACTIVE':
+      return 'green';
+    case 'INACTIVE':
+      return 'yellow';
+    case 'DISCONTINUED':
+      return 'orange';
+    case 'DELETED':
+      return 'red';
+    default:
+      return 'gray';
+  }
 };
 
 export default MaterialDetailPage;

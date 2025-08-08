@@ -22,6 +22,7 @@ import { getMaterials, getAllMaterialsForAutocomplete } from '../../../services/
 import { Material, MaterialQueryParams, MaterialAutoComplete } from '../../../types/material';
 import { PageResponse } from '../../../types/PageResponse';
 import { AddIcon } from '@chakra-ui/icons';
+import { useUser } from '../../../hooks/useUser';
 
 const MaterialCatalogPage: React.FC = () => {
   const [pageData, setPageData] = useState<PageResponse<Material> | null>(null);
@@ -31,6 +32,7 @@ const MaterialCatalogPage: React.FC = () => {
   const [allMaterialsForAutocomplete, setAllMaterialsForAutocomplete] = useState<MaterialAutoComplete[]>([]);
   const toast = useToast();
   const router = useRouter();
+  const { isOwner } = useUser();
 
   // Fetch autocomplete list
   useEffect(() => {
@@ -94,7 +96,8 @@ const MaterialCatalogPage: React.FC = () => {
   const handleFilter = (filters: Omit<MaterialQueryParams, 'search' | 'page' | 'size' | 'sort'>) => {
     setQueryParams((prev) => ({
       ...prev,
-      ...filters,
+      groupMaterial: filters.groupMaterial,
+      status: filters.status,
       page: 0,
     }));
   };
@@ -110,36 +113,39 @@ const MaterialCatalogPage: React.FC = () => {
     router.push(`/material/${materialId}`);
   };
 
+  const handleDelete = () => {
+    // Refresh the material list after deletion
+    fetchMaterials(queryParams);
+  };
+
   return (
     <Box p={8} maxW="1400px" mx="auto">
       <Heading as="h1" size="xl" textAlign="center" mb={8} color="teal.700">
         Material Catalog
       </Heading>
 
-      {/* Search Bar Row - Centered */}
-      <Flex justify="center" mb={6}>
-        <Flex gap={2} align="center" maxW="600px" w="full">
+      <Flex direction="column" gap={4} mb={8}>
+        {/* Line 1: Search bar and Add button */}
+        <Flex justify="center" gap={2} align="center">
           <SearchBar
             onSearch={handleSearch}
             onSelectMaterial={handleSelectMaterialFromSearch}
             initialSearchTerm={queryParams.search}
             materialsForAutocomplete={allMaterialsForAutocomplete}
           />
-          <IconButton
-            icon={<AddIcon />}
-            aria-label="Add new material"
-            colorScheme="teal"
-            onClick={() => router.push('/material/add')}
-            title="Add Material"
-          />
+          {isOwner() && (
+            <IconButton
+              icon={<AddIcon />}
+              aria-label="Add new material"
+              colorScheme="teal"
+              onClick={() => router.push('/material/add')}
+              title="Add Material"
+            />
+          )}
         </Flex>
-      </Flex>
 
-      {/* Filter Row - Centered */}
-      <Flex justify="center" mb={8}>
-        <Box maxW="800px" w="full">
-          <MaterialFilters onFilter={handleFilter} initialFilters={queryParams} />
-        </Box>
+        {/* Line 2: Filters */}
+        <MaterialFilters onFilter={handleFilter} initialFilters={queryParams} />
       </Flex>
 
       {loading && (
@@ -170,6 +176,8 @@ const MaterialCatalogPage: React.FC = () => {
               <MaterialCard 
                 key={material.id} 
                 material={material} 
+                onDelete={handleDelete}
+                showDeleteButton={isOwner()}
               />
             ))}
           </SimpleGrid>

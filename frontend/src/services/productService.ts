@@ -97,3 +97,13 @@ export const getBomItem = async (productId: number, variantId: number): Promise<
     throw error;
   }
 };
+
+// to delete a product (soft delete)
+export const deleteProduct = async (id: number): Promise<any> => {
+  try {
+    const response = await apiClient.delete(`/products/${id}`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};

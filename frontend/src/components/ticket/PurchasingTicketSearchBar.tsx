@@ -142,7 +142,7 @@ const PurchasingTicketSearchBar: React.FC<PurchasingTicketSearchBarProps> = ({
           borderColor="gray.200"
           borderRadius="md"
           shadow="lg"
-          zIndex={1000}
+          zIndex={9999}
           maxH="300px"
           overflowY="auto"
         >
@@ -194,7 +194,7 @@ const PurchasingTicketSearchBar: React.FC<PurchasingTicketSearchBarProps> = ({
           borderColor="gray.200"
           borderRadius="md"
           shadow="lg"
-          zIndex={1000}
+          zIndex={9999}
           p={3}
         >
           <Text fontSize="sm" color="gray.500" textAlign="center">

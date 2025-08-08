@@ -14,14 +14,22 @@ import {
   EnumValue,
   InventoryEnumsResponse,
   TransactionEnumsResponse,
-  AllSearchInventoryResponse
+  AllSearchInventoryResponse,
+  SetMinMaxResponse
 } from '../types/productInventory';
 
 export const createProductInventory = async (
   request: AddProductInventoryRequest
 ): Promise<AddProductInventoryResponse> => {
-  const response = await apiClient.post('/product-inventory/add-inventory', request);
-  return response.data;
+  try {
+    const response = await apiClient.post('/product-inventory/add-inventory', request);
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.status === 409 && error.response?.data?.error === 'PRODUCT_INVENTORY_ALREADY_EXISTS') {
+      throw new Error(`Product inventory already exists for SKU: ${request.productVariantSku}. Cannot create duplicate inventory.`);
+    }
+    throw error;
+  }
 };
 
 // Helper function to convert number to BigDecimal string for backend
@@ -55,9 +63,11 @@ export const addStock = async (
     referenceDocumentId,
     transactionSource,
   };
-  const response = await apiClient.put(`/product-inventory/${variantId}/add`, request);
+  const response = await apiClient.post(`/product-inventory/${variantId}/add`, request);
   return response.data;
 };
+
+
 
 // Subtract stock from a specific variant
 export const subtractStock = async (
@@ -75,7 +85,27 @@ export const subtractStock = async (
     referenceDocumentId,
     transactionSource,
   };
-  const response = await apiClient.put(`/product-inventory/${variantId}/subtract`, request);
+  const response = await apiClient.post(`/product-inventory/${variantId}/subtract`, request);
+  return response.data;
+};
+
+// Set stock for a specific variant
+export const setStock = async (
+  variantId: number,
+  quantity: number,
+  note?: string,
+  referenceDocumentType?: string,
+  referenceDocumentId?: number,
+  transactionSource?: string
+): Promise<InventoryTransactionResponse> => {
+  const request = {
+    newQuantity: toBigDecimalString(quantity),
+    note,
+    referenceDocumentType,
+    referenceDocumentId,
+    transactionSource,
+  };
+  const response = await apiClient.put(`/product-inventory/${variantId}/set`, request);
   return response.data;
 };
 
@@ -221,4 +251,32 @@ export const getProductInventoryById = async (variantId: number): Promise<any> =
   return response.data;
 };
 
- 
+// Set minimum alert stock for a specific variant
+export const setMinimumAlertStock = async (
+  variantId: number,
+  value: number
+): Promise<SetMinMaxResponse> => {
+  const request = {
+    value: toBigDecimalString(value)
+  };
+  const response = await apiClient.put(`/product-inventory/${variantId}/set-minimum`, request);
+  return response.data;
+};
+
+// Set maximum stock level for a specific variant
+export const setMaximumStockLevel = async (
+  variantId: number,
+  value: number
+): Promise<SetMinMaxResponse> => {
+  const request = {
+    value: toBigDecimalString(value)
+  };
+  const response = await apiClient.put(`/product-inventory/${variantId}/set-maximum`, request);
+  return response.data;
+};
+
+// Product-specific aliases for ProductStockTransactionModal
+export const addProductStock = addStock;
+export const subtractProductStock = subtractStock;
+export const setProductStock = setStock;
+export const getProductTransactionEnums = getTransactionEnums;

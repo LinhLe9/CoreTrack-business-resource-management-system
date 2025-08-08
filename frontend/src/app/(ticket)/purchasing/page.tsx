@@ -26,6 +26,7 @@ import { PageResponse } from '../../../types/PageResponse';
 import PurchasingTicketSearchBar from '../../../components/ticket/PurchasingTicketSearchBar';
 import PurchasingTicketFilters from '../../../components/ticket/PurchasingTicketFilters';
 import PurchasingTicketCard from '../../../components/ticket/PurchasingTicketCard';
+import { useUser } from '../../../hooks/useUser';
 
 const PurchasingTicketPage: React.FC = () => {
   const [pageData, setPageData] = useState<PageResponse<PurchasingTicketCardResponse> | null>(null);
@@ -42,6 +43,7 @@ const PurchasingTicketPage: React.FC = () => {
   
   const toast = useToast();
   const router = useRouter();
+  const { isOwner } = useUser();
 
   // Fetch autocomplete results
   const fetchAutocomplete = useCallback(async (search: string) => {
@@ -102,7 +104,7 @@ const PurchasingTicketPage: React.FC = () => {
   const handleFilter = (filters: any) => {
     setQueryParams(prev => ({
       ...prev,
-      ...filters,
+      ticketStatus: filters.ticketStatus,
       page: 0 // Reset to first page when filtering
     }));
   };
@@ -146,15 +148,17 @@ const PurchasingTicketPage: React.FC = () => {
                 />
               </Box>
               
-              <Button
-                leftIcon={<AddIcon />}
-                colorScheme="teal"
-                onClick={handleCreateTicket}
-                size="md"
-                flexShrink={0}
-              >
-                Create Ticket
-              </Button>
+              {isOwner() && (
+                <Button
+                  leftIcon={<AddIcon />}
+                  colorScheme="teal"
+                  onClick={handleCreateTicket}
+                  size="md"
+                  flexShrink={0}
+                >
+                  Create Ticket
+                </Button>
+              )}
             </HStack>
           </VStack>
         </Center>

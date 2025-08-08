@@ -6,6 +6,8 @@ import org.example.coretrack.dto.auth.RegistrationRequest;
 import org.example.coretrack.dto.auth.ResendValidationTokenResquest;
 import org.example.coretrack.dto.auth.ValidationTokenRequest;
 import org.example.coretrack.dto.auth.UserDetailResponse;
+import org.example.coretrack.dto.auth.ForgotPasswordRequest;
+import org.example.coretrack.dto.auth.ResetPasswordRequest;
 import org.example.coretrack.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -91,6 +93,50 @@ public class AuthController {
             return ResponseEntity.ok(userDetails);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // ===== PASSWORD RESET ENDPOINTS =====
+    
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        try {
+            String result = userService.forgotPassword(request.getEmail());
+            if ("valid".equals(result)) {
+                return ResponseEntity.ok("Password reset email sent successfully. Please check your email.");
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+    
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+        try {
+            String result = userService.resetPassword(request.getToken(), request.getNewPassword());
+            if ("valid".equals(result)) {
+                return ResponseEntity.ok("Password reset successfully.");
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+    
+    @PostMapping("/validate-reset-token")
+    public ResponseEntity<?> validateResetToken(@RequestBody ValidationTokenRequest request) {
+        try {
+            String result = userService.validatePasswordResetToken(request.getToken());
+            if ("valid".equals(result)) {
+                return ResponseEntity.ok("Token is valid");
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
     }
 

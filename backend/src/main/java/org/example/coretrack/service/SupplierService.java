@@ -16,18 +16,19 @@ public interface SupplierService {
     Page<SearchSupplierResponse> findSupplier(
             String search,
             List<String> countries,
-            Pageable pageable);
+            Pageable pageable,
+            User currentUser);
 
     // to return all supplier while search
-    List<AllSupplierSearchResponse> getAllSuppliersForAutocomplete(String search);
+    List<AllSupplierSearchResponse> getAllSuppliersForAutocomplete(String search, User currentUser);
 
     // to return all products
-    Page<SearchSupplierResponse> findAllSuppliers (Pageable pageable);
+    Page<SearchSupplierResponse> findAllSuppliers (Pageable pageable, User currentUser);
 
-    List<String> getAllCountries();
+    List<String> getAllCountries(User currentUser);
 
     // to add a new product to product catalog
     AddSupplierResponse createSupplier(AddSupplierRequest addSupplierRequest, User createdByUser);
   
-    SupplierDetailResponse getSupplierById(Long id);
+    SupplierDetailResponse getSupplierById(Long id, User currentUser);
 }

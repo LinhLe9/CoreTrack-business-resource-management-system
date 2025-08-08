@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.example.coretrack.model.auth.User;
+import org.example.coretrack.model.auth.Company;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -18,6 +19,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.FetchType;
 
 @Entity
 @Table(name = "production_ticket")
@@ -45,6 +47,11 @@ public class ProductionTicket {
 
     private LocalDateTime completed_date;
     
+    // Multi-tenancy: Company relationship
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+    
     // Audit Fields
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -61,7 +68,7 @@ public class ProductionTicket {
     
     public ProductionTicket(String name, ProductionTicketStatus status, boolean isActive,
             List<ProductionTicketDetail> ticketDetail, LocalDateTime completed_date, LocalDateTime createdAt,
-            LocalDateTime updatedAt, User createdBy, User updatedBy) {
+            LocalDateTime updatedAt, User createdBy, User updatedBy, Company company) {
         
         this.name = name;
         this.status = status;
@@ -72,6 +79,7 @@ public class ProductionTicket {
         this.updatedAt = updatedAt;
         this.createdBy = createdBy;
         this.updatedBy = updatedBy;
+        this.company = company;
     }
 
     public Long getId() {
@@ -104,6 +112,14 @@ public class ProductionTicket {
 
     public void setCompleted_date(LocalDateTime completed_date) {
         this.completed_date = completed_date;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
     }
 
     public LocalDateTime getCreatedAt() {

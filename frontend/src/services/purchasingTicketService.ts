@@ -107,6 +107,12 @@ export const purchasingTicketService = {
     return response.data;
   },
 
+  // Delete purchasing ticket from catalog (soft delete)
+  async deletePurchasingTicket(ticketId: number, reason: string): Promise<PurchasingTicket> {
+    const response = await axios.delete(`${API_BASE_URL}/${ticketId}/delete?reason=${encodeURIComponent(reason)}`);
+    return response.data;
+  },
+
   // Utility methods for date formatting
   formatDate(dateString: string): string {
     if (!dateString) return '';

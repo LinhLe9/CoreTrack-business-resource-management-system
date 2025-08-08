@@ -22,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -54,9 +55,10 @@ public class PurchasingTicketController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<PurchasingTicketResponse> getPurchasingTicketById(@PathVariable Long id) {
+    public ResponseEntity<PurchasingTicketResponse> getPurchasingTicketById(@PathVariable Long id, Authentication authentication) {
         try {
-            PurchasingTicketResponse ticket = purchasingTicketService.getPurchasingTicketById(id);
+            User user = (User) authentication.getPrincipal();
+            PurchasingTicketResponse ticket = purchasingTicketService.getPurchasingTicketById(id, user);
             return ResponseEntity.ok(ticket);
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
@@ -67,9 +69,11 @@ public class PurchasingTicketController {
     public ResponseEntity<Page<PurchasingTicketCardResponse>> getPurchasingTickets(
             @RequestParam(required = false) String search,
             @RequestParam(name = "ticketStatus", required = false) List<String> ticketStatus,        
-            @PageableDefault(page = 0, size = 20) Pageable pageable) {
+            @PageableDefault(page = 0, size = 20) Pageable pageable,
+            Authentication authentication) {
         try {
-            Page<PurchasingTicketCardResponse> tickets = purchasingTicketService.getPurchasingTickets(search, ticketStatus, pageable);
+            User user = (User) authentication.getPrincipal();
+            Page<PurchasingTicketCardResponse> tickets = purchasingTicketService.getPurchasingTickets(search, ticketStatus, pageable, user);
             return ResponseEntity.ok(tickets);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -81,9 +85,11 @@ public class PurchasingTicketController {
      */
     @GetMapping("/autocomplete")
     public ResponseEntity<List<PurchasingTicketCardResponse>> getAutoComplete(
-        @RequestParam(required = false) String search){
-           try {
-            List<PurchasingTicketCardResponse> tickets = purchasingTicketService.getAutoComplete(search);
+        @RequestParam(required = false) String search,
+        Authentication authentication) {
+        try {
+            User user = (User) authentication.getPrincipal();
+            List<PurchasingTicketCardResponse> tickets = purchasingTicketService.getAutoComplete(search, user);
             return ResponseEntity.ok(tickets);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -162,9 +168,11 @@ public class PurchasingTicketController {
     @GetMapping("/{id}/details/{detailId}")
     public ResponseEntity<PurchasingTicketDetailResponse> getPurchasingTicketDetails(
         @PathVariable Long id,
-        @PathVariable Long detailId) {
+        @PathVariable Long detailId,
+        Authentication authentication) {
         try {
-            PurchasingTicketDetailResponse details = purchasingTicketService.getPurchasingTicketDetails(id, detailId);
+            User user = (User) authentication.getPrincipal();
+            PurchasingTicketDetailResponse details = purchasingTicketService.getPurchasingTicketDetails(id, detailId, user);
             return ResponseEntity.ok(details);
         } catch (Exception e) {
             return ResponseEntity.notFound().build();

@@ -14,7 +14,8 @@ import {
   EnumValue,
   InventoryEnumsResponse,
   TransactionEnumsResponse,
-  AllSearchInventoryResponse
+  AllSearchInventoryResponse,
+  SetMinMaxResponse
 } from '../types/productInventory';
 import {
   MaterialInventoryQueryParams,
@@ -58,7 +59,18 @@ export const getMaterialInventoryFilter = async (params: any): Promise<any> => {
   if (params.size !== undefined) queryParams.append('size', params.size.toString());
   if (params.sort) queryParams.append('sort', params.sort);
 
-  const response = await apiClient.get(`/material-inventory/filter?${queryParams.toString()}`);
+  const url = `/material-inventory/filter?${queryParams.toString()}`;
+  console.log('=== MATERIAL INVENTORY API CALL ===');
+  console.log('URL:', url);
+  console.log('Params:', params);
+  console.log('====================================');
+  
+  const response = await apiClient.get(url);
+  
+  console.log('=== MATERIAL INVENTORY API RESPONSE ===');
+  console.log('Response data:', response.data);
+  console.log('=======================================');
+  
   return response.data;
 };
 
@@ -82,8 +94,8 @@ export const addMaterialStock = async (
   referenceDocumentId?: number,
   transactionSource?: string
 ): Promise<InventoryTransactionResponse> => {
-  const payload: StockModifyRequest = {
-    quantity: toBigDecimalString(quantity),
+  const payload = {
+    newQuantity: toBigDecimalString(quantity),
     note,
     referenceDocumentType,
     referenceDocumentId,
@@ -102,8 +114,8 @@ export const subtractMaterialStock = async (
   referenceDocumentId?: number,
   transactionSource?: string
 ): Promise<InventoryTransactionResponse> => {
-  const payload: StockModifyRequest = {
-    quantity: toBigDecimalString(quantity),
+  const payload = {
+    newQuantity: toBigDecimalString(quantity),
     note,
     referenceDocumentType,
     referenceDocumentId,
@@ -122,8 +134,8 @@ export const setMaterialStock = async (
   referenceDocumentId?: number,
   transactionSource?: string
 ): Promise<InventoryTransactionResponse> => {
-  const payload: StockSetRequest = {
-    quantity: toBigDecimalString(quantity),
+  const payload = {
+    newQuantity: toBigDecimalString(quantity),
     note,
     referenceDocumentType,
     referenceDocumentId,
@@ -138,8 +150,15 @@ export const setMaterialStock = async (
 export const createMaterialInventory = async (
   request: AddMaterialInventoryRequest
 ): Promise<AddMaterialInventoryResponse> => {
-  const response = await apiClient.post('/material-inventory/init', request);
-  return response.data;
+  try {
+    const response = await apiClient.post('/material-inventory/init', request);
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.status === 409 && error.response?.data?.error === 'MATERIAL_INVENTORY_ALREADY_EXISTS') {
+      throw new Error(`Material inventory already exists for SKU: ${request.materialVariantSku}. Cannot create duplicate inventory.`);
+    }
+    throw error;
+  }
 };
 
 // Helper function to convert number to BigDecimal string for backend
@@ -259,4 +278,64 @@ export const createBulkMInitInventoryRequest = (
     minAlertStock: minAlertStock ? toBigDecimalString(minAlertStock) : undefined,
     maxStockLevel: maxStockLevel ? toBigDecimalString(maxStockLevel) : undefined,
   };
+};
+
+// General method to perform stock transactions
+export const performStockTransaction = async (
+  endpoint: string,
+  requestData: {
+    quantity: number;
+    note?: string;
+    referenceDocumentType?: string;
+    referenceDocumentId?: number;
+    transactionSource?: string;
+  }
+): Promise<InventoryTransactionResponse> => {
+  const response = await apiClient.post(`/material-inventory${endpoint}`, requestData);
+  return response.data;
+};
+
+// Set minimum alert stock for a specific material variant
+export const setMinimumAlertStock = async (
+  variantId: number,
+  value: number
+): Promise<SetMinMaxResponse> => {
+  const request = {
+    value: toBigDecimalString(value)
+  };
+  const response = await apiClient.put(`/material-inventory/${variantId}/set-minimum`, request);
+  return response.data;
+};
+
+// Set maximum stock level for a specific material variant
+export const setMaximumStockLevel = async (
+  variantId: number,
+  value: number
+): Promise<SetMinMaxResponse> => {
+  const request = {
+    value: toBigDecimalString(value)
+  };
+  const response = await apiClient.put(`/material-inventory/${variantId}/set-maximum`, request);
+  return response.data;
+};
+
+// Export service object for easier usage
+export const materialInventoryService = {
+  getAllMaterialInventoryForAutocomplete,
+  getMaterialInventoryFilter,
+  getMaterialInventoryById,
+  getMaterialTransactionEnums,
+  addMaterialStock,
+  subtractMaterialStock,
+  setMaterialStock,
+  createMaterialInventory,
+  createMaterialInventoryRequest,
+  bulkSetMaterialStock,
+  bulkAddMaterialStock,
+  bulkSubtractMaterialStock,
+  bulkInitMaterialInventory,
+  createBulkMInitInventoryRequest,
+  performStockTransaction,
+  setMinimumAlertStock,
+  setMaximumStockLevel,
 }; 

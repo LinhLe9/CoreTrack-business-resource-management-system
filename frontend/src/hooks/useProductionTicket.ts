@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { productionTicketService, productionTicketUtils } from '@/services/productionTicketService';
+import { getErrorMessage } from '@/lib/utils';
 import {
   CreateProductionTicketRequest,
   CreateProductionTicketResponse,
@@ -168,7 +169,11 @@ export const useProductionTicket = () => {
   }, [getProductionTickets]);
 
   // Cancel production ticket detail
-  const cancelProductionTicketDetail = useCallback(async (ticketId: number, detailId: number, reason: string) => {
+  const cancelProductionTicketDetail = useCallback(async (
+    ticketId: number, 
+    detailId: number, 
+    reason: string
+  ) => {
     setCancelling(true);
     setError(null);
     try {
@@ -185,6 +190,27 @@ export const useProductionTicket = () => {
       setCancelling(false);
     }
   }, [getProductionTicketById, getProductionTicketDetails]);
+
+  // Delete production ticket from catalog
+  const deleteProductionTicket = useCallback(async (
+    ticketId: number, 
+    reason: string
+  ) => {
+    setCancelling(true);
+    setError(null);
+    try {
+      const result = await productionTicketService.deleteProductionTicket(ticketId, reason);
+      // Refresh the list after deletion
+      await getProductionTickets();
+      return result;
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to delete production ticket';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setCancelling(false);
+    }
+  }, [getProductionTickets]);
 
   // Get status transition rules
   const getStatusTransitionRules = useCallback(async () => {
@@ -303,6 +329,7 @@ export const useProductionTicket = () => {
     updateDetailStatus,
     cancelProductionTicket,
     cancelProductionTicketDetail,
+    deleteProductionTicket,
     getStatusTransitionRules,
     getAllProductionTicketStatuses,
     getAutoComplete,

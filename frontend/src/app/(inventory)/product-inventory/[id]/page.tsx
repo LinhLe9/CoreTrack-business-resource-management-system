@@ -18,11 +18,18 @@ import {
   Grid,
   GridItem,
   Container,
-
+  Button,
+  IconButton,
+  Alert,
+  AlertIcon,
 } from '@chakra-ui/react';
+import { EditIcon } from '@chakra-ui/icons';
 import { useParams, useRouter } from 'next/navigation';
 import { getProductInventoryById } from '../../../../services/productInventoryService';
 import { formatBigDecimal } from '../../../../lib/utils';
+import StockTransactionModal from '../../../../components/inventory/StockTransactionModal';
+import SetMinMaxModal from '../../../../components/inventory/SetMinMaxModal';
+import { useUser } from '../../../../hooks/useUser';
 
 interface ProductInventoryDetail {
   variantId: number;
@@ -60,10 +67,16 @@ const ProductInventoryDetailPage: React.FC = () => {
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSetModalOpen, setIsSetModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSubtractModalOpen, setIsSubtractModalOpen] = useState(false);
+  const [isMinModalOpen, setIsMinModalOpen] = useState(false);
+  const [isMaxModalOpen, setIsMaxModalOpen] = useState(false);
   const toast = useToast();
   const params = useParams();
   const router = useRouter();
   const variantId = params.id as string;
+  const { user, isOwner, isWarehouseStaff } = useUser();
 
   useEffect(() => {
     const fetchProductInventoryDetail = async () => {
@@ -154,6 +167,11 @@ const ProductInventoryDetailPage: React.FC = () => {
     return new Date(dateString).toLocaleString();
   };
 
+  const handleStockSuccess = () => {
+    // Refresh the page data
+    window.location.reload();
+  };
+
   if (loading) {
     return (
       <Box p={8} display="flex" justifyContent="center" alignItems="center" minH="400px">
@@ -213,8 +231,32 @@ const ProductInventoryDetailPage: React.FC = () => {
                           {formatBigDecimal(productInventory.currentStock)}
                         </Text>
                       </HStack>
-                      <Text><strong>Min Alert Stock:</strong> {formatBigDecimal(productInventory.minAlertStock)}</Text>
-                      <Text><strong>Max Stock Level:</strong> {formatBigDecimal(productInventory.maxStockLevel)}</Text>
+                      <HStack>
+                        <Text><strong>Min Alert Stock:</strong> {formatBigDecimal(productInventory.minAlertStock)}</Text>
+                        {(isOwner() || isWarehouseStaff()) && (
+                          <IconButton
+                            aria-label="Edit minimum alert stock"
+                            icon={<EditIcon />}
+                            size="sm"
+                            variant="ghost"
+                            colorScheme="blue"
+                            onClick={() => setIsMinModalOpen(true)}
+                          />
+                        )}
+                      </HStack>
+                      <HStack>
+                        <Text><strong>Max Stock Level:</strong> {formatBigDecimal(productInventory.maxStockLevel)}</Text>
+                        {(isOwner() || isWarehouseStaff()) && (
+                          <IconButton
+                            aria-label="Edit maximum stock level"
+                            icon={<EditIcon />}
+                            size="sm"
+                            variant="ghost"
+                            colorScheme="blue"
+                            onClick={() => setIsMaxModalOpen(true)}
+                          />
+                        )}
+                      </HStack>
                       <HStack>
                         <Text><strong>Status:</strong></Text>
                         <Badge colorScheme={getInventoryStatusColor(productInventory.inventoryStatus)}>
@@ -285,25 +327,25 @@ const ProductInventoryDetailPage: React.FC = () => {
                           </GridItem>
 
                           <GridItem>
-                            <VStack align="start" spacing={1}>
+                            <VStack align="end" spacing={1} pr={4}>
                               <Text fontSize="sm" color="gray.600">Quantity</Text>
                               <Text fontWeight="bold" color={getTransactionTypeColor(transaction.transactionType)}>
-                                {formatBigDecimal(transaction.quantity)}
+                                {transaction.quantity ? formatBigDecimal(transaction.quantity) : '-'}
                               </Text>
                             </VStack>
                           </GridItem>
 
                           <GridItem>
-                            <VStack align="start" spacing={1}>
+                            <VStack align="end" spacing={1} pr={4}>
                               <Text fontSize="sm" color="gray.600">Previous Stock</Text>
-                              <Text>{formatBigDecimal(transaction.previousStock)}</Text>
+                              <Text>{transaction.previousStock ? formatBigDecimal(transaction.previousStock) : '-'}</Text>
                             </VStack>
                           </GridItem>
 
                           <GridItem>
-                            <VStack align="start" spacing={1}>
+                            <VStack align="end" spacing={1} pr={4}>
                               <Text fontSize="sm" color="gray.600">New Stock</Text>
-                              <Text fontWeight="bold">{formatBigDecimal(transaction.newStock)}</Text>
+                              <Text fontWeight="bold">{transaction.newStock ? formatBigDecimal(transaction.newStock) : '-'}</Text>
                             </VStack>
                           </GridItem>
                         </Grid>
@@ -321,7 +363,117 @@ const ProductInventoryDetailPage: React.FC = () => {
             )}
           </CardBody>
         </Card>
+
+        {/* Action Buttons - At the bottom */}
+        <Card>
+          <CardBody>
+            <VStack spacing={4}>
+              <Text fontWeight="bold" fontSize="lg">Stock Actions</Text>
+              
+              {/* Role-based access control */}
+              {(isOwner() || isWarehouseStaff()) ? (
+                <HStack spacing={4} justify="center" flexWrap="wrap">
+                  <Button
+                    variant="outline"
+                    colorScheme="blue"
+                    borderWidth="2px"
+                    borderColor="blue.600"
+                    bg="white"
+                    _hover={{ bg: 'blue.50' }}
+                    onClick={() => setIsSetModalOpen(true)}
+                  >
+                    Set Stock
+                  </Button>
+                  <Button
+                    variant="outline"
+                    colorScheme="green"
+                    borderWidth="2px"
+                    borderColor="green.600"
+                    bg="white"
+                    _hover={{ bg: 'green.50' }}
+                    onClick={() => setIsAddModalOpen(true)}
+                  >
+                    Add Stock
+                  </Button>
+                  <Button
+                    variant="outline"
+                    colorScheme="red"
+                    borderWidth="2px"
+                    borderColor="red.600"
+                    bg="white"
+                    _hover={{ bg: 'red.50' }}
+                    onClick={() => setIsSubtractModalOpen(true)}
+                  >
+                    Subtract Stock
+                  </Button>
+                </HStack>
+              ) : (
+                <Alert status="info">
+                  <AlertIcon />
+                  Only OWNER and WAREHOUSE_STAFF can perform stock actions.
+                </Alert>
+              )}
+            </VStack>
+          </CardBody>
+        </Card>
       </VStack>
+
+      {/* Set Stock Modal */}
+      <StockTransactionModal
+        isOpen={isSetModalOpen}
+        onClose={() => setIsSetModalOpen(false)}
+        variantId={parseInt(variantId)}
+        variantSku={productInventory.variantSku}
+        variantName={productInventory.variantName || productInventory.productName}
+        transactionType="set"
+        onSuccess={handleStockSuccess}
+      />
+
+      {/* Add Stock Modal */}
+      <StockTransactionModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        variantId={parseInt(variantId)}
+        variantSku={productInventory.variantSku}
+        variantName={productInventory.variantName || productInventory.productName}
+        transactionType="add"
+        onSuccess={handleStockSuccess}
+      />
+
+      {/* Subtract Stock Modal */}
+      <StockTransactionModal
+        isOpen={isSubtractModalOpen}
+        onClose={() => setIsSubtractModalOpen(false)}
+        variantId={parseInt(variantId)}
+        variantSku={productInventory.variantSku}
+        variantName={productInventory.variantName || productInventory.productName}
+        transactionType="subtract"
+        onSuccess={handleStockSuccess}
+      />
+
+      {/* Set Minimum Alert Stock Modal */}
+      <SetMinMaxModal
+        isOpen={isMinModalOpen}
+        onClose={() => setIsMinModalOpen(false)}
+        variantId={parseInt(variantId)}
+        variantSku={productInventory.variantSku}
+        variantName={productInventory.variantName || productInventory.productName}
+        type="minimum"
+        currentValue={productInventory.minAlertStock}
+        onSuccess={handleStockSuccess}
+      />
+
+      {/* Set Maximum Stock Level Modal */}
+      <SetMinMaxModal
+        isOpen={isMaxModalOpen}
+        onClose={() => setIsMaxModalOpen(false)}
+        variantId={parseInt(variantId)}
+        variantSku={productInventory.variantSku}
+        variantName={productInventory.variantName || productInventory.productName}
+        type="maximum"
+        currentValue={productInventory.maxStockLevel}
+        onSuccess={handleStockSuccess}
+      />
     </Container>
   );
 };

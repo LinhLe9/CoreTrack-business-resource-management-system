@@ -3,6 +3,9 @@ package org.example.coretrack.dto.material.Inventory;
 import java.math.BigDecimal;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import org.example.coretrack.dto.product.inventory.InventoryTransactionResponse;
 
 public class MaterialInventoryDetailResponse {
@@ -11,9 +14,19 @@ public class MaterialInventoryDetailResponse {
     private String materialSku;
     private String variantSku;
     private String variantName;
+    
+    @JsonSerialize(using = ToStringSerializer.class)
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
     private BigDecimal currentStock;
+    
+    @JsonSerialize(using = ToStringSerializer.class)
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
     private BigDecimal minAlertStock;
+    
+    @JsonSerialize(using = ToStringSerializer.class)
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
     private BigDecimal maxStockLevel;
+    
     private String inventoryStatus;
     private String materialGroup;
     private String imageUrl;

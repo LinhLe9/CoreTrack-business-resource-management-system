@@ -1,17 +1,23 @@
 import type { Metadata } from "next";
-import { Roboto } from 'next/font/google';
+import { Roboto, Poppins } from 'next/font/google';
 import "./globals.css";
 import { Providers } from "./providers";
-import Header from '../components/general/header';
+import HeaderWrapper from '@/components/general/HeaderWrapper';
 import ClientOnly from '../components/auth/ClientOnly';
 import SessionExpiredHandler from '../components/auth/SessionExpiredHandler';
 import TokenExpirationChecker from '../components/auth/TokenExpirationChecker';
-import BackendStatus from '../components/general/BackendStatus';
+// import BackendStatus from '../components/general/BackendStatus';
 
 const roboto = Roboto({
   variable: "--font-roboto",
   subsets: ["latin"],
   weight: ["400", "500", "700"],
+});
+
+const poppins = Poppins({
+  variable: "--font-poppins",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
 export const metadata: Metadata = {
@@ -26,14 +32,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={roboto.variable}>
+      <body className={`${roboto.variable} ${poppins.variable}`}>
         <Providers>
           <ClientOnly>
             <SessionExpiredHandler />
             <TokenExpirationChecker />
-            <BackendStatus />
+            {/* <BackendStatus /> */}
           </ClientOnly>
-          <Header />
+          <HeaderWrapper />
           {children}
         </Providers>
       </body>

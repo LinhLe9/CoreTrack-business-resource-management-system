@@ -1,14 +1,26 @@
 // components/inventory/ProductInventoryCard.tsx
 import React, { useState } from 'react';
-import { 
-  Box, Image, Text, Heading, VStack, Tag, TagLabel, Flex, HStack, 
-  IconButton, useDisclosure, Checkbox 
+import {
+  Box,
+  VStack,
+  HStack,
+  Text,
+  Badge,
+  Flex,
+  IconButton,
+  Checkbox,
+  Tag,
+  TagLabel,
+  useDisclosure,
+  Heading,
+  Image,
 } from '@chakra-ui/react';
-import { AddIcon, MinusIcon } from '@chakra-ui/icons';
-import { SearchInventoryResponse } from '../../types/productInventory';
+import { AddIcon, MinusIcon, SettingsIcon } from '@chakra-ui/icons';
 import NextLink from 'next/link';
+import { SearchInventoryResponse } from '../../types/productInventory';
+import ProductStockTransactionModal from './ProductStockTransactionModal';
+import { useUser } from '../../hooks/useUser';
 import { formatBigDecimal } from '../../lib/utils';
-import StockTransactionModal from './StockTransactionModal';
 
 interface ProductInventoryCardProps {
   productInventory: SearchInventoryResponse;
@@ -18,15 +30,20 @@ interface ProductInventoryCardProps {
   onSelectionChange?: (variantId: number, isSelected: boolean) => void;
 }
 
-const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({ 
-  productInventory, 
+const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
+  productInventory,
   onStockUpdate,
   isSelectionMode = false,
   isSelected = false,
-  onSelectionChange
+  onSelectionChange,
 }) => {
   const { isOpen: isAddModalOpen, onOpen: onAddModalOpen, onClose: onAddModalClose } = useDisclosure();
   const { isOpen: isSubtractModalOpen, onOpen: onSubtractModalOpen, onClose: onSubtractModalClose } = useDisclosure();
+  const { isOpen: isSetModalOpen, onOpen: onSetModalOpen, onClose: onSetModalClose } = useDisclosure();
+  const { isOwner, isWarehouseStaff } = useUser();
+
+  // Check if user has permission for inventory operations
+  const hasInventoryPermission = () => isOwner() || isWarehouseStaff();
 
   const getInventoryStatusColor = (status: string) => {
     switch (status) {
@@ -83,7 +100,7 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
         <Flex gap={4} align="stretch" direction={{ base: "row", lg: "row" }}>
           {/* Column 1: Selection Checkbox */}
           {isSelectionMode && (
-            <Box display="flex" alignItems="center" justifyContent="center" flexShrink={0}>
+            <Box display="flex" alignItems="center" justifyContent="center" flexShrink={0} position="relative" zIndex={10}>
               <Checkbox
                 isChecked={isSelected}
                 onChange={handleSelectionChange}
@@ -129,7 +146,7 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
               <Heading size="md" noOfLines={2} lineHeight="1.2">
                 {productInventory.name}
               </Heading>
-              
+
               {/* SKU - Small font */}
               <Text fontSize="sm" color="gray.600">
                 SKU: {productInventory.sku}
@@ -137,11 +154,11 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
 
               {/* Product Group Tag */}
               {productInventory.group && (
-                <Tag 
-                  size="sm" 
-                  variant="outline" 
-                  colorScheme="gray" 
-                  borderRadius="full" 
+                <Tag
+                  size="sm"
+                  variant="outline"
+                  colorScheme="gray"
+                  borderRadius="full"
                   alignSelf="flex-start"
                   bg="transparent"
                   borderColor="gray.300"
@@ -183,7 +200,7 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
           </Box>
 
           {/* Column 4: Action Buttons - Vertical layout */}
-          {!isSelectionMode && (
+          {!isSelectionMode && hasInventoryPermission() && (
             <Box flexShrink={0} display="flex" flexDirection="column" gap={2} alignSelf={{ base: "center", lg: "flex-start" }} position="relative" zIndex={10}>
               <IconButton
                 aria-label="Add stock"
@@ -213,16 +230,30 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
                 _hover={{ transform: 'scale(1.1)' }}
                 transition="all 0.2s"
               />
+              <IconButton
+                aria-label="Set stock"
+                icon={<SettingsIcon />}
+                size="sm"
+                colorScheme="blue"
+                variant="solid"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onSetModalOpen();
+                }}
+                _hover={{ transform: 'scale(1.1)' }}
+                transition="all 0.2s"
+              />
             </Box>
           )}
         </Flex>
 
-        {/* Clickable overlay for navigation - excluding action buttons area */}
+        {/* Clickable overlay for navigation - excluding action buttons area and checkbox area in selection mode */}
         <NextLink href={`/product-inventory/${productInventory.id}`} passHref>
           <Box
             position="absolute"
             top={0}
-            left={0}
+            left={isSelectionMode ? "60px" : 0} // Exclude checkbox area in selection mode
             right={!isSelectionMode ? "60px" : 0} // Exclude space for action buttons
             bottom={0}
             cursor="pointer"
@@ -235,7 +266,7 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
       </Box>
 
       {/* Add Stock Modal */}
-      <StockTransactionModal
+      <ProductStockTransactionModal
         isOpen={isAddModalOpen}
         onClose={onAddModalClose}
         variantId={productInventory.id}
@@ -246,13 +277,24 @@ const ProductInventoryCard: React.FC<ProductInventoryCardProps> = React.memo(({
       />
 
       {/* Subtract Stock Modal */}
-      <StockTransactionModal
+      <ProductStockTransactionModal
         isOpen={isSubtractModalOpen}
         onClose={onSubtractModalClose}
         variantId={productInventory.id}
         variantSku={productInventory.sku}
         variantName={productInventory.name}
         transactionType="subtract"
+        onSuccess={handleStockUpdate}
+      />
+
+      {/* Set Stock Modal */}
+      <ProductStockTransactionModal
+        isOpen={isSetModalOpen}
+        onClose={onSetModalClose}
+        variantId={productInventory.id}
+        variantSku={productInventory.sku}
+        variantName={productInventory.name}
+        transactionType="set"
         onSuccess={handleStockUpdate}
       />
     </>

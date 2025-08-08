@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from "next/navigation";
 import {
-  Box, Button, FormControl, FormLabel, Input, Heading, VStack, useToast
+  Box, Button, FormControl, FormLabel, Input, Heading, VStack, useToast, Text, Link
 } from '@chakra-ui/react';
 import api, { resetLogoutFlag } from '@/lib/axios';
 import notificationPollingService from '@/services/websocketService';
@@ -20,6 +20,12 @@ export default function LoginForm() {
     try {
       const res = await api.post('/auth/login', { email, password });
 
+      console.log('=== Login Response Debug ===');
+      console.log('Full response:', res.data);
+      console.log('Token:', res.data.token);
+      console.log('User data:', res.data);
+      console.log('==========================');
+
       // Reset logout flag on successful login
       resetLogoutFlag();
 
@@ -27,6 +33,18 @@ export default function LoginForm() {
       const token = res.data.token;
       localStorage.removeItem("token");
       localStorage.setItem("token", token);
+
+      // Save user data from AuthResponse
+      const userData = {
+        id: res.data.id,
+        username: res.data.username,
+        email: res.data.email,
+        role: res.data.role,
+        enabled: res.data.enabled
+      };
+      localStorage.removeItem("user");
+      localStorage.setItem("user", JSON.stringify(userData));
+      console.log('User data saved to localStorage:', userData);
 
       // Start notification polling after successful login
       notificationPollingService.startAfterLogin();
@@ -78,6 +96,18 @@ export default function LoginForm() {
           <Button type="submit" colorScheme="blue" width="full">
             Login
           </Button>
+
+          <Text textAlign="center" fontSize="sm" color="gray.600">
+            Forgot your password?{' '}
+            <Link 
+              color="blue.500" 
+              onClick={() => router.push('/forgot-password')}
+              _hover={{ textDecoration: 'underline' }}
+              cursor="pointer"
+            >
+              Click here
+            </Link>
+          </Text>
         </VStack>
       </form>
     </Box>

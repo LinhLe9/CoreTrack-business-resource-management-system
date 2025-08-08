@@ -11,7 +11,8 @@ import org.example.coretrack.model.notification.NotificationType;
 import org.example.coretrack.model.product.inventory.InventoryStatus;
 import org.example.coretrack.model.product.inventory.ProductInventory;
 import org.example.coretrack.repository.NotificationRepository;
-import org.example.coretrack.service.WebSocketNotificationService;
+import org.example.coretrack.repository.NotificationUserRepository;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,7 +26,9 @@ public class NotificationServiceImpl implements NotificationService {
     private NotificationRepository notificationRepository;
     
     @Autowired
-    private WebSocketNotificationService webSocketNotificationService;
+    private NotificationUserRepository notificationUserRepository;
+    
+
     
     @Override
     @Transactional
@@ -39,16 +42,37 @@ public class NotificationServiceImpl implements NotificationService {
             String title = getNotificationTitle(newStatus, productInventory);
             String message = getNotificationMessage(newStatus, productInventory);
             
-            Notification notification = new Notification(user, productInventory, notificationType, title, message);
+            Notification notification = new Notification(productInventory, notificationType, title, message);
+            notification.addUser(user);
             notificationRepository.save(notification);
             
-            // Send real-time notification via WebSocket
-            NotificationResponse notificationResponse = convertToResponse(notification);
-            webSocketNotificationService.sendNotificationToUser(user.getUsername(), notificationResponse);
-            webSocketNotificationService.sendUnreadCountToUser(user.getUsername(), (int) getUnreadCount(user));
+            // Notification created successfully
             
             System.out.println("Created notification: " + notificationType + " for product: " + 
-                             productInventory.getProductVariant().getName());
+                             productInventory.getProductVariant().getName() + " for user: " + user.getUsername());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void createInventoryNotification(List<User> users, ProductInventory productInventory, 
+                                        InventoryStatus oldStatus, InventoryStatus newStatus) {
+        
+        // Only create notification if status changed to alarm status
+        if (isAlarmStatus(newStatus) && !newStatus.equals(oldStatus)) {
+            
+            NotificationType notificationType = getNotificationType(newStatus);
+            String title = getNotificationTitle(newStatus, productInventory);
+            String message = getNotificationMessage(newStatus, productInventory);
+            
+            Notification notification = new Notification(productInventory, notificationType, title, message);
+            notification.addUsers(users);
+            notificationRepository.save(notification);
+            
+            // Notifications created successfully for all users
+            
+            System.out.println("Created notification: " + notificationType + " for product: " + 
+                             productInventory.getProductVariant().getName() + " for " + users.size() + " users");
         }
     }
 
@@ -64,66 +88,190 @@ public class NotificationServiceImpl implements NotificationService {
             String title = getMaterialNotificationTitle(newStatus, materialInventory);
             String message = getMaterialNotificationMessage(newStatus, materialInventory);
             
-            Notification notification = new Notification(user, materialInventory, notificationType, title, message);
+            Notification notification = new Notification(materialInventory, notificationType, title, message);
+            notification.addUser(user);
             notificationRepository.save(notification);
             
-            // Send real-time notification via WebSocket
-            NotificationResponse notificationResponse = convertToResponse(notification);
-            webSocketNotificationService.sendNotificationToUser(user.getUsername(), notificationResponse);
-            webSocketNotificationService.sendUnreadCountToUser(user.getUsername(), (int) getUnreadCount(user));
+            // Notification created successfully
             
             System.out.println("Created notification: " + notificationType + " for material: " + 
-                             materialInventory.getMaterialVariant().getName());
+                             materialInventory.getMaterialVariant().getName() + " for user: " + user.getUsername());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void createMaterialInventoryNotification(List<User> users, MaterialInventory materialInventory, 
+                                                InventoryStatus oldStatus, InventoryStatus newStatus) {
+        
+        // Only create notification if status changed to alarm status
+        if (isAlarmStatus(newStatus) && !newStatus.equals(oldStatus)) {
+            
+            NotificationType notificationType = getNotificationType(newStatus);
+            String title = getMaterialNotificationTitle(newStatus, materialInventory);
+            String message = getMaterialNotificationMessage(newStatus, materialInventory);
+            
+            Notification notification = new Notification(materialInventory, notificationType, title, message);
+            notification.addUsers(users);
+            notificationRepository.save(notification);
+            
+            // Notifications created successfully for all users
+            
+            System.out.println("Created notification: " + notificationType + " for material: " + 
+                             materialInventory.getMaterialVariant().getName() + " for " + users.size() + " users");
         }
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<NotificationResponse> getUserNotifications(User user, Pageable pageable) {
-        Page<Notification> notifications = notificationRepository.findByUserOrderByCreatedAtDesc(user, pageable);
+        Page<org.example.coretrack.model.notification.NotificationUser> notificationUsers = 
+            notificationUserRepository.findByUserOrderByCreatedAtDesc(user, pageable);
         
-        return notifications.map(this::convertToResponse);
+        return notificationUsers.map(nu -> convertToResponse(nu.getNotification(), user));
     }
     
     @Override
     @Transactional(readOnly = true)
     public long getUnreadCount(User user) {
-        return notificationRepository.countByUserAndIsReadFalse(user);
+        return notificationUserRepository.countByUserAndIsReadFalse(user);
     }
     
     @Override
     @Transactional
     public void markAsRead(Long notificationId, User user) {
-        notificationRepository.markAsRead(notificationId, user);
+        System.out.println("=== Starting markAsRead ===");
+        System.out.println("Notification ID: " + notificationId);
+        System.out.println("User: " + user.getUsername());
+        
+        try {
+            // Find the notification first
+            Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new RuntimeException("Notification not found with ID: " + notificationId));
+            
+            // Find the NotificationUser for this specific user and notification
+            org.example.coretrack.model.notification.NotificationUser notificationUser = 
+                notificationUserRepository.findByNotificationAndUser(notification, user);
+            
+            if (notificationUser == null) {
+                throw new RuntimeException("NotificationUser not found for notification ID: " + notificationId + " and user: " + user.getUsername());
+            }
+            
+            // Mark the NotificationUser as read using its ID
+            notificationUserRepository.markAsRead(notificationUser.getId(), user, java.time.LocalDateTime.now());
+            System.out.println("Successfully marked notification as read");
+        } catch (Exception e) {
+            System.err.println("Error marking notification as read: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
     
     @Override
     @Transactional
     public void markAllAsRead(User user) {
-        notificationRepository.markAllAsRead(user);
+        System.out.println("=== Starting markAllAsRead ===");
+        System.out.println("User: " + user.getUsername());
+        
+        try {
+            notificationUserRepository.markAllAsRead(user, java.time.LocalDateTime.now());
+            System.out.println("Successfully marked all notifications as read");
+        } catch (Exception e) {
+            System.err.println("Error marking all notifications as read: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
     
     @Override
     @Transactional
     public void deleteNotification(Long notificationId, User user) {
-        // Check if notification belongs to user before deleting
+        // Find the notification first
         Notification notification = notificationRepository.findById(notificationId)
-            .orElseThrow(() -> new RuntimeException("Notification not found"));
-            
-        if (!notification.getUser().getId().equals(user.getId())) {
+            .orElseThrow(() -> new RuntimeException("Notification not found with ID: " + notificationId));
+        
+        // Find the NotificationUser for this specific user and notification
+        org.example.coretrack.model.notification.NotificationUser notificationUser = 
+            notificationUserRepository.findByNotificationAndUser(notification, user);
+        
+        if (notificationUser == null) {
+            throw new RuntimeException("NotificationUser not found for notification ID: " + notificationId + " and user: " + user.getUsername());
+        }
+        
+        // Check if notification belongs to user before deleting
+        if (!notificationUser.getUser().getId().equals(user.getId())) {
             throw new RuntimeException("Unauthorized to delete this notification");
         }
         
-        notificationRepository.deleteById(notificationId);
+        notificationUserRepository.deleteById(notificationUser.getId());
     }
     
     @Override
     @Transactional(readOnly = true)
     public List<NotificationResponse> getNotificationsByType(User user, NotificationType type) {
-        List<Notification> notifications = notificationRepository.findByUserAndTypeOrderByCreatedAtDesc(user, type);
-        return notifications.stream()
-            .map(this::convertToResponse)
+        List<org.example.coretrack.model.notification.NotificationUser> notificationUsers = 
+            notificationUserRepository.findByUserAndNotification_TypeOrderByCreatedAtDesc(user, type);
+        return notificationUsers.stream()
+            .map(nu -> convertToResponse(nu.getNotification(), user))
             .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional
+    public void createTicketNotification(Notification notification) {
+        System.out.println("=== DEBUG: Creating ticket notification ===");
+        System.out.println("Notification type: " + notification.getType());
+        System.out.println("Title: " + notification.getTitle());
+        System.out.println("Message: " + notification.getMessage());
+        System.out.println("Users count: " + notification.getNotificationUsers().size());
+        System.out.println("==========================================");
+        
+        notificationRepository.save(notification);
+        
+        // Notifications sent successfully to all users
+        for (org.example.coretrack.model.notification.NotificationUser nu : notification.getNotificationUsers()) {
+            User user = nu.getUser();
+            NotificationResponse notificationResponse = convertToResponse(notification, user);
+            // Notification sent successfully
+        }
+        
+        System.out.println("Created ticket notification: " + notification.getType() + " for " + 
+                         notification.getNotificationUsers().size() + " users");
+    }
+    
+    @Override
+    @Transactional
+    public void createTicketNotification(Notification notification, List<User> users) {
+        notification.addUsers(users);
+        createTicketNotification(notification);
+    }
+    
+    @Override
+    @Transactional
+    public void createGeneralNotification(List<User> users, NotificationType type, String title, String message) {
+        Notification notification = new Notification(type, title, message);
+        notification.addUsers(users);
+        notificationRepository.save(notification);
+        
+        // Notifications sent successfully to all users
+        
+        System.out.println("Created general notification: " + type + " for " + users.size() + " users");
+    }
+    
+    @Override
+    @Transactional
+    public void createTestNotification(User user) {
+        Notification notification = new Notification(
+            NotificationType.INVENTORY_LOW_STOCK, 
+            "Test Notification", 
+            "This is a test notification to verify the notification system is working properly."
+        );
+        notification.addUser(user);
+        notificationRepository.save(notification);
+        
+        // Notification created successfully
+        
+        System.out.println("Created test notification for user: " + user.getUsername());
     }
     
     // Helper methods
@@ -224,21 +372,7 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
     
-    @Override
-    @Transactional
-    public void createTicketNotification(Notification notification) {
-        notificationRepository.save(notification);
-        
-        // Send real-time notification via WebSocket
-        NotificationResponse notificationResponse = convertToResponse(notification);
-        webSocketNotificationService.sendNotificationToUser(notification.getUser().getUsername(), notificationResponse);
-        webSocketNotificationService.sendUnreadCountToUser(notification.getUser().getUsername(), (int) getUnreadCount(notification.getUser()));
-        
-        System.out.println("Created ticket notification: " + notification.getType() + " for user: " + 
-                         notification.getUser().getUsername());
-    }
-    
-    private NotificationResponse convertToResponse(Notification notification) {
+    private NotificationResponse convertToResponse(Notification notification, User user) {
         ProductInventory productInventory = notification.getProductInventory();
         MaterialInventory materialInventory = notification.getMaterialInventory();
         
@@ -252,14 +386,24 @@ public class NotificationServiceImpl implements NotificationService {
         String materialImageUrl = materialInventory != null ? materialInventory.getMaterialVariant().getImageUrl() : null;
         Long materialInventoryId = materialInventory != null ? materialInventory.getId() : null;
         
+        // Find the NotificationUser for this specific user
+        org.example.coretrack.model.notification.NotificationUser notificationUser = 
+            notification.getNotificationUsers().stream()
+                .filter(nu -> nu.getUser().equals(user))
+                .findFirst()
+                .orElse(null);
+        
+        boolean isRead = notificationUser != null ? notificationUser.isRead() : false;
+        java.time.LocalDateTime readAt = notificationUser != null ? notificationUser.getReadAt() : null;
+        
         return new NotificationResponse(
             notification.getId(),
             notification.getType(),
             notification.getTitle(),
             notification.getMessage(),
-            notification.isRead(),
+            isRead,
             notification.getCreatedAt(),
-            notification.getReadAt(),
+            readAt,
             productInventoryId,
             productName,
             productSku,

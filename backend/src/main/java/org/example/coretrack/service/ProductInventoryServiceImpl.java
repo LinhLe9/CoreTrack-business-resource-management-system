@@ -15,6 +15,8 @@ import org.example.coretrack.dto.product.inventory.ProductInventoryDetailRespons
 import org.example.coretrack.dto.product.inventory.SearchInventoryResponse;
 import org.example.coretrack.dto.product.inventory.StockModifyRequest;
 import org.example.coretrack.dto.product.inventory.StockSetRequest;
+import org.example.coretrack.dto.product.inventory.SetMinMaxRequest;
+import org.example.coretrack.dto.product.inventory.SetMinMaxResponse;
 import org.example.coretrack.dto.product.inventory.BulkStockModifyRequest;
 import org.example.coretrack.dto.product.inventory.BulkStockSetRequest;
 import org.example.coretrack.dto.product.inventory.BulkInventoryTransactionResponse;
@@ -47,6 +49,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import org.springframework.transaction.annotation.Transactional;
+import org.example.coretrack.exception.ProductInventoryAlreadyExistsException;
+import org.example.coretrack.service.SendGridEmailService;
+import org.example.coretrack.service.NotificationTargetService;
 
 @Service
 public class ProductInventoryServiceImpl implements ProductInventoryService{
@@ -62,23 +67,29 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
 
     @Autowired
     private NotificationService notificationService;
+    
+    @Autowired
+    private NotificationTargetService notificationTargetService;
+
+    @Autowired
+    private EmailSendingService emailSendingService;
 
     @Override
     @Transactional
     public AddProductInventoryResponse createProductInventory(AddProductInventoryRequest request, User user) {
-        System.out.println("=== CREATE PRODUCT INVENTORY DEBUG ===");
-        System.out.println("Request SKU: " + request.getProductVariantSku());
-        System.out.println("Current Stock: " + request.getCurrentStock());
-        System.out.println("Min Alert Stock: " + request.getMinAlertStock());
-        System.out.println("Max Stock Level: " + request.getMaxStockLevel());
-        System.out.println("User: " + user.getUsername());
-        System.out.println("=====================================");
-        
-        ProductVariant productVariant = productVariantRepository.findBySku(request.getProductVariantSku())
-            .orElseThrow(() -> new RuntimeException("Product not found with SKU: " + request.getProductVariantSku()));
+        ProductVariant productVariant = productVariantRepository.findBySkuAndCompany(request.getProductVariantSku(), user.getCompany())
+            .orElseThrow(() -> new RuntimeException("Product not found with SKU: " + request.getProductVariantSku() + " for company: " + user.getCompany().getName()));
 
         if (productVariant.getStatus() == ProductStatus.DELETED) {
             throw new RuntimeException("Product was deleted, cannot initialize the stock quantity");
+        }
+
+        // Check if ProductInventory already exists for this ProductVariant
+        Optional<ProductInventory> existingInventory = productInventoryRepository.findByProductVariant_IdAndProductVariant_Product_Company(
+                                                                                                            productVariant.getId(), user.getCompany());
+        if (existingInventory.isPresent()) {
+            throw new ProductInventoryAlreadyExistsException("Product inventory already exists for SKU: " + request.getProductVariantSku() + 
+                ". Cannot create duplicate inventory.");
         }
 
         String inventoryStatus = request.getCurrentStock().compareTo(BigDecimal.ZERO) == 0
@@ -141,7 +152,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
     @Override
     @Transactional
     public InventoryTransactionResponse setStock(Long variantId, StockSetRequest request, User user) {
-        ProductVariant productVariant = productVariantRepository.findById(variantId)
+        ProductVariant productVariant = productVariantRepository.findByIdAndCompany(variantId, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Product not found with id: " + variantId));
 
         if (productVariant.getStatus() == ProductStatus.DELETED) {
@@ -153,7 +164,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
         } catch (IllegalArgumentException e) {
             System.err.println("Invalid Reference Document type" + request.getReferenceDocumentType());
         }
-        Optional<ProductInventory> optionalInventory = productInventoryRepository.findByProductVariant_Id(variantId);
+        Optional<ProductInventory> optionalInventory = productInventoryRepository.findByProductVariant_IdAndProductVariant_Product_Company(variantId, user.getCompany());
         
         ProductInventory productInventory;
         if (optionalInventory.isPresent()) {
@@ -190,6 +201,9 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             // Create notification if status changed to alarm status
             if (!oldStatus.equals(status)) {
                 notificationService.createInventoryNotification(user, productInventory, oldStatus, status);
+
+                // Send email alerts for inventory status changes
+                emailSendingService.sendProductInventoryStatusEmailAlert(productInventory, oldStatus, status);
             }
             
             return new InventoryTransactionResponse(
@@ -227,12 +241,9 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
 
             inventoryLogList.add(inventoryLog);
 
-            InventoryStatus status;
-            if (request.getNewQuantity().compareTo(BigDecimal.ZERO)==0){
-                status = InventoryStatus.OUT_OF_STOCK;
-            } else {
-                status = InventoryStatus.IN_STOCK;
-            }
+            InventoryStatus status = handelStatus(request.getNewQuantity(), null, 
+                                                    null, null, null);
+            
             productInventory = new ProductInventory(
                 productVariant,
                 request.getNewQuantity(),
@@ -267,7 +278,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
     @Override
     @Transactional
     public InventoryTransactionResponse addStock(Long variantId, StockModifyRequest request, User user) {
-        ProductVariant productVariant = productVariantRepository.findById(variantId)
+        ProductVariant productVariant = productVariantRepository.findByIdAndCompany(variantId, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Product not found with id: " + variantId));
 
         if (productVariant.getStatus() == ProductStatus.DELETED) {
@@ -286,7 +297,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
         } catch (IllegalArgumentException e){
             System.err.println("Invalid Reference Document type" + request.getReferenceDocumentType());
         }
-        Optional<ProductInventory> optionalInventory = productInventoryRepository.findByProductVariant_Id(variantId);
+        Optional<ProductInventory> optionalInventory = productInventoryRepository.findByProductVariant_IdAndProductVariant_Product_Company(variantId, user.getCompany());
         
         ProductInventory productInventory;
         if (optionalInventory.isPresent()) {
@@ -323,6 +334,9 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             // Create notification if status changed to alarm status
             if (!oldStatus.equals(status)) {
                 notificationService.createInventoryNotification(user, productInventory, oldStatus, status);
+                
+                // Send email alerts for inventory status changes
+                emailSendingService.sendProductInventoryStatusEmailAlert(productInventory, oldStatus, status);
             }
             
             return new InventoryTransactionResponse(
@@ -358,6 +372,8 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
                 user
             );
 
+            InventoryStatus status = handelStatus(request.getNewQuantity(), null, 
+                                                    null, null, null);
             inventoryLogList.add(inventoryLog);
             productInventory = new ProductInventory(
                 productVariant,
@@ -365,7 +381,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
                 null,
                 null,
                 inventoryLogList,
-                InventoryStatus.IN_STOCK,
+                status,
                 user
             );
 
@@ -390,7 +406,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
     @Override
     @Transactional
     public InventoryTransactionResponse subtractStock(Long variantId, StockModifyRequest request, User user) {
-        ProductVariant productVariant = productVariantRepository.findById(variantId)
+        ProductVariant productVariant = productVariantRepository.findByIdAndCompany(variantId, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Product not found with id: " + variantId));
 
         if (productVariant.getStatus() == ProductStatus.DELETED) {
@@ -409,7 +425,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
         } catch (IllegalArgumentException e){
             System.err.println("Invalid Reference Document type" + request.getReferenceDocumentType());
         }
-        Optional<ProductInventory> optionalInventory = productInventoryRepository.findByProductVariant_Id(variantId);
+        Optional<ProductInventory> optionalInventory = productInventoryRepository.findByProductVariant_IdAndProductVariant_Product_Company(variantId, user.getCompany());
         
         ProductInventory productInventory;
         if (optionalInventory.isPresent()) {
@@ -450,6 +466,9 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             // Create notification if status changed to alarm status
             if (!oldStatus.equals(status)) {
                 notificationService.createInventoryNotification(user, productInventory, oldStatus, status);
+                
+                // Send email alerts for inventory status changes
+                emailSendingService.sendProductInventoryStatusEmailAlert(productInventory, oldStatus, status);
             }
             
             return new InventoryTransactionResponse(
@@ -477,13 +496,8 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
         String search, 
         List<String> groupProducts,
         List<String> inventoryStatus, 
-        Pageable pageable) {
-        
-        System.out.println("=== FIND PRODUCT INVENTORY DEBUG ===");
-        System.out.println("Search: " + search);
-        System.out.println("Group Products (String): " + groupProducts);
-        System.out.println("Inventory Status (String): " + inventoryStatus);
-        System.out.println("Pageable: " + pageable);
+        Pageable pageable,
+        User user) {
         
         // Convert List<String> to List<Long> for groupProducts
         List<Long> groupProductIds = null;
@@ -509,16 +523,8 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
                 .collect(Collectors.toList());
         }
         
-        System.out.println("Group Product IDs: " + groupProductIds);
-        System.out.println("Inventory Status List: " + inventoryStatusList);
-        
         Page<SearchInventoryResponse> result = productInventoryRepository.searchInventoryByCriteria(
-            search, groupProductIds, inventoryStatusList, pageable);
-            
-        System.out.println("Result total elements: " + result.getTotalElements());
-        System.out.println("Result content size: " + result.getContent().size());
-        System.out.println("Result content: " + result.getContent());
-        System.out.println("=====================================");
+            search, groupProductIds, inventoryStatusList, user.getCompany(), pageable);
         
         return result;
     }
@@ -538,10 +544,10 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
         BigDecimal available = currentQ.subtract(allocatedQ);
         BigDecimal projected = currentQ.add(futureQ);
     
-        if (available.compareTo(minQ) < 0) {
-            return InventoryStatus.LOW_STOCK;
-        } else if (available.compareTo(BigDecimal.ZERO) == 0) {
+        if (currentQ.compareTo(BigDecimal.ZERO) == 0){
             return InventoryStatus.OUT_OF_STOCK;
+        } else if (available.compareTo(minQ) <= 0) {
+            return InventoryStatus.LOW_STOCK;
         } else if (projected.compareTo(maxQ) > 0){
             return InventoryStatus.OVER_STOCK;
         }
@@ -549,17 +555,17 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
     }
 
     @Override
-    public List<AllSearchInventoryResponse> getAllForAutocomplete(String search) {
+    public List<AllSearchInventoryResponse> getAllForAutocomplete(String search, User user) {
         // handle search
         String processedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
-        List<AllSearchInventoryResponse> response = productInventoryRepository.searchInventory(processedSearch);
+        List<AllSearchInventoryResponse> response = productInventoryRepository.searchInventory(processedSearch, user.getCompany());
         return response;
     }
 
     @Transactional(readOnly = true)
     @Override
-    public ProductInventoryDetailResponse getProductInventoryById(Long variantId) {
-        ProductInventory inventory = productInventoryRepository.findByProductVariant_Id(variantId)
+    public ProductInventoryDetailResponse getProductInventoryById(Long variantId, User user) {
+        ProductInventory inventory = productInventoryRepository.findByProductVariant_IdAndProductVariant_Product_Company(variantId, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Product inventory not found with variant ID: " + variantId));
 
         ProductVariant variant = inventory.getProductVariant();
@@ -922,7 +928,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
     @Override
     @Transactional
     public ProductInventory addToFutureStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
-        ProductInventory inventory = getByProductVariantId(variantId);
+        ProductInventory inventory = getByProductVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("ProductInventory not found for variant ID: " + variantId);
         }
@@ -959,7 +965,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
     @Override
     @Transactional
     public ProductInventory moveFromFutureToCurrentStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
-        ProductInventory inventory = getByProductVariantId(variantId);
+        ProductInventory inventory = getByProductVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("ProductInventory not found for variant ID: " + variantId);
         }
@@ -1021,7 +1027,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
     @Override
     @Transactional
     public ProductInventory removeFromFutureStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
-        ProductInventory inventory = getByProductVariantId(variantId);
+        ProductInventory inventory = getByProductVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("ProductInventory not found for variant ID: " + variantId);
         }
@@ -1060,7 +1066,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
     @Override
     @Transactional
     public ProductInventory removeFromCurrentStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
-        ProductInventory inventory = getByProductVariantId(variantId);
+        ProductInventory inventory = getByProductVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("ProductInventory not found for variant ID: " + variantId);
         }
@@ -1099,8 +1105,8 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
 
     @Override
     @Transactional(readOnly = true)
-    public ProductInventory getByProductVariantId(Long variantId) {
-        return productInventoryRepository.findByProductVariant_Id(variantId).orElse(null);
+    public ProductInventory getByProductVariantId(Long variantId, User user) {
+        return productInventoryRepository.findByProductVariant_IdAndProductVariant_Product_Company(variantId, user.getCompany()).orElse(null);
     }
 
     @Override
@@ -1110,7 +1116,8 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             List<String> groupProducts,
             List<String> status,
             boolean sortByOldest,
-            Pageable pageable) {
+            Pageable pageable,
+            User user) {
         
         System.out.println("=== GET ALARM PRODUCTS DEBUG ===");
         System.out.println("Search: " + search);
@@ -1167,7 +1174,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
 
         // Call repository method with status filtering and sorting
         Page<Object[]> rawResults = productInventoryRepository.searchAlarmInventoryWithUpdatedAt(
-            processedSearch, groupProductIds, statusList, sortedPageable);
+            processedSearch, groupProductIds, statusList, user.getCompany(), sortedPageable);
         
         // Convert Object[] to SearchInventoryResponse
         List<SearchInventoryResponse> content = rawResults.getContent().stream()
@@ -1199,7 +1206,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
     @Override
     @Transactional
     public ProductInventory addToAllocatedStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
-        ProductInventory inventory = getByProductVariantId(variantId);
+        ProductInventory inventory = getByProductVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("ProductInventory not found for variant ID: " + variantId);
         }
@@ -1239,7 +1246,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
     @Override
     @Transactional
     public ProductInventory removeFromAllocatedAndCurrentStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
-        ProductInventory inventory = getByProductVariantId(variantId);
+        ProductInventory inventory = getByProductVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("ProductInventory not found for variant ID: " + variantId);
         }
@@ -1279,7 +1286,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             inventory.setAllocatedStock(BigDecimal.ZERO);
         } else {
             BigDecimal newAllocatedStock = oldAllocatedStock.subtract(quantity);
-            inventory.setCurrentStock(newAllocatedStock);
+            inventory.setAllocatedStock(newAllocatedStock);
         }
 
         inventory.setUpdatedAt(LocalDateTime.now());
@@ -1308,7 +1315,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
     @Override
     @Transactional
     public ProductInventory removeFromAllocatedStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
-        ProductInventory inventory = getByProductVariantId(variantId);
+        ProductInventory inventory = getByProductVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("ProductInventory not found for variant ID: " + variantId);
         }
@@ -1319,7 +1326,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             inventory.setAllocatedStock(BigDecimal.ZERO);
         } else {
             BigDecimal newAllocatedStock = oldAllocatedStock.subtract(quantity);
-            inventory.setCurrentStock(newAllocatedStock);
+            inventory.setAllocatedStock(newAllocatedStock);
         }
 
         inventory.setUpdatedAt(LocalDateTime.now());
@@ -1348,12 +1355,12 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
     @Override
     @Transactional
     public ProductInventory addToCurrentStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
-        ProductInventory inventory = getByProductVariantId(variantId);
+        ProductInventory inventory = getByProductVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("ProductInventory not found for variant ID: " + variantId);
         }
 
-        // Validate Allocated stock is sufficient
+        // Add to current stock
         BigDecimal oldCurrentStock = inventory.getCurrentStock() != null ? inventory.getCurrentStock() : BigDecimal.ZERO;
         BigDecimal newCurrentStock = oldCurrentStock.add(quantity);
         inventory.setCurrentStock(newCurrentStock);
@@ -1371,7 +1378,7 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
             ProductInventoryTransactionSourceType.CUSTOMER_RETURN,
             quantity,
             oldCurrentStock,
-            inventory.getAllocatedStock(),
+            inventory.getCurrentStock(),
             "Current stock added for Sale Cancel",
             ProductInventoryReferenceDocumentType.SALES_ORDER,
             ticketId, // Use the provided ticketId
@@ -1382,4 +1389,115 @@ public class ProductInventoryServiceImpl implements ProductInventoryService{
         return productInventoryRepository.save(inventory);
     }
 
+    @Override
+    @Transactional
+    public SetMinMaxResponse setMinimumAlertStock(Long variantId, SetMinMaxRequest request, User user) {
+        // First check if ProductVariant exists
+        ProductVariant productVariant = productVariantRepository.findByIdAndCompany(variantId, user.getCompany())
+            .orElseThrow(() -> new RuntimeException("Product variant not found with ID: " + variantId));
+
+        if (productVariant.getStatus() == ProductStatus.DELETED) {
+            throw new RuntimeException("Product variant was deleted, cannot set minimum alert stock");
+        }
+
+        // Check if ProductInventory exists for this variant
+        Optional<ProductInventory> optionalInventory = productInventoryRepository.findByProductVariant_IdAndProductVariant_Product_Company(variantId, user.getCompany());
+        ProductInventory inventory;
+        BigDecimal oldMinAlertStock = null;
+
+        if (optionalInventory.isPresent()) {
+            // ProductInventory exists, update it
+            inventory = optionalInventory.get();
+            oldMinAlertStock = inventory.getMinAlertStock();
+        } else {
+            // ProductInventory doesn't exist, create a new empty one
+            inventory = new ProductInventory(
+                productVariant,
+                BigDecimal.ZERO, // currentStock
+                request.getValue(), // minAlertStock
+                null, // maxStockLevel
+                new ArrayList<>(), // logs
+                InventoryStatus.OUT_OF_STOCK, // status
+                user
+            );
+            // Explicitly set currentStock to ensure it's saved
+            inventory.setCurrentStock(BigDecimal.ZERO);
+            oldMinAlertStock = null;
+        }
+
+        // Update minimum alert stock
+        inventory.setMinAlertStock(request.getValue());
+        inventory.setUpdatedAt(LocalDateTime.now());
+        inventory.setUpdated_by(user);
+
+        // Save inventory
+        ProductInventory savedInventory = productInventoryRepository.save(inventory);
+
+        return new SetMinMaxResponse(
+            savedInventory.getId(),
+            savedInventory.getProductVariant().getSku(),
+            savedInventory.getProductVariant().getName(),
+            oldMinAlertStock,
+            request.getValue(),
+            "Minimum alert stock updated successfully",
+            user.getUsername(),
+            LocalDateTime.now()
+        );
+    }
+
+    @Override
+    @Transactional
+    public SetMinMaxResponse setMaximumStockLevel(Long variantId, SetMinMaxRequest request, User user) {
+        // First check if ProductVariant exists
+        ProductVariant productVariant = productVariantRepository.findByIdAndCompany(variantId, user.getCompany())
+            .orElseThrow(() -> new RuntimeException("Product variant not found with ID: " + variantId));
+
+        if (productVariant.getStatus() == ProductStatus.DELETED) {
+            throw new RuntimeException("Product variant was deleted, cannot set maximum stock level");
+        }
+
+        // Check if ProductInventory exists for this variant
+        Optional<ProductInventory> optionalInventory = productInventoryRepository.findByProductVariant_IdAndProductVariant_Product_Company(variantId, user.getCompany());
+        ProductInventory inventory;
+        BigDecimal oldMaxStockLevel = null;
+
+        if (optionalInventory.isPresent()) {
+            // ProductInventory exists, update it
+            inventory = optionalInventory.get();
+            oldMaxStockLevel = inventory.getMaxStockLevel();
+        } else {
+            // ProductInventory doesn't exist, create a new empty one
+            inventory = new ProductInventory(
+                productVariant,
+                BigDecimal.ZERO, // currentStock
+                null, // minAlertStock
+                request.getValue(), // maxStockLevel
+                new ArrayList<>(), // logs
+                InventoryStatus.OUT_OF_STOCK, // status
+                user
+            );
+            // Explicitly set currentStock to ensure it's saved
+            inventory.setCurrentStock(BigDecimal.ZERO);
+            oldMaxStockLevel = null;
+        }
+
+        // Update maximum stock level
+        inventory.setMaxStockLevel(request.getValue());
+        inventory.setUpdatedAt(LocalDateTime.now());
+        inventory.setUpdated_by(user);
+
+        // Save inventory
+        ProductInventory savedInventory = productInventoryRepository.save(inventory);
+
+        return new SetMinMaxResponse(
+            savedInventory.getId(),
+            savedInventory.getProductVariant().getSku(),
+            savedInventory.getProductVariant().getName(),
+            oldMaxStockLevel,
+            request.getValue(),
+            "Maximum stock level updated successfully",
+            user.getUsername(),
+            LocalDateTime.now()
+        );
+    }
 }

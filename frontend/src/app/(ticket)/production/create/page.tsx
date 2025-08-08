@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Box,
   VStack,
@@ -33,10 +33,11 @@ import {
   NumberIncrementStepper,
   NumberDecrementStepper,
 } from '@chakra-ui/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronDownIcon, ChevronUpIcon, AddIcon, CloseIcon } from '@chakra-ui/icons';
 import { useProductionTicket } from '../../../../hooks/useProductionTicket';
 import { useProduct } from '../../../../hooks/useProduct';
+import { useUser } from '../../../../hooks/useUser';
 import { 
   ProductVariantAutoComplete, 
   BOMItemResponse
@@ -59,6 +60,16 @@ interface ProductVariantData {
   customBomItems: BomItemProductionTicketRequest[];
 }
 
+interface LowStockProduct {
+  id: number;
+  name: string;
+  sku: string;
+  currentStock: string;
+  minAlertStock: string;
+  maxStockLevel: string;
+  group?: string;
+}
+
 const CreateProductionTicketPage: React.FC = () => {
   const [title, setTitle] = useState('');
   const [productVariants, setProductVariants] = useState<ProductVariantData[]>([]);
@@ -66,6 +77,105 @@ const CreateProductionTicketPage: React.FC = () => {
   const [materialVariantSearchResults, setMaterialVariantSearchResults] = useState<MaterialVariantAutoComplete[]>([]);
   const [currentVariantIndex, setCurrentVariantIndex] = useState<number>(-1);
   const [currentMaterialIndex, setCurrentMaterialIndex] = useState<number>(-1);
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const toast = useToast();
+  const { isOwner, user } = useUser();
+
+  // Check if user has permission to access this page
+  useEffect(() => {
+    console.log('=== Production Create Page Debug ===');
+    console.log('User from useUser:', user);
+    console.log('isOwner():', isOwner());
+    console.log('=====================================');
+    
+    if (user && !isOwner()) {
+      console.log('Access denied - redirecting to /production');
+      toast({
+        title: 'Access Denied',
+        description: 'Only owners can create production tickets.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      router.push('/production');
+    }
+  }, [user, isOwner, router, toast]);
+
+  // Load low stock data from URL parameters
+  useEffect(() => {
+    const lowStockData = searchParams.get('lowStockData');
+    if (lowStockData) {
+      try {
+        const parsedData: LowStockProduct[] = JSON.parse(decodeURIComponent(lowStockData));
+        
+        // Auto-generate title
+        const productNames = parsedData.map(p => p.name).join(', ');
+        setTitle(`Production for Low Stock Items: ${productNames}`);
+        
+        // Convert low stock products to product variants
+        const convertLowStockToProductVariants = async () => {
+          const variants: ProductVariantData[] = [];
+          
+          for (const lowStockProduct of parsedData) {
+            try {
+              // Search for the product variant by SKU
+              const searchResults = await fetchVariantAutocomplete(lowStockProduct.sku);
+              const matchingVariant = searchResults?.find(v => v.variantSku === lowStockProduct.sku);
+              
+              if (matchingVariant) {
+                // Get BOM items for the variant
+                const bomItems = await fetchBomItems(matchingVariant.productId, matchingVariant.variantId);
+                
+                // Calculate required quantity
+                const currentStock = parseFloat(lowStockProduct.currentStock || '0');
+                const minAlert = parseFloat(lowStockProduct.minAlertStock || '0');
+                const maxLevel = parseFloat(lowStockProduct.maxStockLevel || '100');
+                const targetStock = maxLevel * 0.8;
+                const requiredQuantity = Math.max(targetStock - currentStock, minAlert - currentStock);
+                
+                const variantData: ProductVariantData = {
+                  variant: matchingVariant,
+                  quantity: Math.ceil(requiredQuantity),
+                  expectedCompleteDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                  bomItems,
+                  customBomItems: [],
+                };
+                
+                variants.push(variantData);
+              }
+            } catch (error) {
+              console.error(`Error processing low stock product ${lowStockProduct.sku}:`, error);
+            }
+          }
+          
+          setProductVariants(variants);
+          
+          if (variants.length > 0) {
+            toast({
+              title: 'Low Stock Items Loaded',
+              description: `Pre-filled ${variants.length} product variants from low stock items.`,
+              status: 'success',
+              duration: 5000,
+              isClosable: true,
+            });
+          }
+        };
+        
+        convertLowStockToProductVariants();
+      } catch (error) {
+        console.error('Error parsing low stock data:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load low stock data',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    }
+  }, [searchParams, toast]);
 
   // Helper function to convert date string to YYYY-MM-DD format
   const convertToDateString = (dateString: string): string => {
@@ -84,9 +194,6 @@ const CreateProductionTicketPage: React.FC = () => {
   
   const { bulkCreateProductionTicket, bulkCreating, error, clearError } = useProductionTicket();
   const { fetchVariantAutocomplete, fetchBomItems } = useProduct();
-  
-  const toast = useToast();
-  const router = useRouter();
 
   // Handle product variant search
   const handleProductVariantSearch = useCallback(async (search: string) => {
@@ -570,7 +677,7 @@ const CreateProductionTicketPage: React.FC = () => {
                             </Td>
                             <Td>
                               <Text fontSize="sm" color="gray.600">
-                                {item.uom}
+                                {item.uomDisplayName}
                               </Text>
                             </Td>
                           </Tr>
@@ -694,7 +801,7 @@ const CreateProductionTicketPage: React.FC = () => {
           </Button>
           <Button
             variant="outline"
-            onClick={() => router.push('/ticket/production')}
+            onClick={() => router.push('/production')}
           >
             Cancel
           </Button>

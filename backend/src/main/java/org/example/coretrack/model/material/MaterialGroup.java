@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.example.coretrack.model.auth.User;
+import org.example.coretrack.model.auth.Company;
 
 import jakarta.persistence.*;
 
@@ -24,6 +25,11 @@ public class MaterialGroup {
     @OneToMany(mappedBy = "group", cascade = CascadeType.ALL)
     List<Material> materials = new ArrayList<>();
 
+    // Multi-tenancy: Company relationship
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
     //logging element
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_user_id", nullable = false)
@@ -40,10 +46,11 @@ public class MaterialGroup {
     public MaterialGroup() {
     }
 
-    public MaterialGroup(String name, User created_by) {
+    public MaterialGroup(String name, User created_by, Company company) {
         this.name = name;
         this.created_by = created_by;
         this.updated_by = created_by;
+        this.company = company;
         this.isActive = true;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -71,6 +78,14 @@ public class MaterialGroup {
 
     public void setActive(boolean isActive) {
         this.isActive = isActive;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
     }
 
     public User getCreated_by() {

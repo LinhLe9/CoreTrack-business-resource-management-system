@@ -39,7 +39,7 @@ public class SupplierController {
     private UserRepository userRepository;
 
     @PostMapping("/add-supplier")
-    @PreAuthorize("hasRole('OWNER')")
+    @PreAuthorize("hasAnyRole('OWNER', 'WAREHOUSE_STAFF')")
     public ResponseEntity<AddSupplierResponse> createSupplier(@Valid @RequestBody AddSupplierRequest request) {
         // Get current user information from Spring Security Context
         User currentUser = getCurrentUserFromSecurityContext();
@@ -99,12 +99,18 @@ public class SupplierController {
             @RequestParam(required = false) List<String> countries, 
             @RequestParam(required = false) Pageable pageable) { 
 
+        // Get current user information from Spring Security Context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+
         // Validation E1: Invalid Search Keyword/Format
         if (search != null && search.length() > 255) { // maximum 255 characters
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
         }
 
-        Page<SearchSupplierResponse> suppliers = supplierService.findSupplier(search, countries, pageable);
+        Page<SearchSupplierResponse> suppliers = supplierService.findSupplier(search, countries, pageable, currentUser);
 
         // A2: No matching results - frontend solves
         return ResponseEntity.ok(suppliers);
@@ -116,15 +122,21 @@ public class SupplierController {
      * @return SeachProductResponse
      */
     @GetMapping("/all")
-    public ResponseEntity<List<AllSupplierSearchResponse>> getProducts(
+    public ResponseEntity<List<AllSupplierSearchResponse>> getAllSuppliers(
             @RequestParam(required = false) String search) { 
+
+        // Get current user information from Spring Security Context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
 
         // Validation E1: Invalid Search Keyword/Format
         if (search != null && search.length() > 255) { // maximum 255 characters
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
         }
 
-        List<AllSupplierSearchResponse> supplier = supplierService.getAllSuppliersForAutocomplete(search);
+        List<AllSupplierSearchResponse> supplier = supplierService.getAllSuppliersForAutocomplete(search, currentUser);
 
         // A2: No matching results - frontend solves
         return ResponseEntity.ok(supplier);
@@ -132,7 +144,13 @@ public class SupplierController {
 
     @GetMapping("/available-country")
     public ResponseEntity<List<String>> getSupplierFilters() {
-        List<String> countries = supplierService.getAllCountries();
+        // Get current user information from Spring Security Context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+        
+        List<String> countries = supplierService.getAllCountries(currentUser);
         return ResponseEntity.ok(countries);
     }
 
@@ -141,7 +159,13 @@ public class SupplierController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<SupplierDetailResponse> getSupplierById(@PathVariable Long id) {
-        SupplierDetailResponse supplier = supplierService.getSupplierById(id);
+        // Get current user information from Spring Security Context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+        
+        SupplierDetailResponse supplier = supplierService.getSupplierById(id, currentUser);
         if (supplier == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Supplier not found with ID: " + id);
         }

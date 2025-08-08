@@ -23,6 +23,7 @@ import org.example.coretrack.dto.sale.SaleOrderStatusLogResponse;
 import org.example.coretrack.dto.sale.SaleStatusTransitionRule;
 import org.example.coretrack.dto.sale.SaleTicketResponse;
 import org.example.coretrack.dto.sale.UpdateSaleOrderStatusRequest;
+import org.example.coretrack.dto.sale.UpdateSaleRequest;
 import org.example.coretrack.model.Sale.Order;
 import org.example.coretrack.model.Sale.OrderDetail;
 import org.example.coretrack.model.Sale.OrderStatus;
@@ -53,6 +54,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
+import org.example.coretrack.service.NotificationService;
+import org.example.coretrack.service.NotificationTargetService;
+import org.example.coretrack.service.EmailSendingService;
 
 @Service
 public class SaleServiceImpl implements SaleService{
@@ -79,6 +83,9 @@ public class SaleServiceImpl implements SaleService{
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private NotificationTargetService notificationTargetService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -124,7 +131,7 @@ public class SaleServiceImpl implements SaleService{
         if (StringUtils.hasText(request.getSku())) {
             String manualSku = request.getSku().trim();
             // Validate SKU uniqueness
-            if (ordersRepository.findBySku(manualSku).isPresent()) {
+            if (ordersRepository.findBySkuAndCompany(manualSku, user.getCompany()).isPresent()) {
                 throw new IllegalArgumentException("Order SKU already exists: " + manualSku);
             }
             // Validate SKU format - length (8-16 chars for tidy SKU)
@@ -134,7 +141,7 @@ public class SaleServiceImpl implements SaleService{
             orderSku = manualSku;
         } else {
             // Automatic SKU Generation
-            orderSku = generateUniqueOrderSku(); 
+            orderSku = generateUniqueOrderSku(user);
         }
         
         System.out.println("Generated/Manual SKU: " + orderSku);
@@ -157,6 +164,7 @@ public class SaleServiceImpl implements SaleService{
         ticket.setActive(true);
         ticket.setCreatedBy(user);
         ticket.setUpdatedBy(user);
+        ticket.setCompany(user.getCompany());
         ticket.setCreatedAt(LocalDateTime.now());
         ticket.setUpdatedAt(LocalDateTime.now());
         
@@ -178,17 +186,17 @@ public class SaleServiceImpl implements SaleService{
 
                 // Get ProductVariant
                 System.out.println("Looking for ProductVariant with SKU: " + productVariantSku);
-                ProductVariant variant = productVariantRepository.findBySku(productVariantSku)
-                    .orElseThrow(() -> new RuntimeException("Product Variant not found with SKU: " + productVariantSku));
+                ProductVariant variant = productVariantRepository.findBySkuAndCompany(productVariantSku, user.getCompany())
+                    .orElseThrow(() -> new RuntimeException("Product Variant not found with SKU: " + productVariantSku + " for company: " + user.getCompany().getName()));
                 System.out.println("Found ProductVariant: " + variant.getName() + " (ID: " + variant.getId() + ")");
 
                 // Check if ProductInventory exists
-                ProductInventory inventory = productInventoryService.getByProductVariantId(variant.getId());
+                ProductInventory inventory = productInventoryService.getByProductVariantId(variant.getId(), user);
                 boolean needToCreateInventory = (inventory == null);
                 System.out.println("ProductInventory exists: " + (inventory != null) + ", needToCreateInventory: " + needToCreateInventory);
 
                 // Create OrderDetail
-                String detailSku = generateVariantSku(orderSku, (i + 1));
+                String detailSku = generateVariantSku(orderSku, (i + 1), user);
                 OrderDetail detail = new OrderDetail();
                 detail.setSku(detailSku);
                 detail.setProductVariant(variant);
@@ -236,7 +244,7 @@ public class SaleServiceImpl implements SaleService{
             
             try {
                 // Check if ProductInventory exists, create if needed
-                ProductInventory inventory = productInventoryService.getByProductVariantId(variant.getId());
+                ProductInventory inventory = productInventoryService.getByProductVariantId(variant.getId(), user);
                 if (inventory == null) {
                     System.out.println("Creating default product inventory for SKU: " + variant.getSku());
                     createDefaultProductInventory(variant, user, ticket.getId());
@@ -296,7 +304,7 @@ public class SaleServiceImpl implements SaleService{
      * Helper method to generate Sku
      */
 
-    private String generateUniqueOrderSku() {
+    private String generateUniqueOrderSku(User user){
         String newSku;
         Random random = new Random(); // Initialize Random
         do {
@@ -304,7 +312,7 @@ public class SaleServiceImpl implements SaleService{
             // ORD-1234567 = 11 chars (max 16)
             int randomNumber = 1000000 + random.nextInt(9000000); // Generates number between 1,000,000 and 9,999,999
             newSku = "ORD-" + randomNumber; // Example: ORD-1234567 (11 chars)
-        } while (ordersRepository.findBySku(newSku).isPresent());
+        } while (ordersRepository.findBySkuAndCompany(newSku, user.getCompany()).isPresent()); // Check for duplicates within company
         return newSku;
     }
 
@@ -312,7 +320,7 @@ public class SaleServiceImpl implements SaleService{
      * Helper method to generate SKU variant
      */
 
-    private String generateVariantSku(String baseOrderSku, int variantIndex) {
+    private String generateVariantSku(String baseOrderSku, int variantIndex, User user) {
         // Ensure SKU doesn't exceed 16 characters
         // Base format: ORD-1234567-1 (max 16 chars for Order detail)
         String suffix = "-" + variantIndex;
@@ -337,7 +345,7 @@ public class SaleServiceImpl implements SaleService{
                 }
             }
             attempt++;
-        } while (orderDetailRepository.findBySku(finalVariantSku).isPresent());
+        } while (orderDetailRepository.findBySkuAndCompany(finalVariantSku, user.getCompany()).isPresent());
 
         return finalVariantSku;
     }
@@ -414,12 +422,12 @@ public class SaleServiceImpl implements SaleService{
     }
 
     @Override
-    public SaleTicketResponse getSaleTicketById(Long id) {
+    public SaleTicketResponse getSaleTicketById(Long id, User user) {
         System.out.println("=== Starting getSaleTicketById ===");
         System.out.println("Looking for order with ID: " + id);
         
         try {
-            Order ticket = ordersRepository.findByIdAndIsActive(id, true)
+            Order ticket = ordersRepository.findByIdAndIsActiveAndCompany(id, true, user.getCompany())
                 .orElseThrow(() -> new RuntimeException("Order not found with id: " + id));
             
             System.out.println("Found order: " + ticket.getSku() + " (ID: " + ticket.getId() + ")");
@@ -520,7 +528,7 @@ public class SaleServiceImpl implements SaleService{
     }
 
     @Override
-    public Page<SaleCardResponse> getSaleTickets(String search, List<String> ticketStatus, Pageable pageable) {
+    public Page<SaleCardResponse> getSaleTickets(String search, List<String> ticketStatus, Pageable pageable, User user) {
         // Handle search
         String processedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
@@ -544,12 +552,12 @@ public class SaleServiceImpl implements SaleService{
             }
         }
 
-        Page<Order> response = ordersRepository.findAllActiveByCriteria(processedSearch, processedStatuses, pageable);
+        Page<Order> response = ordersRepository.findAllActiveByCriteriaAndCompany(processedSearch, processedStatuses, user.getCompany(), pageable);
         return response.map(this::convertToSaleCardResponse);
     }
 
     @Override
-    public List<SaleCardResponse> getAutoComplete(String search) {
+    public List<SaleCardResponse> getAutoComplete(String search, User user) {
         // Handle null or empty search
         if (search == null || search.trim().isEmpty()) {
             // Return empty list for null/empty search to avoid showing all orders
@@ -559,13 +567,13 @@ public class SaleServiceImpl implements SaleService{
         String processedSearch = search.trim();
         
         try {
-            List<Order> orders = ordersRepository.findAllBySearch(processedSearch);
+            List<Order> orders = ordersRepository.findAllBySearchAndCompany(processedSearch, user.getCompany());
             return orders.stream()
                 .map(this::convertToSaleCardResponse)
                 .collect(Collectors.toList());
         } catch (Exception e) {
             // Log error and return empty list
-            System.err.println("Error in autocomplete search: " + e.getMessage());
+            System.err.println("Error in autocomplete search for user " + user.getId() + ": " + e.getMessage());
             return new ArrayList<>();
         }
     }
@@ -614,7 +622,7 @@ public class SaleServiceImpl implements SaleService{
         System.out.println("User: " + user.getUsername());
         
         try {
-            Order ticket = ordersRepository.findByIdAndIsActive(ticketId, true)
+            Order ticket = ordersRepository.findByIdAndIsActiveAndCompany(ticketId, true, user.getCompany())
                 .orElseThrow(() -> new RuntimeException("Sale Ticket not found with id: " + ticketId));
             
             System.out.println("Found ticket: " + ticket.getSku() + " (ID: " + ticket.getId() + ")");
@@ -663,16 +671,15 @@ public class SaleServiceImpl implements SaleService{
                     ticket.getId(), reason);
                 
                 Notification notification = new Notification(
-                    ticket.getCreatedBy(), // Notify the sale creator
                     NotificationType.SALE_CANCELLED,
                     title,
                     message
                 );
                 
-                notificationService.createTicketNotification(notification);
+                List<User> notificationTargets = notificationTargetService.getSaleNotificationTargets();
+                notificationService.createTicketNotification(notification, notificationTargets);
                 
-                System.out.println("Created sale cancellation notification for user: " + 
-                                 ticket.getCreatedBy().getUsername());
+                System.out.println("Created sale cancellation notification for " + notificationTargets.size() + " users");
             } catch (Exception e) {
                 System.err.println("Failed to create sale cancellation notification: " + e.getMessage());
                 // Don't fail the cancellation if notification fails
@@ -697,7 +704,7 @@ public class SaleServiceImpl implements SaleService{
         System.out.println("Ticket ID: " + ticketId + ", Detail ID: " + detailId);
         
         // Find the ticket
-        Order ticket = ordersRepository.findByIdAndIsActive(ticketId, true)
+        Order ticket = ordersRepository.findByIdAndIsActiveAndCompany(ticketId, true, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Sale ticket not found"));
         
         // Find the specific detail
@@ -745,7 +752,7 @@ public class SaleServiceImpl implements SaleService{
         }
         
         // Return updated ticket response
-        return getSaleTicketById(ticketId);
+        return getSaleTicketById(ticketId, user);
     }
 
 
@@ -754,7 +761,7 @@ public class SaleServiceImpl implements SaleService{
     @Transactional(rollbackFor = Exception.class)
     public SaleTicketResponse updateDetailStatus(Long id, UpdateSaleOrderStatusRequest request, User user) {
         // Verify the sale ticket exists
-        Order ticket = ordersRepository.findByIdAndIsActive(id, true)
+        Order ticket = ordersRepository.findByIdAndIsActiveAndCompany(id, true, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Sale Ticket not found with id: " + id));
         
         // Call helper method to validate status transition
@@ -787,23 +794,103 @@ public class SaleServiceImpl implements SaleService{
                 ticket.getId(), oldStatus, request.getNewStatus());
             
             Notification notification = new Notification(
-                ticket.getCreatedBy(), // Notify the sale creator
                 NotificationType.SALE_STATUS_CHANGE,
                 title,
                 message
             );
             
-            notificationService.createTicketNotification(notification);
+            List<User> notificationTargets = notificationTargetService.getSaleNotificationTargets();
+            notificationService.createTicketNotification(notification, notificationTargets);
             
-            System.out.println("Created sale status change notification for user: " + 
-                             ticket.getCreatedBy().getUsername());
+            System.out.println("Created sale status change notification for " + notificationTargets.size() + " users");
         } catch (Exception e) {
             System.err.println("Failed to create sale status change notification: " + e.getMessage());
             // Don't fail the status update if notification fails
         }
         
         // Return updated ticket response
-        return getSaleTicketById(id);
+        return getSaleTicketById(id, user);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SaleTicketResponse updateSaleTicket(Long id, UpdateSaleRequest request, User user) {
+        System.out.println("=== Starting updateSaleTicket ===");
+        System.out.println("Ticket ID: " + id);
+        System.out.println("User: " + user.getUsername());
+        
+        try {
+            Order ticket = ordersRepository.findByIdAndIsActiveAndCompany(id, true, user.getCompany())
+                .orElseThrow(() -> new RuntimeException("Sale Ticket not found with id: " + id));
+            
+            System.out.println("Found ticket: " + ticket.getSku() + " (ID: " + ticket.getId() + ")");
+            
+            // Update expected complete date if provided
+            if (request.getExpected_complete_date() != null && !request.getExpected_complete_date().trim().isEmpty()) {
+                LocalDate expectedCompleteDate = LocalDate.parse(request.getExpected_complete_date());
+                ticket.setExpected_complete_date(expectedCompleteDate.atStartOfDay());
+                System.out.println("Updated expected complete date to: " + expectedCompleteDate);
+            }
+            
+            // Update customer information if provided
+            if (request.getCustomerName() != null) {
+                ticket.setCustomerName(request.getCustomerName());
+                System.out.println("Updated customer name to: " + request.getCustomerName());
+            }
+            
+            if (request.getCustomerEmail() != null) {
+                ticket.setCustomerEmail(request.getCustomerEmail());
+                System.out.println("Updated customer email to: " + request.getCustomerEmail());
+            }
+            
+            if (request.getCustomerPhone() != null) {
+                ticket.setCustomerPhone(request.getCustomerPhone());
+                System.out.println("Updated customer phone to: " + request.getCustomerPhone());
+            }
+            
+            if (request.getCustomerAddress() != null) {
+                ticket.setCustomerAddress(request.getCustomerAddress());
+                System.out.println("Updated customer address to: " + request.getCustomerAddress());
+            }
+            
+            // Update audit fields
+            ticket.setUpdatedAt(LocalDateTime.now());
+            ticket.setUpdatedBy(user);
+            
+            // Save the updated ticket
+            ticket = ordersRepository.save(ticket);
+            System.out.println("Successfully updated sale ticket");
+            
+            // Create notification for sale update
+            try {
+                String title = "Sale Information Updated";
+                String message = String.format("Sale Order #%d information has been updated", ticket.getId());
+                
+                Notification notification = new Notification(
+                    NotificationType.SALE_STATUS_CHANGE,
+                    title,
+                    message
+                );
+                
+                List<User> notificationTargets = notificationTargetService.getSaleNotificationTargets();
+                notificationService.createTicketNotification(notification, notificationTargets);
+                
+                System.out.println("Created sale update notification for " + notificationTargets.size() + " users");
+            } catch (Exception e) {
+                System.err.println("Failed to create sale update notification: " + e.getMessage());
+                // Don't fail the update if notification fails
+            }
+            
+            System.out.println("=== Successfully updated sale ticket ===");
+            return getSaleTicketById(id, user);
+            
+        } catch (Exception e) {
+            System.err.println("=== ERROR in updateSaleTicket ===");
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+            System.err.println("=== END ERROR ===");
+            throw e;
+        }
     }
 
     // Helper methods for Sale Service

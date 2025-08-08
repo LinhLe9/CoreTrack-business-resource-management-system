@@ -11,6 +11,8 @@ import org.example.coretrack.dto.product.inventory.ProductInventoryDetailRespons
 import org.example.coretrack.dto.product.inventory.SearchInventoryResponse;
 import org.example.coretrack.dto.product.inventory.StockModifyRequest;
 import org.example.coretrack.dto.product.inventory.StockSetRequest;
+import org.example.coretrack.dto.product.inventory.SetMinMaxRequest;
+import org.example.coretrack.dto.product.inventory.SetMinMaxResponse;
 import org.example.coretrack.dto.product.inventory.BulkStockModifyRequest;
 import org.example.coretrack.dto.product.inventory.BulkStockSetRequest;
 import org.example.coretrack.dto.product.inventory.BulkInventoryTransactionResponse;
@@ -37,11 +39,12 @@ public interface ProductInventoryService {
             String search,
             List<String> groupProducts,
             List<String> inventoryStatus,
-            Pageable pageable);
+            Pageable pageable,
+            User user);
 
-    List<AllSearchInventoryResponse> getAllForAutocomplete (String search);
+    List<AllSearchInventoryResponse> getAllForAutocomplete (String search, User user);
 
-    ProductInventoryDetailResponse getProductInventoryById (Long variantId);
+    ProductInventoryDetailResponse getProductInventoryById (Long variantId, User user);
 
     // Bulk operations
     BulkInventoryTransactionResponse bulkSetStock(BulkStockSetRequest request, User user);
@@ -71,10 +74,16 @@ public interface ProductInventoryService {
     ProductInventory addToAllocatedStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
     ProductInventory removeFromAllocatedStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
     ProductInventory addToCurrentStock(Long variantId, BigDecimal quantity, User user, Long ticketId);
-    ProductInventory getByProductVariantId(Long variantId);
+    ProductInventory getByProductVariantId(Long variantId, User user);
     Page<SearchInventoryResponse> getAlarmProduct(String search,
             List<String> groupProducts,
             List<String> status,
             boolean sortByOldest,
-            Pageable pageable);
+            Pageable pageable,
+            User user);
+
+    // Set minimum and maximum stock levels
+    SetMinMaxResponse setMinimumAlertStock(Long variantId, SetMinMaxRequest request, User user);
+    
+    SetMinMaxResponse setMaximumStockLevel(Long variantId, SetMinMaxRequest request, User user);
 }

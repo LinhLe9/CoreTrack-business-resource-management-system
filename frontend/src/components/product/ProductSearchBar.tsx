@@ -3,8 +3,6 @@ import React, { useState } from 'react';
 import Select from 'react-select';
 import {
   Box,
-  Button,
-  Flex,
 } from '@chakra-ui/react';
 import { ProductAutoComplete } from '../../types/product';
 
@@ -29,6 +27,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
   productsForAutocomplete,
 }) => {
   const [selectedOption, setSelectedOption] = useState<OptionType | null>(null);
+  const [inputValue, setInputValue] = useState(initialSearchTerm);
 
   const options: OptionType[] = productsForAutocomplete.map((product) => ({
     value: product.id,
@@ -48,9 +47,15 @@ const SearchBar: React.FC<SearchBarProps> = ({
     }
   };
 
-  const handleSearch = () => {
-    if (selectedOption) {
-      onSearch(selectedOption.label);
+  const handleInputChange = (newValue: string) => {
+    setInputValue(newValue);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && inputValue.trim()) {
+      onSearch(inputValue.trim());
+      setInputValue('');
+      setSelectedOption(null);
     }
   };
 
@@ -68,26 +73,38 @@ const SearchBar: React.FC<SearchBarProps> = ({
   );
 
   return (
-    <Flex gap={2} align="center">
-      <Box width="400px" minWidth="300px" maxWidth="600px">
-        <Select
-          options={options}
-          placeholder="Search by name, SKU, or description"
-          onChange={handleChange}
-          value={selectedOption}
-          isClearable
-          components={{ SingleValue: customSingleValue, Option: customOption }}
-          filterOption={(option, inputValue) => {
-            const nameMatch = option.label.toLowerCase().includes(inputValue.toLowerCase());
-            const skuMatch = option.data.sku.toLowerCase().includes(inputValue.toLowerCase());
-            const descMatch = option.data.description?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+    <Box width="400px" minWidth="300px" maxWidth="600px">
+      <Select
+        options={options}
+        placeholder="Search by name, SKU, or description"
+        onChange={handleChange}
+        value={selectedOption}
+        inputValue={inputValue}
+        onInputChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        isClearable
+        components={{ SingleValue: customSingleValue, Option: customOption }}
+        filterOption={(option, inputValue) => {
+          const nameMatch = option.label.toLowerCase().includes(inputValue.toLowerCase());
+          const skuMatch = option.data.sku.toLowerCase().includes(inputValue.toLowerCase());
+          const descMatch = option.data.description?.toLowerCase().includes(inputValue.toLowerCase()) || false;
 
-            return nameMatch || skuMatch || descMatch;
-          }}
-        />
-      </Box>
-      <Button colorScheme="blue" onClick={handleSearch}>Search</Button>
-    </Flex>
+          return nameMatch || skuMatch || descMatch;
+        }}
+        styles={{
+          menu: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+          }),
+          menuPortal: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+          }),
+        }}
+        menuPortalTarget={document.body}
+        menuPosition="fixed"
+      />
+    </Box>
   );
 };
 

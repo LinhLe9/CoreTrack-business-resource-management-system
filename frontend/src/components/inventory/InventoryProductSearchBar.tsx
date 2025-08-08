@@ -35,6 +35,7 @@ const InventoryProductSearchBar: React.FC<SearchBarProps> = ({
 }) => {
   const [selectedOption, setSelectedOption] = useState<OptionType | null>(null);
   const router = useRouter();
+  const [inputValue, setInputValue] = useState(initialSearchTerm);
 
   const options: OptionType[] = productInventoryForAutocomplete
     .filter(item => item && item.id && item.name) // Filter out null/undefined items
@@ -56,14 +57,17 @@ const InventoryProductSearchBar: React.FC<SearchBarProps> = ({
   };
 
   const handleInputChange = (inputValue: string) => {
+    setInputValue(inputValue);
     if (onSearchInputChange) {
       onSearchInputChange(inputValue);
     }
   };
 
-  const handleSearch = () => {
-    if (selectedOption) {
-      onSearch(selectedOption.label);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && inputValue.trim()) {
+      onSearch(inputValue.trim());
+      setInputValue('');
+      setSelectedOption(null);
     }
   };
 
@@ -83,30 +87,40 @@ const InventoryProductSearchBar: React.FC<SearchBarProps> = ({
   );
 
   return (
-    <Flex gap={2} align="center">
-      <Box width="400px" minWidth="300px" maxWidth="600px">
-        <Select
-          instanceId="inventory-product-search"
-          options={options}
-          placeholder="Search by product name, SKU, or variant"
-          onChange={handleChange}
-          value={selectedOption}
-          isClearable
-          components={{ SingleValue: customSingleValue, Option: customOption }}
-          filterOption={(option, inputValue) => {
-            if (!option || !option.data) return false;
-            
-            const nameMatch = option.label?.toLowerCase().includes(inputValue.toLowerCase()) || false;
-            const skuMatch = option.data.sku?.toLowerCase().includes(inputValue.toLowerCase()) || false;
-            const statusMatch = option.data.inventoryStatus?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+    <Box width="400px" minWidth="300px" maxWidth="600px">
+      <Select
+        options={options}
+        placeholder="Search by product name, SKU, or variant"
+        onChange={handleChange}
+        value={selectedOption}
+        inputValue={inputValue}
+        onInputChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        isClearable
+        components={{ SingleValue: customSingleValue, Option: customOption }}
+        filterOption={(option, inputValue) => {
+          if (!option || !option.data) return false;
+          
+          const nameMatch = option.label?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+          const skuMatch = option.data.sku?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+          const statusMatch = option.data.inventoryStatus?.toLowerCase().includes(inputValue.toLowerCase()) || false;
 
-            return nameMatch || skuMatch || statusMatch;
-          }}
-          onInputChange={handleInputChange}
-        />
-      </Box>
-      <Button colorScheme="blue" onClick={handleSearch}>Search</Button>
-    </Flex>
+          return nameMatch || skuMatch || statusMatch;
+        }}
+        styles={{
+          menu: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+          }),
+          menuPortal: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+          }),
+        }}
+        menuPortalTarget={document.body}
+        menuPosition="fixed"
+      />
+    </Box>
   );
 };
 

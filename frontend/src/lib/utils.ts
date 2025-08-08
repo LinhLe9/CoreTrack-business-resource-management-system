@@ -19,9 +19,24 @@ export const parseBigDecimal = (value: string | null | undefined): number => {
  * @returns Formatted string or 'N/A' if null/undefined
  */
 export const formatBigDecimal = (value: string | null | undefined): string => {
+  console.log('=== formatBigDecimal DEBUG ===');
+  console.log('Input value:', value);
+  console.log('Input type:', typeof value);
+  console.log('Is null:', value === null);
+  console.log('Is undefined:', value === undefined);
+  console.log('Is empty string:', value === '');
+  console.log('Is "0":', value === '0');
+  console.log('Is "0.00":', value === '0.00');
+  console.log('=============================');
+  
   if (!value) return 'N/A';
   const parsed = parseFloat(value);
-  return isNaN(parsed) ? 'N/A' : parsed.toFixed(2);
+  console.log('Parsed value:', parsed);
+  console.log('Is NaN:', isNaN(parsed));
+  const result = isNaN(parsed) ? 'N/A' : parsed.toFixed(2);
+  console.log('Final result:', result);
+  console.log('=============================');
+  return result;
 };
 
 /**

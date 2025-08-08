@@ -6,11 +6,13 @@ import {Group} from '@/types/product'
 
 export default function SearchProductGroup({
   onSelect,
+  value,
 }: {
   onSelect: (group: Group) => void;
+  value?: string;
 }) {
   const [allGroups, setAllGroups] = useState<Group[]>([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(value || '');
   const [filtered, setFiltered] = useState<Group[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,10 +41,17 @@ export default function SearchProductGroup({
     setFiltered(allGroups.filter(group => group.name.toLowerCase().includes(q)));
   }, [query, allGroups]);
 
+  // Update query when value prop changes
+  useEffect(() => {
+    if (value !== undefined) {
+      setQuery(value);
+    }
+  }, [value]);
+
   return (
     <Box position="relative">
       <Input
-        placeholder="Click to search groups..."
+        placeholder="Search product groups..."
         value={query}
         onChange={e => setQuery(e.target.value)}
         onFocus={() => setIsFocused(true)}
@@ -57,7 +66,7 @@ export default function SearchProductGroup({
           {error}
         </Text>
       )}
-      {isFocused && filtered.length > 0 && (
+      {isFocused && query.trim() && filtered.length > 0 && (
         <List
           position="absolute"
           bg="white"

@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 public class ProductionTicketDetailResponse {
     private Long id;
     private String productVariantSku;
@@ -12,12 +14,16 @@ public class ProductionTicketDetailResponse {
     List<BomItemProductionTicketResponse> boms;
     private String status;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime expected_complete_date;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime completed_date;
 
     private List<ProductionTicketDetailStatusLogResponse> logs;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime lastUpdatedAt;
 
     private String createdBy_name;

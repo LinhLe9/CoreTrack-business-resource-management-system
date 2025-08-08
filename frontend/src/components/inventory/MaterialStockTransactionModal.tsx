@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import {
   Modal,
@@ -19,7 +21,7 @@ import {
   useToast,
   Spinner,
 } from '@chakra-ui/react';
-import { getMaterialTransactionEnums, addMaterialStock, subtractMaterialStock } from '../../services/materialInventoryService';
+import { getMaterialTransactionEnums, addMaterialStock, subtractMaterialStock, setMaterialStock } from '../../services/materialInventoryService';
 import { TransactionEnumsResponse } from '../../types/productInventory';
 
 interface MaterialStockTransactionModalProps {
@@ -28,8 +30,8 @@ interface MaterialStockTransactionModalProps {
   variantId: number;
   variantSku: string;
   variantName: string;
-  transactionType: 'add' | 'subtract';
-  onSuccess?: () => void;
+  transactionType: 'set' | 'add' | 'subtract';
+  onSuccess: () => void;
 }
 
 const MaterialStockTransactionModal: React.FC<MaterialStockTransactionModalProps> = ({
@@ -79,18 +81,46 @@ const MaterialStockTransactionModal: React.FC<MaterialStockTransactionModalProps
     }
   };
 
+  const getModalTitle = () => {
+    switch (transactionType) {
+      case 'set':
+        return 'Set Stock';
+      case 'add':
+        return 'Add Stock';
+      case 'subtract':
+        return 'Subtract Stock';
+      default:
+        return 'Stock Transaction';
+    }
+  };
+
+  const getDefaultTransactionType = () => {
+    switch (transactionType) {
+      case 'add':
+        return 'IN';
+      case 'subtract':
+        return 'OUT';
+      case 'set':
+        return 'SET';
+      default:
+        return 'IN';
+    }
+  };
+
   const handleSubmit = async () => {
     if (!quantity || parseFloat(quantity) <= 0) {
       toast({
         title: 'Invalid Quantity',
-        description: 'Please enter a valid quantity greater than 0',
+        description: 'Please enter a valid quantity greater than 0.',
         status: 'error',
         duration: 3000,
+        isClosable: true,
       });
       return;
     }
 
     setLoading(true);
+
     try {
       const quantityNum = parseFloat(quantity);
       const referenceId = referenceDocumentId ? parseInt(referenceDocumentId) : undefined;
@@ -99,43 +129,57 @@ const MaterialStockTransactionModal: React.FC<MaterialStockTransactionModalProps
         await addMaterialStock(
           variantId,
           quantityNum,
-          note || undefined,
+          note.trim() || undefined,
           referenceDocumentType || undefined,
           referenceId,
           transactionSource || undefined
         );
-        toast({
-          title: 'Success',
-          description: `Material stock added successfully`,
-          status: 'success',
-          duration: 3000,
-        });
-      } else {
+      } else if (transactionType === 'subtract') {
         await subtractMaterialStock(
           variantId,
           quantityNum,
-          note || undefined,
+          note.trim() || undefined,
           referenceDocumentType || undefined,
           referenceId,
           transactionSource || undefined
         );
-        toast({
-          title: 'Success',
-          description: `Material stock subtracted successfully`,
-          status: 'success',
-          duration: 3000,
-        });
+      } else if (transactionType === 'set') {
+        await setMaterialStock(
+          variantId,
+          quantityNum,
+          note.trim() || undefined,
+          referenceDocumentType || undefined,
+          referenceId,
+          transactionSource || undefined
+        );
       }
 
-      onSuccess?.();
-      handleClose();
+      toast({
+        title: 'Success',
+        description: `Stock ${transactionType} operation completed successfully.`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+      // Reset form
+      setQuantity('');
+      setNote('');
+      setReferenceDocumentType('');
+      setReferenceDocumentId('');
+      setTransactionSource('');
+      
+      // Close modal and refresh data
+      onClose();
+      onSuccess();
     } catch (error: any) {
-      console.error('Error processing transaction:', error);
+      console.error('Stock transaction error:', error);
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to process transaction',
+        description: error.response?.data?.message || `Failed to ${transactionType} stock.`,
         status: 'error',
         duration: 5000,
+        isClosable: true,
       });
     } finally {
       setLoading(false);
@@ -151,18 +195,15 @@ const MaterialStockTransactionModal: React.FC<MaterialStockTransactionModalProps
     onClose();
   };
 
-  const getDefaultTransactionType = () => {
-    return transactionType === 'add' ? 'IN' : 'OUT';
-  };
-
   return (
     <Modal isOpen={isOpen} onClose={handleClose} size="lg">
       <ModalOverlay />
       <ModalContent>
         <ModalHeader>
-          {transactionType === 'add' ? 'Add Stock' : 'Subtract Stock'} - {variantName}
+          {getModalTitle()} - {variantName}
         </ModalHeader>
         <ModalCloseButton />
+        
         <ModalBody>
           <VStack spacing={4}>
             {/* Variant SKU (readonly) */}
@@ -200,6 +241,7 @@ const MaterialStockTransactionModal: React.FC<MaterialStockTransactionModalProps
                 >
                   <option value="IN">IN</option>
                   <option value="OUT">OUT</option>
+                  <option value="SET">SET</option>
                 </Select>
               </FormControl>
 
@@ -273,12 +315,12 @@ const MaterialStockTransactionModal: React.FC<MaterialStockTransactionModalProps
             Cancel
           </Button>
           <Button
-            colorScheme={transactionType === 'add' ? 'green' : 'red'}
+            colorScheme="blue"
             onClick={handleSubmit}
             isLoading={loading}
             loadingText="Processing..."
           >
-            {transactionType === 'add' ? 'Add Stock' : 'Subtract Stock'}
+            {getModalTitle()}
           </Button>
         </ModalFooter>
       </ModalContent>

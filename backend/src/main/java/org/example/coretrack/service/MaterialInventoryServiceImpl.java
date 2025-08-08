@@ -24,6 +24,8 @@ import org.example.coretrack.dto.product.inventory.SearchInventoryResponse;
 import org.example.coretrack.dto.product.inventory.StockModifyRequest;
 import org.example.coretrack.dto.product.inventory.StockSetRequest;
 import org.example.coretrack.dto.product.inventory.TransactionEnumsResponse;
+import org.example.coretrack.dto.product.inventory.SetMinMaxRequest;
+import org.example.coretrack.dto.product.inventory.SetMinMaxResponse;
 import org.example.coretrack.model.auth.User;
 import org.example.coretrack.model.material.Material;
 import org.example.coretrack.model.material.MaterialStatus;
@@ -44,6 +46,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.example.coretrack.exception.MaterialInventoryAlreadyExistsException;
+import org.example.coretrack.service.NotificationTargetService;
 
 @Service
 public class MaterialInventoryServiceImpl implements MaterialInventoryService{
@@ -61,11 +65,17 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
 
     @Autowired
     private NotificationService notificationService;
+    
+    @Autowired
+    private NotificationTargetService notificationTargetService;
+
+    @Autowired
+    private EmailSendingService emailSendingService;
 
     @Override
     @Transactional
     public AddMaterialInventoryResponse createMaterialInventory(AddMaterialInventoryRequest request, User user) {
-        MaterialVariant materialVariant = materialVariantRepository.findBySku(request.getMaterialVariantSku())
+        MaterialVariant materialVariant = materialVariantRepository.findBySkuAndCompany(request.getMaterialVariantSku(), user.getCompany())
             .orElseThrow(() -> new RuntimeException("Material not found with SKU: " + request.getMaterialVariantSku()));
 
         if (materialVariant.getStatus() == MaterialStatus.DELETED) {
@@ -73,9 +83,10 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
         }
 
         // Check if MaterialInventory already exists for this material variant
-        Optional<MaterialInventory> existingInventory = materialInventoryRepository.findByMaterialVariant_Id(materialVariant.getId());
+        Optional<MaterialInventory> existingInventory = materialInventoryRepository.findByMaterialVariant_IdAndMaterialVariant_Material_Company(materialVariant.getId(), user.getCompany());
         if (existingInventory.isPresent()) {
-            throw new RuntimeException("Material inventory already exists for SKU: " + request.getMaterialVariantSku() + ". Cannot create duplicate inventory.");
+            throw new MaterialInventoryAlreadyExistsException("Material inventory already exists for SKU: " + request.getMaterialVariantSku() + 
+                ". Cannot create duplicate inventory.");
         }
 
         String inventoryStatus = request.getCurrentStock().compareTo(BigDecimal.ZERO) == 0
@@ -150,11 +161,22 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
             
         BigDecimal available = currentQ.subtract(allocatedQ);
         BigDecimal projected = currentQ.add(futureQ);
+        
+        // Debug logs
+        System.out.println("=== handelStatus DEBUG ===");
+        System.out.println("currentQ: " + currentQ);
+        System.out.println("futureQ: " + futureQ);
+        System.out.println("allocatedQ: " + allocatedQ);
+        System.out.println("minQ: " + minQ);
+        System.out.println("maxQ: " + maxQ);
+        System.out.println("available: " + available);
+        System.out.println("projected: " + projected);
+        System.out.println("==========================");
     
-        if (available.compareTo(minQ) < 0) {
-            return InventoryStatus.LOW_STOCK;
-        } else if (available.compareTo(BigDecimal.ZERO) == 0) {
+        if (available.compareTo(BigDecimal.ZERO) == 0) {
             return InventoryStatus.OUT_OF_STOCK;
+        } else if (available.compareTo(minQ) < 0) {
+            return InventoryStatus.LOW_STOCK;
         } else if (projected.compareTo(maxQ) > 0){
             return InventoryStatus.OVER_STOCK;
         }
@@ -165,7 +187,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
     @Override
     @Transactional
     public InventoryTransactionResponse setStock(Long variantId, StockSetRequest request, User user) {
-        MaterialVariant materialVariant = materialVariantRepository.findById(variantId)
+        MaterialVariant materialVariant = materialVariantRepository.findByIdAndCompany(variantId, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Material not found with id: " + variantId));
 
         if (materialVariant.getStatus() == MaterialStatus.DELETED) {
@@ -173,11 +195,13 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
         } 
         materialInventoryReferenceDocumentType type = null ;
         try {
-            type = materialInventoryReferenceDocumentType.valueOf(request.getReferenceDocumentType().toUpperCase());
+            if (request.getReferenceDocumentType() != null && !request.getReferenceDocumentType().trim().isEmpty()) {
+                type = materialInventoryReferenceDocumentType.valueOf(request.getReferenceDocumentType().toUpperCase());
+            }
         } catch (IllegalArgumentException e) {
-            System.err.println("Invalid Reference Document type" + request.getReferenceDocumentType());
+            System.err.println("Invalid Reference Document type: " + request.getReferenceDocumentType());
         }
-        Optional<MaterialInventory> optionalInventory = materialInventoryRepository.findByMaterialVariant_Id(variantId);
+        Optional<MaterialInventory> optionalInventory = materialInventoryRepository.findByMaterialVariant_IdAndMaterialVariant_Material_Company(variantId, user.getCompany());
         
         MaterialInventory materialInventory;
         if (optionalInventory.isPresent()) {
@@ -207,22 +231,34 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
             
             materialInventory.setInventoryStatus(status);
             
+            // Save the inventory to persist the log - handle log errors gracefully
+            try {
+                materialInventoryRepository.save(materialInventory);
+            } catch (Exception e) {
+                // If log saving fails, still save the inventory without the log
+                System.err.println("Failed to save log, but stock operation succeeded: " + e.getMessage());
+                materialInventory.getLogs().clear(); // Remove the problematic log
+                materialInventoryRepository.save(materialInventory);
+            }
+            
             // Create notification if status changed
             if (!oldStatus.equals(status)) {
                 notificationService.createMaterialInventoryNotification(user, materialInventory, oldStatus, status);
+                // Send email alerts for inventory status changes
+                emailSendingService.sendMaterialInventoryStatusEmailAlert(materialInventory, oldStatus, status);
             }
             
             return new InventoryTransactionResponse(
                 inventoryLog.getId(),
-                inventoryLog.getTransactionType().toString(),
-                inventoryLog.getTransactionSourceType().toString(),
+                inventoryLog.getTransactionType() != null ? inventoryLog.getTransactionType().toString() : "UNKNOWN",
+                inventoryLog.getTransactionSourceType() != null ? inventoryLog.getTransactionSourceType().toString() : "UNKNOWN",
                 result,
                 inventoryLog.getBeforeQuantity(),
                 inventoryLog.getAfterQuantity(),
                 inventoryLog.getNote(),
-                inventoryLog.getReferenceDocumentType().toString(),
+                inventoryLog.getReferenceDocumentType() != null ? inventoryLog.getReferenceDocumentType().toString() : null,
                 inventoryLog.getReferenceDocumentId(),
-                inventoryLog.getStockType().getDisplayName(),
+                inventoryLog.getStockType() != null ? inventoryLog.getStockType().getDisplayName() : "UNKNOWN",
                 LocalDateTime.now(),
                 user.getUsername(),
                 user.getRole().toString()
@@ -247,12 +283,9 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
 
             inventoryLogList.add(inventoryLog);
 
-            InventoryStatus status;
-            if (request.getNewQuantity().compareTo(BigDecimal.ZERO)==0){
-                status = InventoryStatus.OUT_OF_STOCK;
-            } else {
-                status = InventoryStatus.IN_STOCK;
-            }
+            InventoryStatus status = handelStatus(request.getNewQuantity(), null,null, null, null);
+            
+
             materialInventory = new MaterialInventory(
                 materialVariant,
                 request.getNewQuantity(),
@@ -285,7 +318,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
     @Override
     @Transactional
     public InventoryTransactionResponse addStock(Long variantId, StockModifyRequest request, User user) {
-        MaterialVariant materialVariant = materialVariantRepository.findById(variantId)
+        MaterialVariant materialVariant = materialVariantRepository.findByIdAndCompany(variantId, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Material varian not found with id: " + variantId));
 
         if (materialVariant.getStatus() == MaterialStatus.DELETED) {
@@ -293,18 +326,22 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
         } 
         materialInventoryReferenceDocumentType type = null ;
         try {
-            type = materialInventoryReferenceDocumentType.valueOf(request.getReferenceDocumentType().toUpperCase());
+            if (request.getReferenceDocumentType() != null && !request.getReferenceDocumentType().trim().isEmpty()) {
+                type = materialInventoryReferenceDocumentType.valueOf(request.getReferenceDocumentType().toUpperCase());
+            }
         } catch (IllegalArgumentException e) {
-            System.err.println("Invalid Reference Document type" + request.getReferenceDocumentType());
+            System.err.println("Invalid Reference Document type: " + request.getReferenceDocumentType());
         }
 
         materialInventoryTransactionSourceType source = null;
         try {
-            source = materialInventoryTransactionSourceType.valueOf(request.getTransactionSource());
+            if (request.getTransactionSource() != null && !request.getTransactionSource().trim().isEmpty()) {
+                source = materialInventoryTransactionSourceType.valueOf(request.getTransactionSource());
+            }
         } catch (IllegalArgumentException e){
-            System.err.println("Invalid Reference Document type" + request.getReferenceDocumentType());
+            System.err.println("Invalid Transaction Source: " + request.getTransactionSource());
         }
-        Optional<MaterialInventory> optionalInventory = materialInventoryRepository.findByMaterialVariant_Id(variantId);
+        Optional<MaterialInventory> optionalInventory = materialInventoryRepository.findByMaterialVariant_IdAndMaterialVariant_Material_Company(variantId, user.getCompany());
         
         MaterialInventory materialInventory;
         if (optionalInventory.isPresent()) {
@@ -334,9 +371,21 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
 
             materialInventory.setInventoryStatus(status);
             
+            // Save the inventory to persist the log - handle log errors gracefully
+            try {
+                materialInventoryRepository.save(materialInventory);
+            } catch (Exception e) {
+                // If log saving fails, still save the inventory without the log
+                System.err.println("Failed to save log, but stock operation succeeded: " + e.getMessage());
+                materialInventory.getLogs().clear(); // Remove the problematic log
+                materialInventoryRepository.save(materialInventory);
+            }
+            
             // Create notification if status changed
             if (!oldStatus.equals(status)) {
                 notificationService.createMaterialInventoryNotification(user, materialInventory, oldStatus, status);
+                // Send email alerts for inventory status changes
+                emailSendingService.sendMaterialInventoryStatusEmailAlert(materialInventory, oldStatus, status);
             }
 
             return new InventoryTransactionResponse(
@@ -382,6 +431,13 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
                 InventoryStatus.IN_STOCK,
                 user
             );
+            
+            // Explicitly set futureStock and allocatedStock to zero
+            materialInventory.setFutureStock(BigDecimal.ZERO);
+            materialInventory.setAllocatedStock(BigDecimal.ZERO);
+            
+            // Save the inventory - logs will be saved automatically due to cascade
+            materialInventoryRepository.save(materialInventory);
 
             return new InventoryTransactionResponse(
                 inventoryLog.getId(),
@@ -405,7 +461,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
     @Override
     @Transactional
     public InventoryTransactionResponse subtractStock(Long variantId, StockModifyRequest request, User user) {
-        MaterialVariant materialVariant = materialVariantRepository.findById(variantId)
+        MaterialVariant materialVariant = materialVariantRepository.findByIdAndCompany(variantId, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Material variant not found with id: " + variantId));
 
         if (materialVariant.getStatus() == MaterialStatus.DELETED) {
@@ -413,18 +469,22 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
         } 
         materialInventoryReferenceDocumentType type = null ;
         try {
-            type = materialInventoryReferenceDocumentType.valueOf(request.getReferenceDocumentType().toUpperCase());
+            if (request.getReferenceDocumentType() != null && !request.getReferenceDocumentType().trim().isEmpty()) {
+                type = materialInventoryReferenceDocumentType.valueOf(request.getReferenceDocumentType().toUpperCase());
+            }
         } catch (IllegalArgumentException e) {
-            System.err.println("Invalid Reference Document type" + request.getReferenceDocumentType());
+            System.err.println("Invalid Reference Document type: " + request.getReferenceDocumentType());
         }
 
         materialInventoryTransactionSourceType source = null;
         try {
-            source = materialInventoryTransactionSourceType.valueOf(request.getTransactionSource());
+            if (request.getTransactionSource() != null && !request.getTransactionSource().trim().isEmpty()) {
+                source = materialInventoryTransactionSourceType.valueOf(request.getTransactionSource());
+            }
         } catch (IllegalArgumentException e){
-            System.err.println("Invalid Reference Document type" + request.getReferenceDocumentType());
+            System.err.println("Invalid Transaction Source: " + request.getTransactionSource());
         }
-        Optional<MaterialInventory> optionalInventory = materialInventoryRepository.findByMaterialVariant_Id(variantId);
+        Optional<MaterialInventory> optionalInventory = materialInventoryRepository.findByMaterialVariant_IdAndMaterialVariant_Material_Company(variantId, user.getCompany());
         
         MaterialInventory materialInventory;
         if (optionalInventory.isPresent()) {
@@ -458,21 +518,33 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
                                                     , materialInventory.getMinAlertStock(), materialInventory.getMaxStockLevel());
             materialInventory.setInventoryStatus(status);
             
+            // Save the inventory to persist the log - handle log errors gracefully
+            try {
+                materialInventoryRepository.save(materialInventory);
+            } catch (Exception e) {
+                // If log saving fails, still save the inventory without the log
+                System.err.println("Failed to save log, but stock operation succeeded: " + e.getMessage());
+                materialInventory.getLogs().clear(); // Remove the problematic log
+                materialInventoryRepository.save(materialInventory);
+            }
+            
             // Create notification if status changed
             if (!oldStatus.equals(status)) {
                 notificationService.createMaterialInventoryNotification(user, materialInventory, oldStatus, status);
+                // Send email alerts for inventory status changes
+                emailSendingService.sendMaterialInventoryStatusEmailAlert(materialInventory, oldStatus, status);
             }
             return new InventoryTransactionResponse(
                 inventoryLog.getId(),
-                inventoryLog.getTransactionType().toString(),
-                inventoryLog.getTransactionSourceType().toString(),
+                inventoryLog.getTransactionType() != null ? inventoryLog.getTransactionType().toString() : "UNKNOWN",
+                inventoryLog.getTransactionSourceType() != null ? inventoryLog.getTransactionSourceType().toString() : "UNKNOWN",
                 inventoryLog.getQuantity(),
                 inventoryLog.getBeforeQuantity(),
                 inventoryLog.getAfterQuantity(),
                 inventoryLog.getNote(),
-                inventoryLog.getReferenceDocumentType().toString(),
+                inventoryLog.getReferenceDocumentType() != null ? inventoryLog.getReferenceDocumentType().toString() : null,
                 inventoryLog.getReferenceDocumentId(),
-                inventoryLog.getStockType().getDisplayName(),
+                inventoryLog.getStockType() != null ? inventoryLog.getStockType().getDisplayName() : "UNKNOWN",
                 LocalDateTime.now(),
                 user.getUsername(),
                 user.getRole().toString()
@@ -488,7 +560,8 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
         String search, 
         List<String> groupMaterials,
         List<String> inventoryStatus, 
-        Pageable pageable) {
+        Pageable pageable,
+        User user){
         System.out.println("=== FIND MATERIAL INVENTORY DEBUG ===");
         System.out.println("Search: " + search);
         System.out.println("Group Materials (String): " + groupMaterials);
@@ -523,7 +596,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
         System.out.println("Inventory Status List: " + inventoryStatusList);
         
         Page<SearchInventoryResponse> result = materialInventoryRepository.searchInventoryByCriteria(
-            search, groupMaterialIds, inventoryStatusList, pageable);
+            search, groupMaterialIds, inventoryStatusList, user.getCompany(), pageable);
             
         System.out.println("Result total elements: " + result.getTotalElements());
         System.out.println("Result content size: " + result.getContent().size());
@@ -570,40 +643,76 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
     }
 
     @Override
-    public List<AllSearchInventoryResponse> getAllForAutocomplete(String search) {
+    public List<AllSearchInventoryResponse> getAllForAutocomplete(String search, User user){
         // handle search
         String processedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
-        List<AllSearchInventoryResponse> response = materialInventoryRepository.searchInventory(processedSearch);
+        List<AllSearchInventoryResponse> response = materialInventoryRepository.searchInventory(processedSearch,user.getCompany());
         return response;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     @Override
-    public MaterialInventoryDetailResponse getMaterialInventoryById(Long variantId) {
-        MaterialInventory inventory = materialInventoryRepository.findByMaterialVariant_Id(variantId)
+    public MaterialInventoryDetailResponse getMaterialInventoryById(Long variantId, User user) {
+        MaterialInventory inventory = materialInventoryRepository.findByMaterialVariant_IdAndMaterialVariant_Material_Company(variantId, user.getCompany())
             .orElseThrow(() -> new RuntimeException("Material variant inventory not found with variant ID: " + variantId));
 
         MaterialVariant variant = inventory.getMaterialVariant();
         Material material = variant.getMaterial();
         
-        // Get logs for this inventory with null safety
-        List<InventoryTransactionResponse> logs = materialInventoryLogRepository
-            .findByMaterialVariant_IdOrderByTransactionTimestampDesc(variantId)
+        // Debug: Log the inventory ID
+        System.out.println("DEBUG: MaterialInventory ID: " + inventory.getId());
+        System.out.println("DEBUG: MaterialVariant ID: " + variantId);
+        
+        // Debug: Check currentStock value
+        System.out.println("DEBUG: Current Stock from DB: " + inventory.getCurrentStock());
+        System.out.println("DEBUG: Current Stock type: " + (inventory.getCurrentStock() != null ? inventory.getCurrentStock().getClass().getName() : "NULL"));
+        System.out.println("DEBUG: Current Stock equals zero: " + (inventory.getCurrentStock() != null ? inventory.getCurrentStock().equals(BigDecimal.ZERO) : "NULL"));
+        
+        // Debug: Check total logs in database
+        long totalLogs = materialInventoryLogRepository.count();
+        System.out.println("DEBUG: Total logs in database: " + totalLogs);
+        
+        // Debug: Check logs for this specific material inventory
+        List<MaterialInventoryLog> allLogs = materialInventoryLogRepository.findAll();
+        long logsForThisInventory = allLogs.stream()
+            .filter(log -> log.getMaterialInventory() != null && log.getMaterialInventory().getId().equals(inventory.getId()))
+            .count();
+        System.out.println("DEBUG: Logs for this inventory (ID " + inventory.getId() + "): " + logsForThisInventory);
+        
+        // Get logs for this inventory with null safety - try JPA query
+        List<MaterialInventoryLog> rawLogs = materialInventoryLogRepository
+            .findByMaterialInventory_IdOrderByTransactionTimestampDesc(inventory.getId());
+        
+        System.out.println("DEBUG: Raw logs count (JPA query): " + rawLogs.size());
+        
+        // Debug: Print each log details
+        for (MaterialInventoryLog log : rawLogs) {
+            System.out.println("DEBUG: Log ID: " + log.getId() + 
+                             ", MaterialInventory ID: " + (log.getMaterialInventory() != null ? log.getMaterialInventory().getId() : "NULL") +
+                             ", Transaction Type: " + log.getTransactionType() +
+                             ", Quantity: " + log.getQuantity());
+        }
+        
+        List<InventoryTransactionResponse> logs = rawLogs
             .stream()
             .filter(log -> log != null) // Filter out null logs
             .map(log -> {
                 try {
+                    System.out.println("DEBUG: Processing log ID: " + log.getId());
                     return new InventoryTransactionResponse(log);
                 } catch (Exception e) {
                     // Log the error but continue processing other logs
                     System.err.println("Error processing inventory log: " + e.getMessage());
+                    e.printStackTrace();
                     return null;
                 }
             })
             .filter(response -> response != null) // Filter out null responses
             .collect(Collectors.toList());
+        
+        System.out.println("DEBUG: Final logs count: " + logs.size());
 
-        return new MaterialInventoryDetailResponse(
+        MaterialInventoryDetailResponse response = new MaterialInventoryDetailResponse(
             variant.getId(),
             material.getName(),
             material.getSku(),
@@ -617,6 +726,12 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
             variant.getImageUrl(),
             logs
         );
+        
+        // Debug: Log the response values
+        System.out.println("DEBUG: Response currentStock: " + response.getCurrentStock());
+        System.out.println("DEBUG: Response currentStock type: " + (response.getCurrentStock() != null ? response.getCurrentStock().getClass().getName() : "NULL"));
+        
+        return response;
     }
 
 
@@ -857,7 +972,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
 
     @Override
     public MaterialInventory addToFutureStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
-        MaterialInventory inventory = getByMaterialVariantId(variantId);
+        MaterialInventory inventory = getByMaterialVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("MaterialInventory not found for variant ID: " + variantId);
         }
@@ -894,7 +1009,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
     @Override
     public MaterialInventory moveFromFutureToCurrentStock(Long variantId, BigDecimal quantity, User user,
             Long ticketId) {
-        MaterialInventory inventory = getByMaterialVariantId(variantId);
+        MaterialInventory inventory = getByMaterialVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("MaterialInventory not found for variant ID: " + variantId);
         }
@@ -960,7 +1075,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
 
     @Override
     public MaterialInventory addToAllocatedStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
-        MaterialInventory inventory = getByMaterialVariantId(variantId);
+        MaterialInventory inventory = getByMaterialVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("MaterialInventory not found for variant ID: " + variantId);
         }
@@ -999,7 +1114,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
 
     @Override
     public MaterialInventory removeFromCurrentStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
-        MaterialInventory inventory = getByMaterialVariantId(variantId);
+        MaterialInventory inventory = getByMaterialVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("MaterialInventory not found for variant ID: " + variantId);
         }
@@ -1036,26 +1151,73 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
     }
 
     @Transactional(readOnly = true)
-    public MaterialInventory getByMaterialVariantId(Long variantId) {
-        return materialInventoryRepository.findByMaterialVariant_Id(variantId).orElse(null);
+    public MaterialInventory getByMaterialVariantId(Long variantId, User user) {
+        return materialInventoryRepository.findByMaterialVariant_IdAndMaterialVariant_Material_Company(variantId, user.getCompany()).orElse(null);
     }
 
     
     @Override
-    public boolean isEnough(MaterialVariant variant, BigDecimal plannedQuantity){
+    public boolean isEnough(MaterialVariant variant, BigDecimal plannedQuantity, User user){
         boolean isEnough = true;
-        MaterialInventory inventory = materialInventoryRepository.findByMaterialVariant_Id(variant.getId())
-                                    .orElseThrow(() -> new RuntimeException("Material variant inventory not found with the material variant id: " + variant.getId()));
-        BigDecimal savedStock = inventory.getFutureStock().subtract(inventory.getAllocatedStock());
-        if(savedStock.compareTo(plannedQuantity)<0){
+        
+        // Try to find the material inventory
+        MaterialInventory inventory = materialInventoryRepository.findByMaterialVariant_IdAndMaterialVariant_Material_Company(variant.getId(), user.getCompany())
+                                    .orElse(null);
+        
+        // If inventory doesn't exist, create it with default values
+        if (inventory == null) {
+            System.out.println("Material inventory not found for variant ID: " + variant.getId() + ", creating default inventory");
+            inventory = new MaterialInventory();
+            inventory.setMaterialVariant(variant);
+            inventory.setCurrentStock(BigDecimal.ZERO);
+            inventory.setFutureStock(BigDecimal.ZERO);
+            inventory.setAllocatedStock(BigDecimal.ZERO);
+            inventory.setInventoryStatus(InventoryStatus.OUT_OF_STOCK);
+            inventory.setActive(true);
+            inventory.setCreatedAt(LocalDateTime.now());
+            inventory.setCreated_by(user);
+            inventory.setUpdatedAt(LocalDateTime.now());
+            inventory.setUpdated_by(user);
+            
+            // Save the new inventory
+            inventory = materialInventoryRepository.save(inventory);
+            System.out.println("Created default material inventory with ID: " + inventory.getId());
+        }
+        
+        // Handle null values safely
+        BigDecimal futureStock = inventory.getFutureStock() != null ? inventory.getFutureStock() : BigDecimal.ZERO;
+        BigDecimal allocatedStock = inventory.getAllocatedStock() != null ? inventory.getAllocatedStock() : BigDecimal.ZERO;
+        
+        BigDecimal savedStock = futureStock.subtract(allocatedStock);
+        if(savedStock.compareTo(plannedQuantity) < 0){
             isEnough = false;
         }
+        
         return isEnough;
     }
 
     @Override
+    public BigDecimal getAvailableStock(MaterialVariant variant, User user) {
+        // Try to find the material inventory
+        MaterialInventory inventory = materialInventoryRepository.findByMaterialVariant_IdAndMaterialVariant_Material_Company(variant.getId(), user.getCompany())
+                                    .orElse(null);
+        
+        // If inventory doesn't exist, return zero
+        if (inventory == null) {
+            return BigDecimal.ZERO;
+        }
+        
+        // Handle null values safely
+        BigDecimal futureStock = inventory.getFutureStock() != null ? inventory.getFutureStock() : BigDecimal.ZERO;
+        BigDecimal allocatedStock = inventory.getAllocatedStock() != null ? inventory.getAllocatedStock() : BigDecimal.ZERO;
+        
+        // Available stock = future stock - allocated stock
+        return futureStock.subtract(allocatedStock);
+    }
+
+    @Override
     public MaterialInventory removeFromFutureStock (Long variantId, BigDecimal quantity, User user, Long ticketId){
-        MaterialInventory inventory = getByMaterialVariantId(variantId);
+        MaterialInventory inventory = getByMaterialVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("MaterialInventory not found for variant ID: " + variantId);
         }
@@ -1093,7 +1255,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
 
     @Override
     public MaterialInventory removeFromCurrentAndAllocatedStock(Long variantId, BigDecimal quantity, User user, Long ticketId) {
-        MaterialInventory inventory = getByMaterialVariantId(variantId);
+        MaterialInventory inventory = getByMaterialVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("MaterialInventory not found for variant ID: " + variantId);
         }
@@ -1135,7 +1297,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
         if (oldAllocatedStock.compareTo(quantity) < 0) {
             inventory.setAllocatedStock(BigDecimal.ZERO);
         } else {
-            BigDecimal newAllocatedStock = oldCurrentStock.subtract(quantity);
+            BigDecimal newAllocatedStock = oldAllocatedStock.subtract(quantity);
             inventory.setAllocatedStock(newAllocatedStock);
         }
 
@@ -1161,7 +1323,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
 
     @Override
     public MaterialInventory removeFromAllocatedStock (Long variantId, BigDecimal quantity, User user, Long ticketId){
-        MaterialInventory inventory = getByMaterialVariantId(variantId);
+        MaterialInventory inventory = getByMaterialVariantId(variantId, user);
         if (inventory == null) {
             throw new RuntimeException("MaterialInventory not found for variant ID: " + variantId);
         }
@@ -1198,7 +1360,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
     }
 
     @Override
-    public Page<SearchInventoryResponse> getAlarmMaterial(String search, List<Long> groupMaterials, List<String> status, boolean sortByOldest, Pageable pageable) {
+    public Page<SearchInventoryResponse> getAlarmMaterial(String search, List<Long> groupMaterials, List<String> status, boolean sortByOldest, Pageable pageable, User user){
         System.out.println("=== GET ALARM MATERIALS DEBUG ===");
         System.out.println("Search: " + search);
         System.out.println("Group Materials: " + groupMaterials);
@@ -1232,7 +1394,7 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
         }
 
         Page<Object[]> rawResults = materialInventoryRepository.searchAlarmInventoryWithUpdatedAt(
-            search, groupMaterials, statusEnums, sortByOldest, pageable);
+            search, groupMaterials, statusEnums, sortByOldest, user.getCompany(),pageable);
 
         Page<SearchInventoryResponse> result = rawResults.map(row -> {
             MaterialInventory inventory = (MaterialInventory) row[0];
@@ -1260,9 +1422,123 @@ public class MaterialInventoryServiceImpl implements MaterialInventoryService{
         return result;
     }
 
+    @Override
+    @Transactional
+    public SetMinMaxResponse setMinimumAlertStock(Long variantId, SetMinMaxRequest request, User user) {
+        // First check if MaterialVariant exists
+        MaterialVariant materialVariant = materialVariantRepository.findByIdAndCompany(variantId, user.getCompany())
+            .orElseThrow(() -> new RuntimeException("Material variant not found with ID: " + variantId));
+
+        if (materialVariant.getStatus() == MaterialStatus.DELETED) {
+            throw new RuntimeException("Material variant was deleted, cannot set minimum alert stock");
+        }
+
+        // Check if MaterialInventory exists for this variant
+        Optional<MaterialInventory> optionalInventory = materialInventoryRepository.findByMaterialVariant_IdAndMaterialVariant_Material_Company(variantId, user.getCompany());
+        MaterialInventory inventory;
+        BigDecimal oldMinAlertStock = null;
+
+        if (optionalInventory.isPresent()) {
+            // MaterialInventory exists, update it
+            inventory = optionalInventory.get();
+            oldMinAlertStock = inventory.getMinAlertStock();
+        } else {
+            // MaterialInventory doesn't exist, create a new empty one
+            inventory = new MaterialInventory(
+                materialVariant,
+                BigDecimal.ZERO, // currentStock
+                request.getValue(), // minAlertStock
+                null, // maxStockLevel
+                new ArrayList<>(), // logs
+                InventoryStatus.OUT_OF_STOCK, // status
+                user
+            );
+            // Explicitly set currentStock to ensure it's saved
+            inventory.setCurrentStock(BigDecimal.ZERO);
+            oldMinAlertStock = null;
+        }
+
+        // Update minimum alert stock
+        inventory.setMinAlertStock(request.getValue());
+        inventory.setUpdatedAt(LocalDateTime.now());
+        inventory.setUpdated_by(user);
+
+        // Save inventory
+        MaterialInventory savedInventory = materialInventoryRepository.save(inventory);
+
+        return new SetMinMaxResponse(
+            savedInventory.getId(),
+            savedInventory.getMaterialVariant().getSku(),
+            savedInventory.getMaterialVariant().getName(),
+            oldMinAlertStock,
+            request.getValue(),
+            "Minimum alert stock updated successfully",
+            user.getUsername(),
+            LocalDateTime.now()
+        );
+    }
+
+    @Override
+    @Transactional
+    public SetMinMaxResponse setMaximumStockLevel(Long variantId, SetMinMaxRequest request, User user) {
+        // First check if MaterialVariant exists
+        MaterialVariant materialVariant = materialVariantRepository.findByIdAndCompany(variantId, user.getCompany())
+            .orElseThrow(() -> new RuntimeException("Material variant not found with ID: " + variantId));
+
+        if (materialVariant.getStatus() == MaterialStatus.DELETED) {
+            throw new RuntimeException("Material variant was deleted, cannot set maximum stock level");
+        }
+
+        // Check if MaterialInventory exists for this variant
+        Optional<MaterialInventory> optionalInventory = materialInventoryRepository.findByMaterialVariant_IdAndMaterialVariant_Material_Company(variantId, user.getCompany());
+        MaterialInventory inventory;
+        BigDecimal oldMaxStockLevel = null;
+
+        if (optionalInventory.isPresent()) {
+            // MaterialInventory exists, update it
+            inventory = optionalInventory.get();
+            oldMaxStockLevel = inventory.getMaxStockLevel();
+        } else {
+            // MaterialInventory doesn't exist, create a new empty one
+            inventory = new MaterialInventory(
+                materialVariant,
+                BigDecimal.ZERO, // currentStock
+                null, // minAlertStock
+                request.getValue(), // maxStockLevel
+                new ArrayList<>(), // logs
+                InventoryStatus.OUT_OF_STOCK, // status
+                user
+            );
+            // Explicitly set currentStock to ensure it's saved
+            inventory.setCurrentStock(BigDecimal.ZERO);
+            oldMaxStockLevel = null;
+        }
+
+        // Update maximum stock level
+        inventory.setMaxStockLevel(request.getValue());
+        inventory.setUpdatedAt(LocalDateTime.now());
+        inventory.setUpdated_by(user);
+
+        // Save inventory
+        MaterialInventory savedInventory = materialInventoryRepository.save(inventory);
+
+        return new SetMinMaxResponse(
+            savedInventory.getId(),
+            savedInventory.getMaterialVariant().getSku(),
+            savedInventory.getMaterialVariant().getName(),
+            oldMaxStockLevel,
+            request.getValue(),
+            "Maximum stock level updated successfully",
+            user.getUsername(),
+            LocalDateTime.now()
+        );
+    }
+
     private boolean isAlarmStatus(InventoryStatus status) {
         return status == InventoryStatus.OUT_OF_STOCK || 
                status == InventoryStatus.LOW_STOCK || 
                status == InventoryStatus.OVER_STOCK;
     }
+
+
 }

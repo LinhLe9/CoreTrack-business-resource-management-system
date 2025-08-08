@@ -39,12 +39,14 @@ import {
 } from '@chakra-ui/react';
 import { purchasingTicketService } from '@/services/purchasingTicketService';
 import { PurchasingTicketResponse } from '@/types/purchasingTicket';
+import { useUser } from '@/hooks/useUser';
 
 const PurchasingTicketDetailPage = () => {
   const router = useRouter();
   const params = useParams(); 
   const id = params?.id;
   const toast = useToast();
+  const { isOwner, isWarehouseStaff } = useUser();
   
   const [ticket, setTicket] = useState<PurchasingTicketResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -390,7 +392,7 @@ const PurchasingTicketDetailPage = () => {
       {/* Action Buttons */}
       <Box textAlign="center">
         <HStack spacing={4} justify="center">
-          {ticket.status !== 'CANCELLED' && ticket.status !== 'Cancelled' && (
+          {ticket.status !== 'CANCELLED' && ticket.status !== 'Cancelled' && (isOwner() || isWarehouseStaff()) && (
             <Button 
               colorScheme="red" 
               size="lg"

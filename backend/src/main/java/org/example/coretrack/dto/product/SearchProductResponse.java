@@ -13,6 +13,18 @@ public class SearchProductResponse {
     private BigDecimal price;
     private String imageUrl;
 
+    // Constructor convert from Entity to DTO
+    public SearchProductResponse(Product product) {
+        this.id = product.getId();
+        this.sku = product.getSku();
+        this.name = product.getName();
+        this.description = product.getDescription();
+        this.group = (product.getGroup() != null) ? product.getGroup().getName() : null;
+        this.status = (product.getStatus() != null) ? product.getStatus().name(): null;
+        this.price = product.getPrice();
+        this.imageUrl = product.getImageUrl();
+    }
+
     // Constructors
     public SearchProductResponse() {}
 
@@ -25,18 +37,6 @@ public class SearchProductResponse {
         this.status = status;
         this.price = price;
         this.imageUrl = imageUrl;
-    }
-
-    // Constructor convert from Entity to DTO
-    public SearchProductResponse(Product product) {
-        this.id = product.getId();
-        this.sku = product.getSku();
-        this.name = product.getName();
-        this.description = product.getDescription();
-        this.group = (product.getGroup() != null) ? product.getGroup().getName() : null;
-        this.status = (product.getStatus() != null) ? product.getStatus().name(): null;
-        this.price = product.getPrice();
-        this.imageUrl = product.getImageUrl();
     }
 
     public Long getId() {

@@ -28,11 +28,13 @@ import { useRef } from "react";
 import NotificationBell from "@/components/NotificationBell";
 import { useRouter } from "next/navigation";
 import userService from "@/services/userService";
+import { useUser } from "@/hooks/useUser";
 
 export default function Header() {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const btnRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
+  const { user } = useUser();
 
   const handleLogout = async () => {
     try {
@@ -50,7 +52,17 @@ export default function Header() {
   };
 
   return (
-    <Box bg="white" borderBottom="1px solid" borderColor="gray.200" px={4} py={2}>
+    <Box 
+      bg="white" 
+      borderBottom="1px solid" 
+      borderColor="gray.200" 
+      px={4} 
+      py={2}
+      position="sticky"
+      top={0}
+      zIndex={1000}
+      boxShadow="sm"
+    >
       <Flex maxW="7xl" mx="auto" justify="space-between" align="center">
         {/* Left side: Logo + Menus */}
         <Flex align="center" gap={4}>
@@ -142,9 +154,11 @@ export default function Header() {
               </HStack>
             </MenuButton>
             <MenuList>
-              <MenuItem as="a" href="/user-management">
-                Admin Dashboard
-              </MenuItem>
+              {user?.role === 'OWNER' && (
+                <MenuItem as="a" href="/user-management">
+                  Admin Dashboard
+                </MenuItem>
+              )}
               <MenuItem as="a" href="/profile">
                 Profile
               </MenuItem>
@@ -227,9 +241,11 @@ export default function Header() {
                 </HStack>
               </MenuButton>
               <MenuList>
-                <MenuItem as="a" href="/admin">
-                  Admin Dashboard
-                </MenuItem>
+                {user?.role === 'OWNER' && (
+                  <MenuItem as="a" href="/user-management">
+                    Admin Dashboard
+                  </MenuItem>
+                )}
                 <MenuItem as="a" href="/profile">
                   Profile
                 </MenuItem>

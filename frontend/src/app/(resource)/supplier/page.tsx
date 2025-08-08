@@ -24,6 +24,7 @@ import { getSuppliers, getAllSuppliersForAutocomplete } from '../../../services/
 import { Supplier, SupplierQueryParams, SupplierAutoComplete } from '../../../types/supplier';
 import { PageResponse } from '../../../types/PageResponse';
 import { AddIcon } from '@chakra-ui/icons';
+import { useUser } from '../../../hooks/useUser';
 
 const SupplierCatalogPage: React.FC = () => {
   const [pageData, setPageData] = useState<PageResponse<Supplier> | null>(null);
@@ -33,6 +34,7 @@ const SupplierCatalogPage: React.FC = () => {
   const [allSuppliersForAutocomplete, setAllSuppliersForAutocomplete] = useState<SupplierAutoComplete[]>([]);
   const toast = useToast();
   const router = useRouter();
+  const { isOwner, isWarehouseStaff } = useUser();
 
   // Fetch autocomplete list
   useEffect(() => {
@@ -96,7 +98,7 @@ const SupplierCatalogPage: React.FC = () => {
   const handleFilter = (filters: Omit<SupplierQueryParams, 'search' | 'page' | 'size' | 'sort'>) => {
     setQueryParams((prev) => ({
       ...prev,
-      ...filters,
+      country: filters.country,
       page: 0,
     }));
   };
@@ -127,13 +129,15 @@ const SupplierCatalogPage: React.FC = () => {
             initialSearchTerm={queryParams.search}
             SuppliersForAutocomplete={allSuppliersForAutocomplete}
           />
-          <IconButton
-            icon={<AddIcon />}
-            aria-label="Add new supplier"
-            colorScheme="teal"
-            onClick={() => router.push('/supplier/add')}
-            title="Add Supplier"
-          />
+          {(isOwner() || isWarehouseStaff()) && (
+            <IconButton
+              icon={<AddIcon />}
+              aria-label="Add new supplier"
+              colorScheme="teal"
+              onClick={() => router.push('/supplier/add')}
+              title="Add Supplier"
+            />
+          )}
         </Flex>
 
         {/* Line 2: Filters */}

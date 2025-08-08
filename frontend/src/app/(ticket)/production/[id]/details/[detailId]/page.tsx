@@ -40,6 +40,7 @@ import {
 } from '@chakra-ui/react';
 import { productionTicketService, productionTicketUtils } from '@/services/productionTicketService';
 import { ProductionTicketDetailResponse, ProductionTicketDetailStatus } from '@/types/productionTicket';
+import { useUser } from '@/hooks/useUser';
 
 const ProductionTicketDetailPage = () => {
   const router = useRouter();
@@ -47,6 +48,7 @@ const ProductionTicketDetailPage = () => {
   const ticketId = params?.id;
   const detailId = params?.detailId;
   const toast = useToast();
+  const { isOwner, isProductionStaff, isWarehouseStaff } = useUser();
   
   const [detail, setDetail] = useState<ProductionTicketDetailResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -196,23 +198,23 @@ const ProductionTicketDetailPage = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'NEW':
+      case 'New':
         return 'blue';
-      case 'IN_PROGRESS':
+      case 'In Progress':
         return 'yellow';
-      case 'PARTIAL_COMPLETE':
+      case 'Partial Complete':
         return 'orange';
-      case 'COMPLETE':
+      case 'Complete':
         return 'green';
-      case 'PARTIAL_CANCELLED':
+      case 'Partial Cancelled':
         return 'red';
-      case 'CANCELLED':
+      case 'Cancelled':
         return 'red';
-      case 'APPROVAL':
+      case 'Approved':
         return 'purple';
-      case 'READY':
+      case 'Ready':
         return 'green';
-      case 'CLOSED':
+      case 'Closed':
         return 'gray';
       default:
         return 'blue';
@@ -220,13 +222,27 @@ const ProductionTicketDetailPage = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateString || dateString.trim() === '') {
+      return 'N/A';
+    }
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return 'Invalid Date';
+    }
   };
 
   if (loading) {
@@ -277,8 +293,8 @@ const ProductionTicketDetailPage = () => {
           {detail.completed_date && (
             <Text><strong>Completed Date:</strong> {formatDate(detail.completed_date)}</Text>
           )}
-          <Text><strong>Created:</strong> {formatDate(detail.createdAt)} by {detail.createdBy_name} ({detail.createdBy_role})</Text>
-          <Text><strong>Updated:</strong> {formatDate(detail.lastUpdatedAt)} by {detail.lastUpdatedAt_name} ({detail.lastUpdatedAt_role})</Text>
+          <Text><strong>Created:</strong> {formatDate(detail.createdAt)} by {detail.createdBy_name || 'N/A'} ({detail.createdBy_role || 'N/A'})</Text>
+          <Text><strong>Updated:</strong> {formatDate(detail.lastUpdatedAt)} by {detail.lastUpdatedAt_name || 'N/A'} ({detail.lastUpdatedAt_role || 'N/A'})</Text>
         </VStack>
       </Box>
 
@@ -405,60 +421,62 @@ const ProductionTicketDetailPage = () => {
       <Box textAlign="center">
         <VStack spacing={4}>
           {/* Status Update and Cancel Buttons - Side by Side */}
-          <HStack spacing={4} justify="center">
-            {/* Status Update Button */}
-            {detail && (() => {
-              const nextStatus = getNextStatus(detail.status);
-              if (!nextStatus) return null;
+          {(isOwner() || isProductionStaff() || isWarehouseStaff()) && (
+            <HStack spacing={4} justify="center">
+              {/* Status Update Button */}
+              {detail && (() => {
+                const nextStatus = getNextStatus(detail.status);
+                if (!nextStatus) return null;
+                
+                const getButtonText = (status: string) => {
+                  switch (status) {
+                    case 'APPROVAL': return 'Approve';
+                    case 'COMPLETE': return 'Complete';
+                    case 'READY': return 'Make Ready';
+                    case 'CLOSED': return 'Close';
+                    default: return `Change to ${status}`;
+                  }
+                };
+                
+                const getButtonColor = (status: string) => {
+                  switch (status) {
+                    case 'APPROVAL': return 'purple';
+                    case 'COMPLETE': return 'green';
+                    case 'READY': return 'blue';
+                    case 'CLOSED': return 'gray';
+                    default: return 'blue';
+                  }
+                };
+                
+                return (
+                  <Button
+                    colorScheme={getButtonColor(nextStatus)}
+                    size="lg"
+                    onClick={() => openStatusUpdateModal(nextStatus)}
+                    isLoading={updating}
+                    loadingText="Updating..."
+                  >
+                    {getButtonText(nextStatus)}
+                  </Button>
+                );
+              })()}
               
-              const getButtonText = (status: string) => {
-                switch (status) {
-                  case 'APPROVAL': return 'Approve';
-                  case 'COMPLETE': return 'Complete';
-                  case 'READY': return 'Make Ready';
-                  case 'CLOSED': return 'Close';
-                  default: return `Change to ${status}`;
-                }
-              };
-              
-              const getButtonColor = (status: string) => {
-                switch (status) {
-                  case 'APPROVAL': return 'purple';
-                  case 'COMPLETE': return 'green';
-                  case 'READY': return 'blue';
-                  case 'CLOSED': return 'gray';
-                  default: return 'blue';
-                }
-              };
-              
-              return (
-                <Button
-                  colorScheme={getButtonColor(nextStatus)}
-                  size="lg"
-                  onClick={() => openStatusUpdateModal(nextStatus)}
-                  isLoading={updating}
-                  loadingText="Updating..."
-                >
-                  {getButtonText(nextStatus)}
-                </Button>
-              );
-            })()}
-            
-            {/* Cancel Ticket Button */}
-            <Button 
-              colorScheme="red" 
-              size="lg"
-              onClick={() => {
-                setCancelReason('');
-                onCancelOpen();
-              }}
-              isLoading={updating}
-              loadingText="Cancelling..."
-              isDisabled={detail.status === 'CANCELLED' || detail.status === 'Cancelled'}
-            >
-              Cancel Ticket
-            </Button>
-          </HStack>
+              {/* Cancel Ticket Button */}
+              <Button 
+                colorScheme="red" 
+                size="lg"
+                onClick={() => {
+                  setCancelReason('');
+                  onCancelOpen();
+                }}
+                isLoading={updating}
+                loadingText="Cancelling..."
+                isDisabled={detail.status === 'CANCELLED' || detail.status === 'Cancelled'}
+              >
+                Cancel Ticket
+              </Button>
+            </HStack>
+          )}
           
           {/* Back to Production Ticket Button - Below */}
           <Button 

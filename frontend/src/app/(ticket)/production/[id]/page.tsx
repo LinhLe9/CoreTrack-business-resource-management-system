@@ -39,12 +39,14 @@ import {
 } from '@chakra-ui/react';
 import { productionTicketService, productionTicketUtils } from '@/services/productionTicketService';
 import { ProductionTicketResponse } from '@/types/productionTicket';
+import { useUser } from '@/hooks/useUser';
 
 const ProductionTicketDetailPage = () => {
   const router = useRouter();
   const params = useParams(); 
   const id = params?.id;
   const toast = useToast();
+  const { isOwner, isProductionStaff } = useUser();
   
   const [ticket, setTicket] = useState<ProductionTicketResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -81,23 +83,23 @@ const ProductionTicketDetailPage = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'NEW':
+      case 'New':
         return 'blue';
-      case 'IN_PROGRESS':
+      case 'In Progress':
         return 'yellow';
-      case 'PARTIAL_COMPLETE':
+      case 'Partial Complete':
         return 'orange';
-      case 'COMPLETE':
+      case 'Complete':
         return 'green';
-      case 'PARTIAL_CANCELLED':
+      case 'Partial Cancelled':
         return 'red';
-      case 'CANCELLED':
+      case 'Cancelled':
         return 'red';
-      case 'APPROVAL':
+      case 'Approved':
         return 'purple';
-      case 'READY':
+      case 'Ready':
         return 'green';
-      case 'CLOSED':
+      case 'Closed':
         return 'gray';
       default:
         return 'blue';
@@ -209,8 +211,8 @@ const ProductionTicketDetailPage = () => {
             )}
           </HStack>
           <HStack spacing={8} wrap="wrap">
-            <Text><strong>Created:</strong> {formatDate(ticket.createdAt)} by {ticket.createdBy} ({ticket.createdByRole})</Text>
-            <Text><strong>Updated:</strong> {formatDate(ticket.updatedAt)} by {ticket.updatedBy} ({ticket.updatedByRole})</Text>
+            <Text><strong>Created:</strong> {formatDate(ticket.createdAt)} by {ticket.createdBy || 'N/A'} ({ticket.createdByRole || 'N/A'})</Text>
+            <Text><strong>Updated:</strong> {formatDate(ticket.updatedAt)} by {ticket.updatedBy || 'N/A'} ({ticket.updatedByRole || 'N/A'})</Text>
           </HStack>
         </VStack>
       </Box>
@@ -273,7 +275,7 @@ const ProductionTicketDetailPage = () => {
                       <VStack align="start" spacing={0}>
                         <Text fontSize="xs">{formatDate(detail.createdAt)}</Text>
                         <Text fontSize="xs" color="gray.500">
-                          by {detail.createdBy} ({detail.createdByRole})
+                          by {detail.createdBy || 'N/A'} ({detail.createdByRole || 'N/A'})
                         </Text>
                       </VStack>
                     </Td>
@@ -281,7 +283,7 @@ const ProductionTicketDetailPage = () => {
                       <VStack align="start" spacing={0}>
                         <Text fontSize="xs">{formatDate(detail.updatedAt)}</Text>
                         <Text fontSize="xs" color="gray.500">
-                          by {detail.updatedBy} ({detail.updatedByRole})
+                          by {detail.updatedBy || 'N/A'} ({detail.updatedByRole || 'N/A'})
                         </Text>
                       </VStack>
                     </Td>
@@ -384,7 +386,7 @@ const ProductionTicketDetailPage = () => {
       {/* Action Buttons */}
       <Box textAlign="center">
         <HStack spacing={4} justify="center">
-          {ticket.status !== 'CANCELLED' && ticket.status !== 'Cancelled' && (
+          {ticket.status !== 'CANCELLED' && ticket.status !== 'Cancelled' && (isOwner() || isProductionStaff()) && (
             <Button 
               colorScheme="red" 
               size="lg"

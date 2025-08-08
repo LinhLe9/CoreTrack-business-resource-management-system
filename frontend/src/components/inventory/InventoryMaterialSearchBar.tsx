@@ -35,29 +35,41 @@ const InventoryMaterialSearchBar: React.FC<SearchBarProps> = ({
 }) => {
   const [selectedOption, setSelectedOption] = useState<OptionType | null>(null);
   const router = useRouter();
+  const [inputValue, setInputValue] = useState(initialSearchTerm);
 
   const options: OptionType[] = materialInventoryForAutocomplete
-    .filter(item => item && item.id && item.name) // Filter out null/undefined items
-    .map((materialInventory) => ({
-      value: materialInventory.id,
-      label: materialInventory.name,
-      sku: materialInventory.sku || '',
-      inventoryStatus: materialInventory.inventoryStatus || '',
-      currentStock: materialInventory.currentStock || '',
-      imageUrl: materialInventory.imageUrl,
+    .filter((item) => item.id !== undefined)
+    .map((item) => ({
+      value: item.id!,
+      label: item.name,
+      sku: item.sku,
+      inventoryStatus: item.inventoryStatus,
+      currentStock: item.currentStock?.toString() || '0',
     }));
 
   const handleChange = (option: OptionType | null) => {
     setSelectedOption(option);
     if (option) {
-      // Navigate to material inventory detail page
-      router.push(`/material-inventory/${option.value}`);
+      if (onSelectMaterialInventory) {
+        onSelectMaterialInventory(option.value);
+      } else {
+        onSearch(option.label);
+      }
     }
   };
 
   const handleInputChange = (inputValue: string) => {
+    setInputValue(inputValue);
     if (onSearchInputChange) {
       onSearchInputChange(inputValue);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && inputValue.trim()) {
+      onSearch(inputValue.trim());
+      setInputValue('');
+      setSelectedOption(null);
     }
   };
 
@@ -83,30 +95,40 @@ const InventoryMaterialSearchBar: React.FC<SearchBarProps> = ({
   );
 
   return (
-    <Flex gap={2} align="center">
-      <Box width="400px" minWidth="300px" maxWidth="600px">
-        <Select
-          instanceId="inventory-material-search"
-          options={options}
-          placeholder="Search by material name, SKU, or variant"
-          onChange={handleChange}
-          value={selectedOption}
-          isClearable
-          components={{ SingleValue: customSingleValue, Option: customOption }}
-          filterOption={(option, inputValue) => {
-            if (!option || !option.data) return false;
-            
-            const nameMatch = option.label?.toLowerCase().includes(inputValue.toLowerCase()) || false;
-            const skuMatch = option.data.sku?.toLowerCase().includes(inputValue.toLowerCase()) || false;
-            const statusMatch = option.data.inventoryStatus?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+    <Box width="400px" minWidth="300px" maxWidth="600px">
+      <Select
+        options={options}
+        placeholder="Search by material name, SKU, or variant"
+        onChange={handleChange}
+        value={selectedOption}
+        inputValue={inputValue}
+        onInputChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        isClearable
+        components={{ SingleValue: customSingleValue, Option: customOption }}
+        filterOption={(option, inputValue) => {
+          if (!option || !option.data) return false;
+          
+          const nameMatch = option.label?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+          const skuMatch = option.data.sku?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+          const statusMatch = option.data.inventoryStatus?.toLowerCase().includes(inputValue.toLowerCase()) || false;
 
-            return nameMatch || skuMatch || statusMatch;
-          }}
-          onInputChange={handleInputChange}
-        />
-      </Box>
-      <Button colorScheme="blue" onClick={handleSearch}>Search</Button>
-    </Flex>
+          return nameMatch || skuMatch || statusMatch;
+        }}
+        styles={{
+          menu: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+          }),
+          menuPortal: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+          }),
+        }}
+        menuPortalTarget={document.body}
+        menuPosition="fixed"
+      />
+    </Box>
   );
 };
 

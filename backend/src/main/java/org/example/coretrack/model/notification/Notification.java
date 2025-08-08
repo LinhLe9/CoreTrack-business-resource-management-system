@@ -1,6 +1,8 @@
 package org.example.coretrack.model.notification;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.example.coretrack.model.auth.User;
 import org.example.coretrack.model.product.inventory.ProductInventory;
@@ -15,6 +17,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
@@ -25,9 +28,8 @@ public class Notification {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @OneToMany(mappedBy = "notification", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true)
+    private List<NotificationUser> notificationUsers = new ArrayList<>();
     
     @ManyToOne
     @JoinColumn(name = "product_inventory_id")
@@ -47,46 +49,34 @@ public class Notification {
     @Column(name = "message", nullable = false, length = 1000)
     private String message;
     
-    @Column(name = "is_read", nullable = false)
-    private boolean isRead = false;
-    
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
     
-    @Column(name = "read_at")
-    private LocalDateTime readAt;
-    
-    public Notification(User user, ProductInventory productInventory, NotificationType type, String title, String message) {
-        this.user = user;
+    public Notification(ProductInventory productInventory, NotificationType type, String title, String message) {
         this.productInventory = productInventory;
         this.materialInventory = null;
         this.type = type;
         this.title = title;
         this.message = message;
         this.createdAt = LocalDateTime.now();
-        this.isRead = false;
     }
     
-    public Notification(User user, MaterialInventory materialInventory, NotificationType type, String title, String message) {
-        this.user = user;
+    public Notification(MaterialInventory materialInventory, NotificationType type, String title, String message) {
         this.productInventory = null;
         this.materialInventory = materialInventory;
         this.type = type;
         this.title = title;
         this.message = message;
         this.createdAt = LocalDateTime.now();
-        this.isRead = false;
     }
     
-    public Notification(User user, NotificationType type, String title, String message) {
-        this.user = user;
+    public Notification(NotificationType type, String title, String message) {
         this.productInventory = null;
         this.materialInventory = null;
         this.type = type;
         this.title = title;
         this.message = message;
         this.createdAt = LocalDateTime.now();
-        this.isRead = false;
     }
 
     public Notification(){}
@@ -99,12 +89,28 @@ public class Notification {
         this.id = id;
     }
 
-    public User getUser() {
-        return user;
+    public List<NotificationUser> getNotificationUsers() {
+        return notificationUsers;
     }
 
-    public void setUser(User user) {
-        this.user = user;
+    public void setNotificationUsers(List<NotificationUser> notificationUsers) {
+        this.notificationUsers = notificationUsers;
+    }
+    
+    // Helper methods for managing users
+    public void addUser(User user) {
+        NotificationUser notificationUser = new NotificationUser(this, user);
+        notificationUsers.add(notificationUser);
+    }
+    
+    public void addUsers(List<User> users) {
+        for (User user : users) {
+            addUser(user);
+        }
+    }
+    
+    public void removeUser(User user) {
+        notificationUsers.removeIf(nu -> nu.getUser().equals(user));
     }
 
     public ProductInventory getProductInventory() {
@@ -147,14 +153,6 @@ public class Notification {
         this.message = message;
     }
 
-    public boolean isRead() {
-        return isRead;
-    }
-
-    public void setRead(boolean isRead) {
-        this.isRead = isRead;
-    }
-
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -162,14 +160,4 @@ public class Notification {
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
-
-    public LocalDateTime getReadAt() {
-        return readAt;
-    }
-
-    public void setReadAt(LocalDateTime readAt) {
-        this.readAt = readAt;
-    }
-
-    
 } 

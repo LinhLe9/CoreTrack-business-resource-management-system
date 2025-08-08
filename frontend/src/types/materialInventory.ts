@@ -41,7 +41,7 @@ export interface AddMaterialInventoryResponse {
 }
 
 export interface MaterialInventoryDetailResponse {
-  id: number;
+  variantId: number;
   materialVariantSku: string;
   materialVariantName: string;
   materialName: string;
@@ -54,7 +54,7 @@ export interface MaterialInventoryDetailResponse {
   inventoryStatus: string;
   materialStatus: string;
   imageUrl?: string;
-  transactions: InventoryTransactionResponse[];
+  logs: InventoryTransactionResponse[];
 }
 
 // Stock Operation Types

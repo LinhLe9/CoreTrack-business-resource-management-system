@@ -6,11 +6,13 @@ import {MaterialGroup} from '@/types/material'
 
 export default function SearchMaterialGroup({
   onSelect,
+  value,
 }: {
   onSelect: (group: MaterialGroup) => void;
+  value?: string;
 }) {
   const [allGroups, setAllGroups] = useState<MaterialGroup[]>([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(value || '');
   const [filtered, setFiltered] = useState<MaterialGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +39,13 @@ export default function SearchMaterialGroup({
     const q = query.toLowerCase();
     setFiltered(allGroups.filter(group => group.name.toLowerCase().includes(q)));
   }, [query, allGroups]);
+
+  // Update query when value prop changes
+  useEffect(() => {
+    if (value !== undefined) {
+      setQuery(value);
+    }
+  }, [value]);
 
   return (
     <Box position="relative">

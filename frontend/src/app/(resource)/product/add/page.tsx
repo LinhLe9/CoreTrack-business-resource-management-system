@@ -18,7 +18,7 @@ import { AxiosError } from 'axios';
 import SupabaseUpload from '@/components/upload/SupabaseUpload';
 import { MaterialAutoComplete } from '@/types/material';
 import { getMaterialById, getAllMaterialsForAutocomplete } from '@/services/materialService';
-
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 const AddProductPage = () => {
   const [form, setForm] = useState<AddProductForm>({
@@ -312,6 +312,7 @@ const AddProductPage = () => {
     } else {
       payload.variants = form.variants.map(variant => ({
         ...variant,
+        name: `${form.name} - ${variant.name}`, // Combine product name with variant name
         bomItems: variant.bomItems.map(item => ({
           materialSku: item.materialSku,
           quantity: parseFloat(item.quantity),
@@ -335,406 +336,411 @@ const AddProductPage = () => {
   };
 
   return (
-    <Box maxW="700px" mx="auto" p={6}>
-      <Heading mb={6}>Add New Product</Heading>
-      <form onSubmit={handleSubmit}>
-        <VStack spacing={4} align="stretch">
-          {/* Product General Info */}
-          <FormControl isRequired>
-            <FormLabel>Name</FormLabel>
-            <Input name="name" value={form.name} onChange={handleChange} maxLength={255} />
-          </FormControl>
+    <ProtectedRoute>
+      <Box maxW="700px" mx="auto" p={6}>
+        <Heading mb={6}>Add New Product</Heading>
+        <form onSubmit={handleSubmit}>
+          <VStack spacing={4} align="stretch">
+            {/* Product General Info */}
+            <FormControl isRequired>
+              <FormLabel>Name</FormLabel>
+              <Input name="name" value={form.name} onChange={handleChange} maxLength={255} />
+            </FormControl>
 
-          <FormControl>
-            <FormLabel>Description</FormLabel>
-            <Textarea name="description" value={form.description} onChange={handleChange} />
-          </FormControl>
+            <FormControl>
+              <FormLabel>Description</FormLabel>
+              <Textarea name="description" value={form.description} onChange={handleChange} />
+            </FormControl>
 
-          <FormControl>
-            <FormLabel>SKU</FormLabel>
-            <Input name="sku" value={form.sku} onChange={handleChange} maxLength={16} />
-            <FormHelperText>Maximum 16 characters</FormHelperText>
-          </FormControl>
+            <FormControl>
+              <FormLabel>SKU</FormLabel>
+              <Input name="sku" value={form.sku} onChange={handleChange} maxLength={16} />
+              <FormHelperText>Maximum 16 characters</FormHelperText>
+            </FormControl>
 
-          <FormControl isRequired>
-            <FormLabel>Price</FormLabel>
-            <Input type="number" name="price" value={form.price} onChange={handleChange} min="0" step="0.01" />
-          </FormControl>
+            <FormControl isRequired>
+              <FormLabel>Price</FormLabel>
+              <Input type="number" name="price" value={form.price} onChange={handleChange} min="0" step="0.01" />
+            </FormControl>
 
-          <FormControl isRequired>
-            <FormLabel>Currency</FormLabel>
-            <Select name="currency" value={form.currency} onChange={handleChange}>
-              {currencyList.map(curr => (
-                <option key={curr.code} value={curr.code}>
-                  {curr.code} - {curr.currency}
-                </option>
-              ))}
-            </Select>
-          </FormControl>
+            <FormControl isRequired>
+              <FormLabel>Currency</FormLabel>
+              <Select name="currency" value={form.currency} onChange={handleChange}>
+                {currencyList.map(curr => (
+                  <option key={curr.code} value={curr.code}>
+                    {curr.code} - {curr.currency}
+                  </option>
+                ))}
+              </Select>
+            </FormControl>
 
-           {/* PRODUCT GROUP SEARCH + ADD */}
-          <FormControl>
-            <FormLabel>Product Group</FormLabel>
-            <HStack>
-              <SearchProductGroup
-                onSelect={handleGroupSelect}
+             {/* PRODUCT GROUP SEARCH + ADD */}
+            <FormControl>
+              <FormLabel>Product Group</FormLabel>
+              <HStack>
+                <SearchProductGroup
+                  onSelect={handleGroupSelect}
+                  value={groupSearch}
+                />
+                <IconButton aria-label="Add group" icon={<AddIcon />} onClick={onOpen} />
+              </HStack>
+            </FormControl>
+
+            {/* Upload main product image */}
+            <FormControl>
+              <FormLabel>Product Image</FormLabel>
+              
+              <SupabaseUpload
+                onUpload={(url) => {
+                  setForm(prev => ({
+                    ...prev,
+                    imageUrl: url,
+                  }));
+                  toast({
+                    title: "Image uploaded",
+                    description: "Image uploaded successfully",
+                    status: "success",
+                    duration: 3000,
+                  });
+                }}
+                folder="products"
+                maxSize={5}
+                showPreview={false}
               />
-              <IconButton aria-label="Add group" icon={<AddIcon />} onClick={onOpen} />
-            </HStack>
-          </FormControl>
-
-          {/* Upload main product image */}
-          <FormControl>
-            <FormLabel>Product Image</FormLabel>
-            
-            <SupabaseUpload
-              onUpload={(url) => {
-                setForm(prev => ({
-                  ...prev,
-                  imageUrl: url,
-                }));
-                toast({
-                  title: "Image uploaded",
-                  description: "Image uploaded successfully",
-                  status: "success",
-                  duration: 3000,
-                });
-              }}
-              folder="products"
-              maxSize={5}
-              showPreview={false}
-            />
-            
-            {/* Image Preview and Delete */}
-            {form.imageUrl && (
-              <Box
-                mt={3}
-                p={4}
-                bg="gray.50"
-                border="1px solid"
-                borderColor="gray.200"
-                borderRadius="md"
-              >
-                <Flex justify="space-between" align="center" mb={3}>
-                  <Text fontWeight="bold" color="gray.700">Image Preview</Text>
-                  <IconButton
-                    aria-label="Delete image"
-                    icon={<DeleteIcon />}
-                    size="sm"
-                    colorScheme="red"
-                    variant="ghost"
-                    onClick={() => {
-                      setForm(prev => ({ ...prev, imageUrl: '' }));
-                      toast({
-                        title: "Image removed",
-                        description: "Product image has been removed.",
-                        status: "info",
-                        duration: 2000,
-                      });
-                    }}
-                  />
-                </Flex>
-                
-                <Box textAlign="center">
-                  <img 
-                    src={form.imageUrl} 
-                    alt="Product preview" 
-                    style={{ 
-                      maxWidth: '200px', 
-                      maxHeight: '200px', 
-                      objectFit: 'contain',
-                      borderRadius: '8px'
-                    }} 
-                  />
-                </Box>
-                
-                <Box mt={2} fontSize="sm" color="gray.600">
-                  {form.imageUrl.startsWith('data:') ? (
-                    <Text color="green.600">✅ Local file uploaded</Text>
-                  ) : (
-                    <Text color="blue.600">✅ Stored in Supabase</Text>
-                  )}
-                </Box>
-              </Box>
-            )}
-          </FormControl>
-
-           {/* VARIANTS */}
-          <Box>
-            <Heading size="md" mb={4}>Variants</Heading>
-
-            {form.variants.length === 0 && (
-              <Box mb={4} fontStyle="italic" color="gray.600">
-                No variants added. BOM items below will apply to the main product.
-              </Box>
-            )}
-
-            {form.variants.map((variant, index) => (
-              <Box
-                key={index}
-                border="1px solid #ccc"
-                p={4}
-                mb={6}
-                borderRadius="md"
-                position="relative"
-              >
-                <HStack justifyContent="space-between" mb={2}>
-                  <Heading size="sm">Variant #{index + 1}</Heading>
-                  <IconButton
-                    aria-label="Remove variant"
-                    icon={<DeleteIcon />}
-                    size="sm"
-                    onClick={() => removeVariant(index)}
-                  />
-                </HStack>
-
-                <FormControl mb={2} isRequired>
-                  <FormLabel>Name</FormLabel>
-                  <Input
-                    value={variant.name}
-                    onChange={e => handleVariantChange(index, 'name', e.target.value)}
-                    maxLength={255}
-                  />
-                </FormControl>
-
-                <FormControl mb={2}>
-                  <FormLabel>Short Description</FormLabel>
-                  <Textarea
-                    value={variant.shortDescription}
-                    onChange={e => handleVariantChange(index, 'shortDescription', e.target.value)}
-                  />
-                </FormControl>
-
-                <FormControl mb={4}>
-                  <FormLabel>Variant Image</FormLabel>
-                  {variant.imageUrl && (
-                    <Box
-                      mt={3}
-                      p={4}
-                      bg="green.50"
-                      border="1px solid"
-                      borderColor="green.300"
-                      borderRadius="md"
-                    >
-                      <Flex justify="space-between" align="center" mb={3}>
-                        <Text fontWeight="bold" color="green.700">
-                          Variant #{index + 1} Image
-                        </Text>
-                        <IconButton
-                          aria-label="Remove variant image"
-                          icon={<DeleteIcon />}
-                          size="sm"
-                          colorScheme="red"
-                          variant="ghost"
-                          onClick={() => {
-                            handleVariantChange(index, 'imageUrl', '');
-                            toast({
-                              title: "Image removed",
-                              description: `Variant #${index + 1} image has been removed.`,
-                              status: "info",
-                              duration: 2000,
-                              isClosable: true,
-                            });
-                          }}
-                        />
-                      </Flex>
-                      
-                      <Flex align="center" gap={3}>
-                        <Box>
-                          <img 
-                            src={variant.imageUrl} 
-                            width={80} 
-                            height={80} 
-                            alt={`Variant ${index + 1}`}
-                            style={{ 
-                              objectFit: 'contain',
-                              borderRadius: '8px',
-                              border: '1px solid #e2e8f0'
-                            }}
-                          />
-                        </Box>
-                        <Box flex={1}>
-                          <VStack align="start" spacing={1}>
-                            <Text fontSize="sm" fontWeight="medium" color="gray.700">
-                              Image Type: {variant.imageUrl.startsWith('data:') ? 'Local File' : 'Supabase Storage'}
-                            </Text>
-                            <Text fontSize="xs" color="gray.500" isTruncated maxW="300px">
-                              {variant.imageUrl.startsWith('data:') 
-                                ? 'Base64 encoded image data'
-                                : variant.imageUrl
-                              }
-                            </Text>
-                            <Text fontSize="xs" color="green.600">
-                              ✅ Successfully uploaded
-                            </Text>
-                          </VStack>
-                        </Box>
-                      </Flex>
-                    </Box>
-                  )}
-                  
-                  {/* Upload for Variant */}
-                  <SupabaseUpload
-                    onUpload={(url) => {
-                      handleVariantChange(index, 'imageUrl', url);
-                      toast({
-                        title: "Image uploaded",
-                        description: `Variant #${index + 1} image uploaded successfully.`,
-                        status: "success",
-                        duration: 3000,
-                        isClosable: true,
-                      });
-                    }}
-                    folder="product-variants"
-                    maxSize={5}
-                    showPreview={false}
-                  />
-                </FormControl>
-
-                {/* BOM Items per variant */}
-                <Box>
-                  <Heading size="sm" mb={2}>BOM Items for this variant</Heading>
-                  {(variant.bomItems || []).map((item, bomIndex) => (
-                    <Box key={bomIndex} mb={3} p={3} border="1px solid" borderColor="gray.200" borderRadius="md">
-                      <VStack spacing={3} align="stretch">
-                        <FormControl>
-                          <FormLabel fontSize="sm">Material</FormLabel>
-                          <MaterialSearchBar
-                            materialsForAutocomplete={materialsForAutocomplete}
-                            onSelectMaterial={(materialId) => handleVariantMaterialSelect(materialId, index, bomIndex)}
-                            onSearch={() => {}} // Not needed for BOM
-                            initialSearchTerm=""
-                          />
-                        </FormControl>
-                        
-                        <HStack spacing={3}>
-                          <FormControl>
-                            <FormLabel fontSize="sm">Quantity</FormLabel>
-                            <Input
-                              type="number"
-                              min={1}
-                              placeholder="Quantity"
-                                                          value={parseFloat(item.quantity) || 0}
-                            onChange={e => handleVariantBOMChange(index, bomIndex, 'quantity', e.target.value)}
-                            />
-                          </FormControl>
-                          
-                          <FormControl>
-                            <FormLabel fontSize="sm">UOM</FormLabel>
-                            <Input
-                              placeholder="Unit of Measure"
-                              value={item.uom || ''}
-                              onChange={e => handleVariantBOMChange(index, bomIndex, 'uom', e.target.value)}
-                              isReadOnly
-                              bg="gray.50"
-                            />
-                          </FormControl>
-                          
-                          <IconButton
-                            aria-label="Remove BOM item"
-                            icon={<DeleteIcon />}
-                            size="sm"
-                            onClick={() => removeVariantBOMItem(index, bomIndex)}
-                            alignSelf="end"
-                            mt={6}
-                          />
-                        </HStack>
-                      </VStack>
-                    </Box>
-                  ))}
-                  <Button size="sm" leftIcon={<AddIcon />} onClick={() => addVariantBOMItem(index)}>
-                    Add BOM Item
-                  </Button>
-                </Box>
-              </Box>
-            ))}
-
-            <Button leftIcon={<AddIcon />} onClick={addVariant} mb={6}>
-              Add Variant
-            </Button>
-          </Box>
-
-          <Box w="full">
-            <FormLabel>BOM Items</FormLabel>
-            {form.bomItems.map((item, index) => (
-              <Box key={index} mb={3} p={3} border="1px solid" borderColor="gray.200" borderRadius="md">
-                <VStack spacing={3} align="stretch">
-                  <FormControl>
-                    <FormLabel fontSize="sm">Material</FormLabel>
-                    <MaterialSearchBar
-                      materialsForAutocomplete={materialsForAutocomplete}
-                      onSelectMaterial={(materialId) => handleMaterialSelect(materialId, index)}
-                      onSearch={() => {}} // Not needed for BOM
-                      initialSearchTerm=""
+              
+              {/* Image Preview and Delete */}
+              {form.imageUrl && (
+                <Box
+                  mt={3}
+                  p={4}
+                  bg="gray.50"
+                  border="1px solid"
+                  borderColor="gray.200"
+                  borderRadius="md"
+                >
+                  <Flex justify="space-between" align="center" mb={3}>
+                    <Text fontWeight="bold" color="gray.700">Image Preview</Text>
+                    <IconButton
+                      aria-label="Delete image"
+                      icon={<DeleteIcon />}
+                      size="sm"
+                      colorScheme="red"
+                      variant="ghost"
+                      onClick={() => {
+                        setForm(prev => ({ ...prev, imageUrl: '' }));
+                        toast({
+                          title: "Image removed",
+                          description: "Product image has been removed.",
+                          status: "info",
+                          duration: 2000,
+                        });
+                      }}
                     />
-                  </FormControl>
+                  </Flex>
                   
-                  <HStack spacing={3}>
-                    <FormControl>
-                      <FormLabel fontSize="sm">Quantity</FormLabel>
-                      <Input
-                        type="number"
-                        min={1}
-                        placeholder="Quantity"
-                                                    value={parseFloat(item.quantity) || 0}
-                            onChange={e => handleBOMChange(index, 'quantity', e.target.value)}
-                      />
-                    </FormControl>
-                    
-                    <FormControl>
-                      <FormLabel fontSize="sm">UOM</FormLabel>
-                      <Input
-                        placeholder="Unit of Measure"
-                        value={item.uom || ''}
-                        onChange={e => handleBOMChange(index, 'uom', e.target.value)}
-                        isReadOnly
-                        bg="gray.50"
-                      />
-                    </FormControl>
-                    
-                    <IconButton 
-                      icon={<DeleteIcon />} 
-                      onClick={() => removeBOMItem(index)} 
-                      aria-label="Remove BOM item"
-                      alignSelf="end"
-                      mt={6}
+                  <Box textAlign="center">
+                    <img 
+                      src={form.imageUrl} 
+                      alt="Product preview" 
+                      style={{ 
+                        maxWidth: '200px', 
+                        maxHeight: '200px', 
+                        objectFit: 'contain',
+                        borderRadius: '8px'
+                      }} 
+                    />
+                  </Box>
+                  
+                  <Box mt={2} fontSize="sm" color="gray.600">
+                    {form.imageUrl.startsWith('data:') ? (
+                      <Text color="green.600">✅ Local file uploaded</Text>
+                    ) : (
+                      <Text color="blue.600">✅ Stored in Supabase</Text>
+                    )}
+                  </Box>
+                </Box>
+              )}
+            </FormControl>
+
+             {/* VARIANTS */}
+            <Box>
+              <Heading size="md" mb={4}>Variants</Heading>
+
+              {form.variants.length === 0 && (
+                <Box mb={4} fontStyle="italic" color="gray.600">
+                  No variants added. BOM items below will apply to the main product.
+                </Box>
+              )}
+
+              {form.variants.map((variant, index) => (
+                <Box
+                  key={index}
+                  border="1px solid #ccc"
+                  p={4}
+                  mb={6}
+                  borderRadius="md"
+                  position="relative"
+                >
+                  <HStack justifyContent="space-between" mb={2}>
+                    <Heading size="sm">Variant #{index + 1}</Heading>
+                    <IconButton
+                      aria-label="Remove variant"
+                      icon={<DeleteIcon />}
+                      size="sm"
+                      onClick={() => removeVariant(index)}
                     />
                   </HStack>
-                </VStack>
-              </Box>
-            ))}
-            <Button mt={2} size="sm" leftIcon={<AddIcon />} onClick={addBOMItem}>Add BOM Item</Button>
-          </Box>
 
-          {/* Variants (optional) có thể thêm nếu cần mở rộng thêm UI */}
+                  <FormControl mb={2} isRequired>
+                    <FormLabel>Name</FormLabel>
+                    <Input
+                      value={variant.name}
+                      onChange={e => handleVariantChange(index, 'name', e.target.value)}
+                      maxLength={255}
+                    />
+                  </FormControl>
 
-          <Button type="submit" colorScheme="teal" w="full">Add Product</Button>
-        </VStack>
-      </form>
+                  <FormControl mb={2}>
+                    <FormLabel>Short Description</FormLabel>
+                    <Textarea
+                      value={variant.shortDescription}
+                      onChange={e => handleVariantChange(index, 'shortDescription', e.target.value)}
+                    />
+                  </FormControl>
 
-      {/* ADD NEW GROUP MODAL */}
-      <Modal isOpen={isOpen} onClose={onClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Create New Group</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <FormControl isInvalid={!!groupError}>
-              <FormLabel>Group Name</FormLabel>
-              <Input value={newGroupName} onChange={(e) => {
-                setNewGroupName(e.target.value);
-                setGroupError('');
-              }} />
-            </FormControl>
-            {groupError && <Box color="red.500" mt={2}>{groupError}</Box>}
-          </ModalBody>
-          <ModalFooter>
-            <Button onClick={handleNewGroupSubmit} colorScheme="teal" mr={3}>Add</Button>
-            <Button onClick={onClose}>Cancel</Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-    </Box>
+                  <FormControl mb={4}>
+                    <FormLabel>Variant Image</FormLabel>
+                    {variant.imageUrl && (
+                      <Box
+                        mt={3}
+                        p={4}
+                        bg="green.50"
+                        border="1px solid"
+                        borderColor="green.300"
+                        borderRadius="md"
+                      >
+                        <Flex justify="space-between" align="center" mb={3}>
+                          <Text fontWeight="bold" color="green.700">
+                            Variant #{index + 1} Image
+                          </Text>
+                          <IconButton
+                            aria-label="Remove variant image"
+                            icon={<DeleteIcon />}
+                            size="sm"
+                            colorScheme="red"
+                            variant="ghost"
+                            onClick={() => {
+                              handleVariantChange(index, 'imageUrl', '');
+                              toast({
+                                title: "Image removed",
+                                description: `Variant #${index + 1} image has been removed.`,
+                                status: "info",
+                                duration: 2000,
+                                isClosable: true,
+                              });
+                            }}
+                          />
+                        </Flex>
+                        
+                        <Flex align="center" gap={3}>
+                          <Box>
+                            <img 
+                              src={variant.imageUrl} 
+                              width={80} 
+                              height={80} 
+                              alt={`Variant ${index + 1}`}
+                              style={{ 
+                                objectFit: 'contain',
+                                borderRadius: '8px',
+                                border: '1px solid #e2e8f0'
+                              }}
+                            />
+                          </Box>
+                          <Box flex={1}>
+                            <VStack align="start" spacing={1}>
+                              <Text fontSize="sm" fontWeight="medium" color="gray.700">
+                                Image Type: {variant.imageUrl.startsWith('data:') ? 'Local File' : 'Supabase Storage'}
+                              </Text>
+                              <Text fontSize="xs" color="gray.500" isTruncated maxW="300px">
+                                {variant.imageUrl.startsWith('data:') 
+                                  ? 'Base64 encoded image data'
+                                  : variant.imageUrl
+                                }
+                              </Text>
+                              <Text fontSize="xs" color="green.600">
+                                ✅ Successfully uploaded
+                              </Text>
+                            </VStack>
+                          </Box>
+                        </Flex>
+                      </Box>
+                    )}
+                    
+                    {/* Upload for Variant */}
+                    <SupabaseUpload
+                      onUpload={(url) => {
+                        handleVariantChange(index, 'imageUrl', url);
+                        toast({
+                          title: "Image uploaded",
+                          description: `Variant #${index + 1} image uploaded successfully.`,
+                          status: "success",
+                          duration: 3000,
+                          isClosable: true,
+                        });
+                      }}
+                      folder="product-variants"
+                      maxSize={5}
+                      showPreview={false}
+                    />
+                  </FormControl>
+
+                  {/* BOM Items per variant */}
+                  <Box>
+                    <Heading size="sm" mb={2}>BOM Items for this variant</Heading>
+                    {(variant.bomItems || []).map((item, bomIndex) => (
+                      <Box key={bomIndex} mb={3} p={3} border="1px solid" borderColor="gray.200" borderRadius="md">
+                        <VStack spacing={3} align="stretch">
+                          <FormControl>
+                            <FormLabel fontSize="sm">Material</FormLabel>
+                            <MaterialSearchBar
+                              materialsForAutocomplete={materialsForAutocomplete}
+                              onSelectMaterial={(materialId) => handleVariantMaterialSelect(materialId, index, bomIndex)}
+                              onSearch={() => {}} // Not needed for BOM
+                              initialSearchTerm=""
+                            />
+                          </FormControl>
+                          
+                          <HStack spacing={3}>
+                            <FormControl>
+                              <FormLabel fontSize="sm">Quantity</FormLabel>
+                                                      <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Quantity"
+                          value={parseFloat(item.quantity) || 0}
+                          onChange={e => handleVariantBOMChange(index, bomIndex, 'quantity', e.target.value)}
+                        />
+                            </FormControl>
+                            
+                            <FormControl>
+                              <FormLabel fontSize="sm">UOM</FormLabel>
+                              <Input
+                                placeholder="Unit of Measure"
+                                value={item.uom || ''}
+                                onChange={e => handleVariantBOMChange(index, bomIndex, 'uom', e.target.value)}
+                                isReadOnly
+                                bg="gray.50"
+                              />
+                            </FormControl>
+                            
+                            <IconButton
+                              aria-label="Remove BOM item"
+                              icon={<DeleteIcon />}
+                              size="sm"
+                              onClick={() => removeVariantBOMItem(index, bomIndex)}
+                              alignSelf="end"
+                              mt={6}
+                            />
+                          </HStack>
+                        </VStack>
+                      </Box>
+                    ))}
+                    <Button size="sm" leftIcon={<AddIcon />} onClick={() => addVariantBOMItem(index)}>
+                      Add BOM Item
+                    </Button>
+                  </Box>
+                </Box>
+              ))}
+
+              <Button leftIcon={<AddIcon />} onClick={addVariant} mb={6}>
+                Add Variant
+              </Button>
+            </Box>
+
+            <Box w="full">
+              <FormLabel>BOM Items</FormLabel>
+              {form.bomItems.map((item, index) => (
+                <Box key={index} mb={3} p={3} border="1px solid" borderColor="gray.200" borderRadius="md">
+                  <VStack spacing={3} align="stretch">
+                    <FormControl>
+                      <FormLabel fontSize="sm">Material</FormLabel>
+                      <MaterialSearchBar
+                        materialsForAutocomplete={materialsForAutocomplete}
+                        onSelectMaterial={(materialId) => handleMaterialSelect(materialId, index)}
+                        onSearch={() => {}} // Not needed for BOM
+                        initialSearchTerm=""
+                      />
+                    </FormControl>
+                    
+                    <HStack spacing={3}>
+                      <FormControl>
+                        <FormLabel fontSize="sm">Quantity</FormLabel>
+                                                <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Quantity"
+                          value={parseFloat(item.quantity) || 0}
+                          onChange={e => handleBOMChange(index, 'quantity', e.target.value)}
+                        />
+                      </FormControl>
+                      
+                      <FormControl>
+                        <FormLabel fontSize="sm">UOM</FormLabel>
+                        <Input
+                          placeholder="Unit of Measure"
+                          value={item.uom || ''}
+                          onChange={e => handleBOMChange(index, 'uom', e.target.value)}
+                          isReadOnly
+                          bg="gray.50"
+                        />
+                      </FormControl>
+                      
+                      <IconButton 
+                        icon={<DeleteIcon />} 
+                        onClick={() => removeBOMItem(index)} 
+                        aria-label="Remove BOM item"
+                        alignSelf="end"
+                        mt={6}
+                      />
+                    </HStack>
+                  </VStack>
+                </Box>
+              ))}
+              <Button mt={2} size="sm" leftIcon={<AddIcon />} onClick={addBOMItem}>Add BOM Item</Button>
+            </Box>
+
+            {/* Variants (optional) có thể thêm nếu cần mở rộng thêm UI */}
+
+            <Button type="submit" colorScheme="teal" w="full">Add Product</Button>
+          </VStack>
+        </form>
+
+        {/* ADD NEW GROUP MODAL */}
+        <Modal isOpen={isOpen} onClose={onClose}>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Create New Group</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <FormControl isInvalid={!!groupError}>
+                <FormLabel>Group Name</FormLabel>
+                <Input value={newGroupName} onChange={(e) => {
+                  setNewGroupName(e.target.value);
+                  setGroupError('');
+                }} />
+              </FormControl>
+              {groupError && <Box color="red.500" mt={2}>{groupError}</Box>}
+            </ModalBody>
+            <ModalFooter>
+              <Button onClick={handleNewGroupSubmit} colorScheme="teal" mr={3}>Add</Button>
+              <Button onClick={onClose}>Cancel</Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+      </Box>
+    </ProtectedRoute>
   );
 };
 

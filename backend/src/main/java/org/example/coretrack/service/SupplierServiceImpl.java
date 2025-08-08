@@ -34,17 +34,17 @@ public class SupplierServiceImpl implements SupplierService{
     public Page<SearchSupplierResponse> findSupplier(
         String search, 
         List<String> countries,
-        Pageable pageable) {
+        Pageable pageable,
+        User currentUser) {
 
-        // Xử lý tham số search: nếu null hoặc rỗng, đặt thành null để không áp dụng điều kiện LIKE
         String processedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
-        // Xử lý tham số groupMaterials: nếu rỗng hoặc null, đặt thành null để không áp dụng điều kiện IN
         List<String> processedCountries = CollectionUtils.isEmpty(countries) ? null : countries;
 
-        Page<Supplier> suppliers = supplierRepository.findByCriteria(
+        Page<Supplier> suppliers = supplierRepository.findByCriteriaAndCompany(
             processedSearch,
             processedCountries,
+            currentUser.getCompany(),
             pageable
         );
 
@@ -52,21 +52,21 @@ public class SupplierServiceImpl implements SupplierService{
     }
 
     @Override
-    public List<AllSupplierSearchResponse> getAllSuppliersForAutocomplete(String search) {
-        return supplierRepository.findBySearchKeyword(search).stream()
+    public List<AllSupplierSearchResponse> getAllSuppliersForAutocomplete(String search, User currentUser) {
+        return supplierRepository.findBySearchKeywordAndCompany(search, currentUser.getCompany()).stream()
                     .map(AllSupplierSearchResponse::new)
                     .collect(Collectors.toList());
     }
 
     @Override
-    public Page<SearchSupplierResponse> findAllSuppliers (Pageable pageable){
-        Page<Supplier> suppliers = supplierRepository.findAllActive(pageable);
+    public Page<SearchSupplierResponse> findAllSuppliers (Pageable pageable, User currentUser){
+        Page<Supplier> suppliers = supplierRepository.findAllActiveByCompany(currentUser.getCompany(), pageable);
         return suppliers.map(SearchSupplierResponse::new);
     }
 
     @Override
-    public List<String> getAllCountries(){
-        return supplierRepository.findDistinctCountries();
+    public List<String> getAllCountries(User currentUser){
+        return supplierRepository.findDistinctCountriesByCompany(currentUser.getCompany());
     }
 
     @Override
@@ -89,7 +89,8 @@ public class SupplierServiceImpl implements SupplierService{
             addSupplierRequest.getEmail(),
             addSupplierRequest.getPhone(),
             addSupplierRequest.getCurrency(),
-            createdByUser
+            createdByUser,
+            createdByUser.getCompany()
         );
         
         // Set additional fields
@@ -103,8 +104,8 @@ public class SupplierServiceImpl implements SupplierService{
     }
 
     @Override
-    public SupplierDetailResponse getSupplierById(Long id) {
-    Supplier supplier = supplierRepository.findById(id)
+    public SupplierDetailResponse getSupplierById(Long id, User currentUser) {
+    Supplier supplier = supplierRepository.findByIdAndCompany(id, currentUser.getCompany())
             .orElseThrow(() -> new RuntimeException("Supplier not found with ID: " + id));
 
     List<SupplierMaterialResponse> supplierMaterial = supplier.getMaterialSuppliers() != null

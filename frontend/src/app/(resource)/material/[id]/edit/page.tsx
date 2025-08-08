@@ -44,6 +44,7 @@ import useUoM from '@/hooks/useUoM';
 import { AxiosError } from 'axios';
 import SupabaseUpload from '@/components/upload/SupabaseUpload';
 import MaterialSearchBar from '@/components/material/MaterialSearchBar';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
 interface EditMaterialForm {
   name: string;
@@ -405,395 +406,397 @@ const EditMaterialPage: React.FC = () => {
   }
 
   return (
-    <Box maxW="800px" mx="auto" p={6}>
-      <Heading as="h1" size="xl" mb={6}>
-        Edit Material: {form.name}
-      </Heading>
+    <ProtectedRoute>
+      <Box maxW="800px" mx="auto" p={6}>
+        <Heading as="h1" size="xl" mb={6}>
+          Edit Material: {form.name}
+        </Heading>
 
-      <form onSubmit={handleSubmit}>
-        <VStack spacing={4} align="stretch">
-          {/* Material Name */}
-          <FormControl isRequired isInvalid={!!errors.name}>
-            <FormLabel>Material Name</FormLabel>
-            <Input
-              name="name"
-              value={form.name}
-              onChange={handleChange}
-              placeholder="Enter material name"
-              maxLength={255}
-            />
-            <FormErrorMessage>{errors.name}</FormErrorMessage>
-          </FormControl>
-
-          {/* Description */}
-          <FormControl>
-            <FormLabel>Description</FormLabel>
-            <Textarea
-              name="description"
-              value={form.description}
-              onChange={handleChange}
-              placeholder="Enter material description"
-            />
-          </FormControl>
-
-          {/* SKU (Read-only) */}
-          <FormControl>
-            <FormLabel>SKU</FormLabel>
-            <Input
-              name="sku"
-              value={form.sku}
-              isReadOnly
-              bg="gray.50"
-            />
-            <FormHelperText>SKU cannot be changed</FormHelperText>
-          </FormControl>
-
-          {/* Unit of Measure */}
-          <FormControl isRequired isInvalid={!!errors.uom}>
-            <FormLabel>Unit of Measure</FormLabel>
-            <Select
-              name="uom"
-              value={form.uom}
-              onChange={handleChange}
-              placeholder={uomLoading ? "Loading UoM..." : "Select unit of measure"}
-              isDisabled={uomLoading}
-            >
-              {uomList.map(uom => (
-                <option key={uom.value} value={uom.value}>
-                  {uom.displayName}
-                </option>
-              ))}
-            </Select>
-            <FormErrorMessage>{errors.uom}</FormErrorMessage>
-          </FormControl>
-
-          {/* Main Material Image */}
-          <FormControl>
-            <FormLabel>Material Image</FormLabel>
-            <SupabaseUpload
-              onUpload={(url) => setForm(prev => ({ ...prev, imageUrl: url }))}
-              folder="materials"
-              accept="image/*"
-              maxSize={5}
-            />
-            {form.imageUrl && (
-              <Box mt={2} p={3} bg="gray.50" borderRadius="md">
-                <Text fontSize="sm" fontWeight="bold" mb={1}>Image Information:</Text>
-                <Text fontSize="xs" color="gray.600" mb={1}>
-                  Type: {form.imageUrl.startsWith('data:') ? 'Base64 (Local)' : 'Supabase URL'}
-                </Text>
-                <Text fontSize="xs" color="gray.600" mb={2} noOfLines={2}>
-                  URL: {form.imageUrl.length > 100 ? form.imageUrl.substring(0, 100) + '...' : form.imageUrl}
-                </Text>
-                <Button
-                  size="xs"
-                  colorScheme="red"
-                  onClick={() => setForm(prev => ({ ...prev, imageUrl: '' }))}
-                >
-                  Remove Image
-                </Button>
-              </Box>
-            )}
-          </FormControl>
-
-          {/* Material Group */}
-          <FormControl>
-            <FormLabel>Material Group</FormLabel>
-            <HStack>
+        <form onSubmit={handleSubmit}>
+          <VStack spacing={4} align="stretch">
+            {/* Material Name */}
+            <FormControl isRequired isInvalid={!!errors.name}>
+              <FormLabel>Material Name</FormLabel>
               <Input
-                placeholder="Search existing group"
-                value={groupSearch}
-                onChange={e => {
-                  setGroupSearch(e.target.value);
-                  setForm(prev => ({ ...prev, materialGroupId: '', newMaterialGroupName: '' }));
-                }}
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+                placeholder="Enter material name"
+                maxLength={255}
               />
-              <IconButton aria-label="Add group" icon={<AddIcon />} onClick={onOpen} />
-            </HStack>
-            {filteredGroups.length > 0 && (
-              <List bg="white" border="1px solid #ccc" mt={1} maxH="150px" overflowY="auto">
-                {filteredGroups.map(group => (
-                  <ListItem
-                    key={group.id}
-                    px={2}
-                    py={1}
-                    _hover={{ bg: 'gray.100', cursor: 'pointer' }}
-                    onClick={() => handleGroupSelect(group)}
-                  >
-                    {group.name}
-                  </ListItem>
+              <FormErrorMessage>{errors.name}</FormErrorMessage>
+            </FormControl>
+
+            {/* Description */}
+            <FormControl>
+              <FormLabel>Description</FormLabel>
+              <Textarea
+                name="description"
+                value={form.description}
+                onChange={handleChange}
+                placeholder="Enter material description"
+              />
+            </FormControl>
+
+            {/* SKU (Read-only) */}
+            <FormControl>
+              <FormLabel>SKU</FormLabel>
+              <Input
+                name="sku"
+                value={form.sku}
+                isReadOnly
+                bg="gray.50"
+              />
+              <FormHelperText>SKU cannot be changed</FormHelperText>
+            </FormControl>
+
+            {/* Unit of Measure */}
+            <FormControl isRequired isInvalid={!!errors.uom}>
+              <FormLabel>Unit of Measure</FormLabel>
+              <Select
+                name="uom"
+                value={form.uom}
+                onChange={handleChange}
+                placeholder={uomLoading ? "Loading UoM..." : "Select unit of measure"}
+                isDisabled={uomLoading}
+              >
+                {uomList.map(uom => (
+                  <option key={uom.value} value={uom.value}>
+                    {uom.displayName}
+                  </option>
                 ))}
-              </List>
-            )}
-          </FormControl>
+              </Select>
+              <FormErrorMessage>{errors.uom}</FormErrorMessage>
+            </FormControl>
 
-          {/* Variants Section */}
-          <Box>
-            <Heading size="md" mb={4}>Variants</Heading>
-            
-            {form.variants.length === 0 && (
-              <Box mb={4} fontStyle="italic" color="gray.600">
-                No variants added. The main material will be used.
-              </Box>
-            )}
+            {/* Main Material Image */}
+            <FormControl>
+              <FormLabel>Material Image</FormLabel>
+              <SupabaseUpload
+                onUpload={(url) => setForm(prev => ({ ...prev, imageUrl: url }))}
+                folder="materials"
+                accept="image/*"
+                maxSize={5}
+              />
+              {form.imageUrl && (
+                <Box mt={2} p={3} bg="gray.50" borderRadius="md">
+                  <Text fontSize="sm" fontWeight="bold" mb={1}>Image Information:</Text>
+                  <Text fontSize="xs" color="gray.600" mb={1}>
+                    Type: {form.imageUrl.startsWith('data:') ? 'Base64 (Local)' : 'Supabase URL'}
+                  </Text>
+                  <Text fontSize="xs" color="gray.600" mb={2} noOfLines={2}>
+                    URL: {form.imageUrl.length > 100 ? form.imageUrl.substring(0, 100) + '...' : form.imageUrl}
+                  </Text>
+                  <Button
+                    size="xs"
+                    colorScheme="red"
+                    onClick={() => setForm(prev => ({ ...prev, imageUrl: '' }))}
+                  >
+                    Remove Image
+                  </Button>
+                </Box>
+              )}
+            </FormControl>
 
-            {form.variants.map((variant, index) => (
-              <Box
-                key={index}
-                border="1px solid"
-                borderColor="gray.200"
-                p={4}
-                mb={4}
-                borderRadius="md"
-              >
-                <Flex justify="space-between" align="center" mb={3}>
-                  <Text fontWeight="bold">Variant #{index + 1}</Text>
-                  <IconButton
-                    aria-label="Remove variant"
-                    icon={<DeleteIcon />}
-                    size="sm"
-                    onClick={() => removeVariant(index)}
-                  />
-                </Flex>
+            {/* Material Group */}
+            <FormControl>
+              <FormLabel>Material Group</FormLabel>
+              <HStack>
+                <Input
+                  placeholder="Search existing group"
+                  value={groupSearch}
+                  onChange={e => {
+                    setGroupSearch(e.target.value);
+                    setForm(prev => ({ ...prev, materialGroupId: '', newMaterialGroupName: '' }));
+                  }}
+                />
+                <IconButton aria-label="Add group" icon={<AddIcon />} onClick={onOpen} />
+              </HStack>
+              {filteredGroups.length > 0 && (
+                <List bg="white" border="1px solid #ccc" mt={1} maxH="150px" overflowY="auto">
+                  {filteredGroups.map(group => (
+                    <ListItem
+                      key={group.id}
+                      px={2}
+                      py={1}
+                      _hover={{ bg: 'gray.100', cursor: 'pointer' }}
+                      onClick={() => handleGroupSelect(group)}
+                    >
+                      {group.name}
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </FormControl>
 
-                <FormControl mb={3} isRequired>
-                  <FormLabel>Name</FormLabel>
-                  <Input
-                    value={variant.name}
-                    onChange={e => handleVariantChange(index, 'name', e.target.value)}
-                    placeholder="Enter variant name"
-                    maxLength={255}
-                  />
-                </FormControl>
+            {/* Variants Section */}
+            <Box>
+              <Heading size="md" mb={4}>Variants</Heading>
+              
+              {form.variants.length === 0 && (
+                <Box mb={4} fontStyle="italic" color="gray.600">
+                  No variants added. The main material will be used.
+                </Box>
+              )}
 
-                <FormControl mb={3}>
-                  <FormLabel>Short Description</FormLabel>
-                  <Textarea
-                    value={variant.shortDescription}
-                    onChange={e => handleVariantChange(index, 'shortDescription', e.target.value)}
-                    placeholder="Enter variant description"
-                  />
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Variant Image</FormLabel>
-                  <SupabaseUpload
-                    onUpload={(url) => handleVariantChange(index, 'imageUrl', url)}
-                    folder="materials/variants"
-                    accept="image/*"
-                    maxSize={5}
-                  />
-                  {variant.imageUrl && (
-                    <Box mt={2} p={3} bg="gray.50" borderRadius="md">
-                      <Text fontSize="sm" fontWeight="bold" mb={1}>Image Information:</Text>
-                      <Text fontSize="xs" color="gray.600" mb={1}>
-                        Type: {variant.imageUrl.startsWith('data:') ? 'Base64 (Local)' : 'Supabase URL'}
-                      </Text>
-                      <Text fontSize="xs" color="gray.600" mb={2} noOfLines={2}>
-                        URL: {variant.imageUrl.length > 100 ? variant.imageUrl.substring(0, 100) + '...' : variant.imageUrl}
-                      </Text>
-                      <Button
-                        size="xs"
-                        colorScheme="red"
-                        onClick={() => handleVariantChange(index, 'imageUrl', '')}
-                      >
-                        Remove Image
-                      </Button>
-                    </Box>
-                  )}
-                </FormControl>
-              </Box>
-            ))}
-
-            <Button leftIcon={<AddIcon />} onClick={addVariant} colorScheme="blue">
-              Add Variant
-            </Button>
-          </Box>
-
-          {/* Suppliers Section */}
-          <Box>
-            <Heading size="md" mb={4}>Suppliers</Heading>
-                  
-            {form.suppliers.map((supplier, index) => (
-              <Box
-                key={index}
-                border="1px solid"
-                borderColor="gray.200"
-                p={4}
-                mb={4}
-                borderRadius="md"
-              >
-                <Flex justify="space-between" align="center" mb={3}>
-                  <Text fontWeight="bold">Supplier #{index + 1}</Text>
-                  <IconButton
-                    aria-label="Remove supplier"
-                    icon={<DeleteIcon />}
-                    size="sm"
-                    onClick={() => removeSupplier(index)}
-                  />
-                </Flex>
-          
-                {/* Supplier Search/Select */}
-                <FormControl mb={3}>
-                  <FormLabel>Supplier</FormLabel>
-                  <HStack>
-                    <Input
-                      placeholder="Search and select existing supplier"
-                      value={currentSupplierIndex === index ? supplierSearch : ''}
-                      onChange={(e) => {
-                        setSupplierSearch(e.target.value);
-                        setCurrentSupplierIndex(index);
-                      }}
-                      onFocus={() => {
-                        setSupplierSearch('');
-                        setCurrentSupplierIndex(index);
-                      }}
-                      isInvalid={!supplier.supplierId}
-                    />
+              {form.variants.map((variant, index) => (
+                <Box
+                  key={index}
+                  border="1px solid"
+                  borderColor="gray.200"
+                  p={4}
+                  mb={4}
+                  borderRadius="md"
+                >
+                  <Flex justify="space-between" align="center" mb={3}>
+                    <Text fontWeight="bold">Variant #{index + 1}</Text>
                     <IconButton
-                      aria-label="Create new supplier"
-                      icon={<AddIcon />}
-                      onClick={handleCreateNewSupplier}
-                      colorScheme="blue"
+                      aria-label="Remove variant"
+                      icon={<DeleteIcon />}
+                      size="sm"
+                      onClick={() => removeVariant(index)}
                     />
-                    </HStack>
-                            
-                    {/* Search Results */}
-                    {currentSupplierIndex === index && filteredSuppliers.length > 0 && (
-                      <List bg="white" border="1px solid" borderColor="gray.200" mt={1} maxH="150px" overflowY="auto">
-                        {filteredSuppliers.map(s => (
-                          <ListItem
-                            key={s.id}
-                            px={3}
-                            py={2}
-                            _hover={{ bg: 'gray.100', cursor: 'pointer' }}
-                            onClick={() => handleSupplierSelect(s, index)}
-                          >
-                            <Text fontWeight="medium">{s.name}</Text>
-                              {s.email && <Text fontSize="sm" color="gray.600">{s.email}</Text>}
-                              {s.country && <Text fontSize="sm" color="gray.500">{s.country}</Text>}
-                          </ListItem>
-                        ))}
-                      </List>
-                    )}
-          
-                    {/* Selected Supplier Display */}
-                    {supplier.supplierId && (
-                      <Box mt={2} p={2} bg="blue.50" borderRadius="md">
-                        <Text fontSize="sm" color="blue.700">
-                          Selected: {allSuppliers.find(s => s.id === supplier.supplierId)?.name}
+                  </Flex>
+
+                  <FormControl mb={3} isRequired>
+                    <FormLabel>Name</FormLabel>
+                    <Input
+                      value={variant.name}
+                      onChange={e => handleVariantChange(index, 'name', e.target.value)}
+                      placeholder="Enter variant name"
+                      maxLength={255}
+                    />
+                  </FormControl>
+
+                  <FormControl mb={3}>
+                    <FormLabel>Short Description</FormLabel>
+                    <Textarea
+                      value={variant.shortDescription}
+                      onChange={e => handleVariantChange(index, 'shortDescription', e.target.value)}
+                      placeholder="Enter variant description"
+                    />
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>Variant Image</FormLabel>
+                    <SupabaseUpload
+                      onUpload={(url) => handleVariantChange(index, 'imageUrl', url)}
+                      folder="materials/variants"
+                      accept="image/*"
+                      maxSize={5}
+                    />
+                    {variant.imageUrl && (
+                      <Box mt={2} p={3} bg="gray.50" borderRadius="md">
+                        <Text fontSize="sm" fontWeight="bold" mb={1}>Image Information:</Text>
+                        <Text fontSize="xs" color="gray.600" mb={1}>
+                          Type: {variant.imageUrl.startsWith('data:') ? 'Base64 (Local)' : 'Supabase URL'}
                         </Text>
+                        <Text fontSize="xs" color="gray.600" mb={2} noOfLines={2}>
+                          URL: {variant.imageUrl.length > 100 ? variant.imageUrl.substring(0, 100) + '...' : variant.imageUrl}
+                        </Text>
+                        <Button
+                          size="xs"
+                          colorScheme="red"
+                          onClick={() => handleVariantChange(index, 'imageUrl', '')}
+                        >
+                          Remove Image
+                        </Button>
                       </Box>
                     )}
-          
-                    {/* Error message if no supplier selected */}
-                    {!supplier.supplierId && (
-                      <Text fontSize="sm" color="red.500" mt={1}>
-                        Please select a supplier
-                      </Text>
-                    )}
-                </FormControl>
+                  </FormControl>
+                </Box>
+              ))}
 
-                <HStack spacing={3}>
-                  <FormControl isRequired>
-                    <FormLabel>Price</FormLabel>
+              <Button leftIcon={<AddIcon />} onClick={addVariant} colorScheme="blue">
+                Add Variant
+              </Button>
+            </Box>
+
+            {/* Suppliers Section */}
+            <Box>
+              <Heading size="md" mb={4}>Suppliers</Heading>
+                    
+              {form.suppliers.map((supplier, index) => (
+                <Box
+                  key={index}
+                  border="1px solid"
+                  borderColor="gray.200"
+                  p={4}
+                  mb={4}
+                  borderRadius="md"
+                >
+                  <Flex justify="space-between" align="center" mb={3}>
+                    <Text fontWeight="bold">Supplier #{index + 1}</Text>
+                    <IconButton
+                      aria-label="Remove supplier"
+                      icon={<DeleteIcon />}
+                      size="sm"
+                      onClick={() => removeSupplier(index)}
+                    />
+                  </Flex>
+            
+                  {/* Supplier Search/Select */}
+                  <FormControl mb={3}>
+                    <FormLabel>Supplier</FormLabel>
+                    <HStack>
+                      <Input
+                        placeholder="Search and select existing supplier"
+                        value={currentSupplierIndex === index ? supplierSearch : ''}
+                        onChange={(e) => {
+                          setSupplierSearch(e.target.value);
+                          setCurrentSupplierIndex(index);
+                        }}
+                        onFocus={() => {
+                          setSupplierSearch('');
+                          setCurrentSupplierIndex(index);
+                        }}
+                        isInvalid={!supplier.supplierId}
+                      />
+                      <IconButton
+                        aria-label="Create new supplier"
+                        icon={<AddIcon />}
+                        onClick={handleCreateNewSupplier}
+                        colorScheme="blue"
+                      />
+                      </HStack>
+                              
+                      {/* Search Results */}
+                      {currentSupplierIndex === index && filteredSuppliers.length > 0 && (
+                        <List bg="white" border="1px solid" borderColor="gray.200" mt={1} maxH="150px" overflowY="auto">
+                          {filteredSuppliers.map(s => (
+                            <ListItem
+                              key={s.id}
+                              px={3}
+                              py={2}
+                              _hover={{ bg: 'gray.100', cursor: 'pointer' }}
+                              onClick={() => handleSupplierSelect(s, index)}
+                            >
+                              <Text fontWeight="medium">{s.name}</Text>
+                                {s.email && <Text fontSize="sm" color="gray.600">{s.email}</Text>}
+                                {s.country && <Text fontSize="sm" color="gray.500">{s.country}</Text>}
+                            </ListItem>
+                          ))}
+                        </List>
+                      )}
+            
+                      {/* Selected Supplier Display */}
+                      {supplier.supplierId && (
+                        <Box mt={2} p={2} bg="blue.50" borderRadius="md">
+                          <Text fontSize="sm" color="blue.700">
+                            Selected: {allSuppliers.find(s => s.id === supplier.supplierId)?.name}
+                          </Text>
+                        </Box>
+                      )}
+            
+                      {/* Error message if no supplier selected */}
+                      {!supplier.supplierId && (
+                        <Text fontSize="sm" color="red.500" mt={1}>
+                          Please select a supplier
+                        </Text>
+                      )}
+                  </FormControl>
+
+                  <HStack spacing={3}>
+                    <FormControl isRequired>
+                      <FormLabel>Price</FormLabel>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={supplier.price}
+                        onChange={e => handleSupplierChange(index, 'price', parseFloat(e.target.value))}
+                        placeholder="Enter price"
+                      />
+                    </FormControl>
+
+                    <FormControl>
+                      <FormLabel>Currency</FormLabel>
+                      <Select
+                        value={supplier.currency}
+                        onChange={e => handleSupplierChange(index, 'currency', e.target.value)}
+                      >
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="VND">VND</option>
+                      </Select>
+                    </FormControl>
+                  </HStack>
+
+                  <HStack spacing={3} mt={3}>
+                    <FormControl>
+                      <FormLabel>Lead Time (Days)</FormLabel>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={supplier.leadTime}
+                        onChange={e => handleSupplierChange(index, 'leadTime', parseInt(e.target.value))}
+                        placeholder="Enter lead time"
+                      />
+                    </FormControl>
+
+                    <FormControl>
+                      <FormLabel>Min Order Quantity</FormLabel>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={supplier.minimumOrderQuantity}
+                        onChange={e => handleSupplierChange(index, 'minimumOrderQuantity', parseInt(e.target.value))}
+                        placeholder="Enter min order quantity"
+                      />
+                    </FormControl>
+                  </HStack>
+
+                  <FormControl mt={3}>
+                    <FormLabel>Supplier Material Code</FormLabel>
                     <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={supplier.price}
-                      onChange={e => handleSupplierChange(index, 'price', parseFloat(e.target.value))}
-                      placeholder="Enter price"
+                      value={supplier.supplierMaterialCode}
+                      onChange={e => handleSupplierChange(index, 'supplierMaterialCode', e.target.value)}
+                      placeholder="Enter supplier material code"
                     />
                   </FormControl>
+                </Box>
+              ))}
 
-                  <FormControl>
-                    <FormLabel>Currency</FormLabel>
-                    <Select
-                      value={supplier.currency}
-                      onChange={e => handleSupplierChange(index, 'currency', e.target.value)}
-                    >
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                      <option value="VND">VND</option>
-                    </Select>
-                  </FormControl>
-                </HStack>
+              <Button leftIcon={<AddIcon />} onClick={addSupplier} colorScheme="blue">
+                Add Supplier
+              </Button>
+            </Box>
 
-                <HStack spacing={3} mt={3}>
-                  <FormControl>
-                    <FormLabel>Lead Time (Days)</FormLabel>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={supplier.leadTime}
-                      onChange={e => handleSupplierChange(index, 'leadTime', parseInt(e.target.value))}
-                      placeholder="Enter lead time"
-                    />
-                  </FormControl>
+            <HStack spacing={4}>
+              <Button type="submit" colorScheme="teal" isLoading={isSubmitting}>
+                Update Material
+              </Button>
+              <Button onClick={() => router.push(`/material/${id}`)}>
+                Cancel
+              </Button>
+            </HStack>
+          </VStack>
+        </form>
 
-                  <FormControl>
-                    <FormLabel>Min Order Quantity</FormLabel>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={supplier.minimumOrderQuantity}
-                      onChange={e => handleSupplierChange(index, 'minimumOrderQuantity', parseInt(e.target.value))}
-                      placeholder="Enter min order quantity"
-                    />
-                  </FormControl>
-                </HStack>
-
-                <FormControl mt={3}>
-                  <FormLabel>Supplier Material Code</FormLabel>
-                  <Input
-                    value={supplier.supplierMaterialCode}
-                    onChange={e => handleSupplierChange(index, 'supplierMaterialCode', e.target.value)}
-                    placeholder="Enter supplier material code"
-                  />
-                </FormControl>
-              </Box>
-            ))}
-
-            <Button leftIcon={<AddIcon />} onClick={addSupplier} colorScheme="blue">
-              Add Supplier
-            </Button>
-          </Box>
-
-          <HStack spacing={4}>
-            <Button type="submit" colorScheme="teal" isLoading={isSubmitting}>
-              Update Material
-            </Button>
-            <Button onClick={() => router.push(`/material/${id}`)}>
-              Cancel
-            </Button>
-          </HStack>
-        </VStack>
-      </form>
-
-      {/* ADD NEW GROUP MODAL */}
-      <Modal isOpen={isOpen} onClose={onClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Create New Group</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <FormControl isInvalid={!!groupError}>
-              <FormLabel>Group Name</FormLabel>
-              <Input value={newGroupName} onChange={(e) => {
-                setNewGroupName(e.target.value);
-                setGroupError('');
-              }} />
-            </FormControl>
-            {groupError && <Box color="red.500" mt={2}>{groupError}</Box>}
-          </ModalBody>
-          <ModalFooter>
-            <Button onClick={handleNewGroupSubmit} colorScheme="teal" mr={3}>Add</Button>
-            <Button onClick={onClose}>Cancel</Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-    </Box>
+        {/* ADD NEW GROUP MODAL */}
+        <Modal isOpen={isOpen} onClose={onClose}>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Create New Group</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <FormControl isInvalid={!!groupError}>
+                <FormLabel>Group Name</FormLabel>
+                <Input value={newGroupName} onChange={(e) => {
+                  setNewGroupName(e.target.value);
+                  setGroupError('');
+                }} />
+              </FormControl>
+              {groupError && <Box color="red.500" mt={2}>{groupError}</Box>}
+            </ModalBody>
+            <ModalFooter>
+              <Button onClick={handleNewGroupSubmit} colorScheme="teal" mr={3}>Add</Button>
+              <Button onClick={onClose}>Cancel</Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+      </Box>
+    </ProtectedRoute>
   );
 };
 

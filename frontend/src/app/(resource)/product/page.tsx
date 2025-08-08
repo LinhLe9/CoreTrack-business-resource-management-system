@@ -24,6 +24,7 @@ import { getProducts, getAllProductsForAutocomplete } from '../../../services/pr
 import { Product, ProductQueryParams, ProductAutoComplete } from '../../../types/product';
 import { PageResponse } from '../../../types/PageResponse';
 import { AddIcon } from '@chakra-ui/icons';
+import { useUser } from '../../../hooks/useUser';
 
 const ProductCatalogPage: React.FC = () => {
   const [pageData, setPageData] = useState<PageResponse<Product> | null>(null);
@@ -33,6 +34,7 @@ const ProductCatalogPage: React.FC = () => {
   const [allProductsForAutocomplete, setAllProductsForAutocomplete] = useState<ProductAutoComplete[]>([]);
   const toast = useToast();
   const router = useRouter();
+  const { isOwner } = useUser();
 
   // Fetch autocomplete list
   useEffect(() => {
@@ -75,6 +77,8 @@ const ProductCatalogPage: React.FC = () => {
   }, [fetchProducts, queryParams]);
 
   const handleSearch = (searchTerm: string) => {
+    console.log('Product page handleSearch called with:', searchTerm); // Debug log
+    
     if (searchTerm.length > 255) {
       toast({
         title: 'Search Too Long',
@@ -86,9 +90,10 @@ const ProductCatalogPage: React.FC = () => {
       return;
     }
 
+    console.log('Setting query params with search:', searchTerm); // Debug log
     setQueryParams((prev) => ({
       ...prev,
-      search: searchTerm || undefined,
+      search: searchTerm,
       page: 0,
     }));
   };
@@ -97,7 +102,8 @@ const ProductCatalogPage: React.FC = () => {
     console.log('Applying filters:', filters); // Debug log
     setQueryParams((prev) => ({
       ...prev,
-      ...filters,
+      groupProducts: filters.groupProducts,
+      status: filters.status,
       page: 0,
     }));
   };
@@ -113,6 +119,11 @@ const ProductCatalogPage: React.FC = () => {
     router.push(`/product/${productId}`);
   };
 
+  const handleDelete = () => {
+    // Refresh the product list after deletion
+    fetchProducts(queryParams);
+  };
+
   return (
     <Box p={8} maxW="1400px" mx="auto">
       <Heading as="h1" size="xl" textAlign="center" mb={8} color="teal.700">
@@ -121,20 +132,22 @@ const ProductCatalogPage: React.FC = () => {
 
       <Flex direction="column" gap={4} mb={8}>
         {/* Line 1: Search bar and Add button */}
-        <Flex justify="center" gap={2} align="center" direction={{ base: 'column', md: 'row' }}>
+        <Flex justify="center" gap={2} align="center">
           <SearchBar
             onSearch={handleSearch}
             onSelectProduct={handleSelectProductFromSearch}
             initialSearchTerm={queryParams.search}
             productsForAutocomplete={allProductsForAutocomplete}
           />
-          <IconButton
-            icon={<AddIcon />}
-            aria-label="Add new product"
-            colorScheme="teal"
-            onClick={() => router.push('/product/add')}
-            title="Add Product"
-          />
+          {isOwner() && (
+            <IconButton
+              icon={<AddIcon />}
+              aria-label="Add new product"
+              colorScheme="teal"
+              onClick={() => router.push('/product/add')}
+              title="Add Product"
+            />
+          )}
         </Flex>
 
         {/* Line 2: Filters */}
@@ -169,7 +182,7 @@ const ProductCatalogPage: React.FC = () => {
               .filter(product => product.id != null)
               .map((product) => {
                 console.log('ProductCard id:', product.id, product);
-                return <ProductCard key={product.id} product={product} />;
+                return <ProductCard key={product.id} product={product} onDelete={handleDelete} showDeleteButton={isOwner()} />;
               })}
           </SimpleGrid>
 

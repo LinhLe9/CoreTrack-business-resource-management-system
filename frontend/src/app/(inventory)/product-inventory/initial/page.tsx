@@ -29,6 +29,7 @@ import ProductVariantSearchBar from '../../../../components/product/ProductVaria
 import { getAllProductVariantsForAutocomplete } from '../../../../services/productService';
 import { bulkInitInventory, createBulkInitInventoryRequest } from '../../../../services/productInventoryService';
 import { ProductVariantAutoComplete } from '../../../../types/product';
+import ProtectedRoute from '../../../../components/auth/ProtectedRoute';
 
 interface SelectedProduct {
   variantId: number;
@@ -194,147 +195,149 @@ const InitialStockPage: React.FC = () => {
   };
 
   return (
-    <Box p={8} maxW="800px" mx="auto">
-      <Heading as="h1" size="xl" textAlign="center" mb={8} color="teal.700">
-        Initialize Product Stock
-      </Heading>
+    <ProtectedRoute requiredRoles={['OWNER', 'WAREHOUSE_STAFF']}>
+      <Box p={8} maxW="800px" mx="auto">
+        <Heading as="h1" size="xl" textAlign="center" mb={8} color="teal.700">
+          Initialize Product Stock
+        </Heading>
 
-      <VStack spacing={6} align="stretch">
-        {/* Search Bar */}
-        <Box>
-          <Text fontSize="lg" fontWeight="bold" mb={3}>
-            Search and Select Products
-          </Text>
-          <ProductVariantSearchBar
-            onSearch={() => {}} // Not used for search, only for selection
-            onSelectProductVariant={handleSelectProductVariant}
-            productVariantsForAutocomplete={allProductVariantsForAutocomplete}
-          />
-        </Box>
-
-        {/* Selected Products */}
-        {selectedProducts.length > 0 && (
+        <VStack spacing={6} align="stretch">
+          {/* Search Bar */}
           <Box>
             <Text fontSize="lg" fontWeight="bold" mb={3}>
-              Selected Products ({selectedProducts.length})
+              Search and Select Products
             </Text>
-            <VStack spacing={2} align="stretch">
-              {selectedProducts.map((product) => (
-                <Card key={product.variantId} size="sm">
-                  <CardBody>
-                    <HStack justify="space-between">
-                      <VStack align="start" spacing={1}>
-                        <Text fontWeight="bold">{product.productName}</Text>
-                        <Text fontSize="sm" color="gray.600">
-                          Product SKU: {product.productSku}
-                        </Text>
-                        <Text fontSize="sm" color="gray.600">
-                          Variant SKU: {product.variantSku}
-                        </Text>
-                        <Text fontSize="sm" color="gray.600">
-                          Variant: {product.variantName}
-                        </Text>
-                        {product.productGroup && (
+            <ProductVariantSearchBar
+              onSearch={() => {}} // Not used for search, only for selection
+              onSelectProductVariant={handleSelectProductVariant}
+              productVariantsForAutocomplete={allProductVariantsForAutocomplete}
+            />
+          </Box>
+
+          {/* Selected Products */}
+          {selectedProducts.length > 0 && (
+            <Box>
+              <Text fontSize="lg" fontWeight="bold" mb={3}>
+                Selected Products ({selectedProducts.length})
+              </Text>
+              <VStack spacing={2} align="stretch">
+                {selectedProducts.map((product) => (
+                  <Card key={product.variantId} size="sm">
+                    <CardBody>
+                      <HStack justify="space-between">
+                        <VStack align="start" spacing={1}>
+                          <Text fontWeight="bold">{product.productName}</Text>
                           <Text fontSize="sm" color="gray.600">
-                            Group: {product.productGroup}
+                            Product SKU: {product.productSku}
                           </Text>
-                        )}
-                      </VStack>
-                      <IconButton
-                        icon={<CloseIcon />}
-                        aria-label="Remove product variant"
-                        size="sm"
-                        colorScheme="red"
-                        variant="ghost"
-                        onClick={() => handleRemoveProduct(product.variantId)}
-                      />
-                    </HStack>
-                  </CardBody>
-                </Card>
-              ))}
+                          <Text fontSize="sm" color="gray.600">
+                            Variant SKU: {product.variantSku}
+                          </Text>
+                          <Text fontSize="sm" color="gray.600">
+                            Variant: {product.variantName}
+                          </Text>
+                          {product.productGroup && (
+                            <Text fontSize="sm" color="gray.600">
+                              Group: {product.productGroup}
+                            </Text>
+                          )}
+                        </VStack>
+                        <IconButton
+                          icon={<CloseIcon />}
+                          aria-label="Remove product variant"
+                          size="sm"
+                          colorScheme="red"
+                          variant="ghost"
+                          onClick={() => handleRemoveProduct(product.variantId)}
+                        />
+                      </HStack>
+                    </CardBody>
+                  </Card>
+                ))}
+              </VStack>
+            </Box>
+          )}
+
+          <Divider />
+
+          {/* Stock Level Configuration */}
+          <Box>
+            <Text fontSize="lg" fontWeight="bold" mb={3}>
+              Stock Level Configuration
+            </Text>
+            <VStack spacing={4} align="stretch">
+              <FormControl>
+                <FormLabel>Initial Stock</FormLabel>
+                <NumberInput
+                  value={initialStock}
+                  onChange={(_, value) => setInitialStock(value)}
+                  min={0}
+                  precision={2}
+                >
+                  <NumberInputField />
+                  <NumberInputStepper>
+                    <NumberIncrementStepper />
+                    <NumberDecrementStepper />
+                  </NumberInputStepper>
+                </NumberInput>
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>Min Alert Stock</FormLabel>
+                <NumberInput
+                  value={minAlertStock}
+                  onChange={(_, value) => setMinAlertStock(value)}
+                  min={0}
+                  precision={2}
+                >
+                  <NumberInputField />
+                  <NumberInputStepper>
+                    <NumberIncrementStepper />
+                    <NumberDecrementStepper />
+                  </NumberInputStepper>
+                </NumberInput>
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>Max Stock Level</FormLabel>
+                <NumberInput
+                  value={maxStockLevel}
+                  onChange={(_, value) => setMaxStockLevel(value)}
+                  min={0}
+                  precision={2}
+                >
+                  <NumberInputField />
+                  <NumberInputStepper>
+                    <NumberIncrementStepper />
+                    <NumberDecrementStepper />
+                  </NumberInputStepper>
+                </NumberInput>
+              </FormControl>
             </VStack>
           </Box>
-        )}
 
-        <Divider />
-
-        {/* Stock Level Configuration */}
-        <Box>
-          <Text fontSize="lg" fontWeight="bold" mb={3}>
-            Stock Level Configuration
-          </Text>
-          <VStack spacing={4} align="stretch">
-            <FormControl>
-              <FormLabel>Initial Stock</FormLabel>
-              <NumberInput
-                value={initialStock}
-                onChange={(_, value) => setInitialStock(value)}
-                min={0}
-                precision={2}
-              >
-                <NumberInputField />
-                <NumberInputStepper>
-                  <NumberIncrementStepper />
-                  <NumberDecrementStepper />
-                </NumberInputStepper>
-              </NumberInput>
-            </FormControl>
-
-            <FormControl>
-              <FormLabel>Min Alert Stock</FormLabel>
-              <NumberInput
-                value={minAlertStock}
-                onChange={(_, value) => setMinAlertStock(value)}
-                min={0}
-                precision={2}
-              >
-                <NumberInputField />
-                <NumberInputStepper>
-                  <NumberIncrementStepper />
-                  <NumberDecrementStepper />
-                </NumberInputStepper>
-              </NumberInput>
-            </FormControl>
-
-            <FormControl>
-              <FormLabel>Max Stock Level</FormLabel>
-              <NumberInput
-                value={maxStockLevel}
-                onChange={(_, value) => setMaxStockLevel(value)}
-                min={0}
-                precision={2}
-              >
-                <NumberInputField />
-                <NumberInputStepper>
-                  <NumberIncrementStepper />
-                  <NumberDecrementStepper />
-                </NumberInputStepper>
-              </NumberInput>
-            </FormControl>
-          </VStack>
-        </Box>
-
-        {/* Action Buttons */}
-        <HStack spacing={4} justify="center">
-          <Button
-            colorScheme="gray"
-            onClick={handleCancel}
-            isDisabled={loading}
-          >
-            Cancel
-          </Button>
-          <Button
-            colorScheme="teal"
-            onClick={handleSubmit}
-            isLoading={loading}
-            loadingText="Initializing..."
-            isDisabled={selectedProducts.length === 0}
-          >
-            Initialize Stock
-          </Button>
-        </HStack>
-      </VStack>
-    </Box>
+          {/* Action Buttons */}
+          <HStack spacing={4} justify="center">
+            <Button
+              colorScheme="gray"
+              onClick={handleCancel}
+              isDisabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              colorScheme="teal"
+              onClick={handleSubmit}
+              isLoading={loading}
+              loadingText="Initializing..."
+              isDisabled={selectedProducts.length === 0}
+            >
+              Initialize Stock
+            </Button>
+          </HStack>
+        </VStack>
+      </Box>
+    </ProtectedRoute>
   );
 };
 

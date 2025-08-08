@@ -29,14 +29,15 @@ import org.example.coretrack.dto.material.MaterialStatusTransitionResponse;
 import org.example.coretrack.dto.product.InventoryResponse;
 import org.example.coretrack.dto.material.MaterialVariantAutoCompleteResponse;
 import org.example.coretrack.dto.material.UpdateMaterialVariantRequest;
+import org.example.coretrack.dto.material.DeleteMaterialResponse;
 import org.example.coretrack.model.auth.User;
+import org.example.coretrack.model.auth.Company;
 import org.example.coretrack.model.material.Material;
 import org.example.coretrack.model.material.MaterialGroup;
 import org.example.coretrack.model.material.MaterialStatus;
 import org.example.coretrack.model.material.MaterialStatusAuditLog;
 import org.example.coretrack.model.material.MaterialVariant;
 import org.example.coretrack.model.material.UoM;
-import org.example.coretrack.model.material.inventory.MaterialInventory;
 import org.example.coretrack.model.supplier.MaterialSupplier;
 import org.example.coretrack.model.supplier.MaterialSupplierId;
 import org.example.coretrack.model.supplier.Supplier;
@@ -99,49 +100,49 @@ public class MaterialServiceImpl implements MaterialService{
         if (request.getMaterialGroupId() != null) {
             // Choose Existing Material Group (A5.1)
             Long materialGroupId = Long.parseLong(request.getMaterialGroupId());
-            materialGroup = materialGroupRepository.findByIdAndIsActiveTrue(materialGroupId)
+            materialGroup = materialGroupRepository.findByIdAndCompanyAndIsActiveTrue(materialGroupId, createdByUser.getCompany())
                     .orElseThrow(() -> new RuntimeException("Material Group not found with ID: " + request.getMaterialGroupId()));
-        } else if (StringUtils.hasText(request.getNewMaterialGroupName())) {
-            // Create New Materiap Group (A5.2)
-            String newGroupName = request.getNewMaterialGroupName().trim();
-            // E4: Duplicate Group Name
-            if (materialGroupRepository.findByNameAndIsActiveTrue(newGroupName).isPresent()) { 
-                    throw new IllegalArgumentException("Group name already exists: " + newGroupName);
+        } else {
+            // Create New Material Group (A5.2)
+            if (StringUtils.hasText(request.getNewMaterialGroupName())) {
+                // Check if group name already exists in the same company
+                if (materialGroupRepository.findByNameAndCompany(request.getNewMaterialGroupName(), createdByUser.getCompany()).isPresent()) {
+                    throw new RuntimeException("Material Group name already exists: " + request.getNewMaterialGroupName());
                 }
-            materialGroup = new MaterialGroup(newGroupName,createdByUser);
-            materialGroupRepository.save(materialGroup); // Save new group first
+                materialGroup = new MaterialGroup(request.getNewMaterialGroupName(), createdByUser, createdByUser.getCompany());
+                materialGroupRepository.save(materialGroup);
+            }
         }
 
-        // 2. Handle Material SKU (Main Flow - Step 2, A1, A2)
-        String sku = "";
+        // 2. Handle SKU Generation (Main Flow - Step 1)
+        String sku;
         if (StringUtils.hasText(request.getSku())) {
             // Manual SKU Input (A2)
             String manualSku = request.getSku().trim();
             // E2: Duplicate or Invalid SKU - uniqueness
-            if (materialRepository.findBySku(manualSku).isPresent()) {
+            if (materialRepository.findBySkuAndCompany(manualSku, createdByUser.getCompany()).isPresent()) {
                 throw new IllegalArgumentException("Material SKU already exists: " + manualSku);
             }
             // E2: Invalid SKU format - length (8-12 chars for tidy SKU)
             if (manualSku.length() < 8 || manualSku.length() > 12) {
                  throw new IllegalArgumentException("Manual SKU must be between 8 and 12 characters.");
             }
-            // product.setSku(manualSku);
             sku = manualSku;
         } else {
             // Automatic SKU Generation (A1)
             // Generate a 12-unit SKU
-            sku = generateUniqueMaterialSku(); 
+            sku = generateUniqueMaterialSku(createdByUser.getCompany()); 
         }
     
-        // 3. Create Material Entity (Main Flow - Step 2)
+        // 3. Create Material Entity (Main Flow - Step 2)        
         Material material = new Material(
             sku,
             request.getName(),
             request.getShortDes(),
             materialGroup,
-            createdByUser 
+            createdByUser,
+            createdByUser.getCompany()
         );
-
         String uomStr = request.getUom(); 
         if (!StringUtils.hasText(uomStr)) {
             throw new IllegalArgumentException("UOM cannot be empty");
@@ -157,10 +158,11 @@ public class MaterialServiceImpl implements MaterialService{
         if(StringUtils.hasText(request.getImageUrl())){
             material.setImageUrl(request.getImageUrl());
         }
-        materialRepository.save(material); // Save product to get its ID for relationships
+
+        materialRepository.save(material); // Save material to get its ID for relationships
 
         // 4. Define Variant(s) (Main Flow - Step 4)
-        List<MaterialVariant> allMaterialVariants = new java.util.ArrayList<>();
+    List<MaterialVariant> allMaterialVariants = new java.util.ArrayList<>();
 
         if (request.getVariants() != null && !request.getVariants().isEmpty()) {
             // Material has variants
@@ -180,7 +182,7 @@ public class MaterialServiceImpl implements MaterialService{
                         variant.setImageUrl(variantRequest.getImageUrl());
                     }
                     // Generate SKU for variant (e.g., adding "-1", "-2" suffixes)
-                    variant.setSku(generateVariantSku(material.getSku(), index));
+                    variant.setSku(generateVariantSku(material.getSku(), index, createdByUser.getCompany()));
                     return variant;
                 }).collect(Collectors.toList());
 
@@ -253,52 +255,51 @@ public class MaterialServiceImpl implements MaterialService{
         
         // Save the material entity to persist all relationships
         materialRepository.save(material);
-        
+
         return mapProductToProductResponse(material);
     }
 
     // --- Helper methods for SKU generation ---
-    private String generateUniqueMaterialSku() {
+    private String generateUniqueMaterialSku(Company company) {
         String newSku;
         Random random = new Random(); // Initialize Random
         do {
             // Generate a 7-digit random number
             // 1000000 is the smallest 7-digit number, 9999999 is the largest
             int randomNumber = 1000000 + random.nextInt(9000000); // Generates number between 1,000,000 and 9,999,999
-            newSku = "MATE-" + randomNumber; // Example: PROD-1234567
-        } while (materialRepository.findBySku(newSku).isPresent());
+            newSku = "MAT-" + randomNumber; // Example: MAT-1234567
+        } while (materialRepository.findBySkuAndCompany(newSku, company).isPresent());
         return newSku;
     }
 
-    private String generateVariantSku(String baseMaterialSku, int variantIndex) {
-        // Ensure base SKU is not too long (max 12 chars for base material SKU)
+    private String generateVariantSku(String baseMaterialSku, int variantIndex, Company company) {
+        // This is two layer to ensure that SKU of variant is unique in case 
+        // some error happen while a lot of modify/ delete happened
+        // Example: adding "-1", "-2" suffixes (Main Flow - Step 4)
         if (baseMaterialSku.length() > 12) {
             baseMaterialSku = baseMaterialSku.substring(0, 12);
         }
-        
-        // Create variant SKU with sequential suffix (-1, -2, -3...)
         String suffix = "-" + variantIndex;
         String variantSku = baseMaterialSku + suffix;
-        
-        // If still too long, truncate
+
+         // If still too long, truncate
         if (variantSku.length() > 16) {
             variantSku = variantSku.substring(0, 16);
         }
 
-        // Ensure uniqueness for variant SKU
-        String finalVariantSku = variantSku;
+        // Ensure uniqueness for variant SKU as well
+        String finalVariantSku;
         int attempt = 0;
-        Random random = new Random();
-        
+        Random random = new Random(); // Initialize Random for unique part
         do {
-            if (attempt > 0) {
-                // Add a unique identifier if initial SKU is not unique
-                // Use shorter unique part to stay within 16 char limit
-                String uniquePart = "-" + (10 + random.nextInt(90)); // 2-digit number
-                finalVariantSku = variantSku.substring(0, Math.min(variantSku.length(), 13)) + uniquePart;
+            finalVariantSku = variantSku;
+            if (attempt > 0) { // Add a unique identifier if initial SKU is not unique
+                // Generate a 4-digit random number for unique part
+                String uniquePart = "-" + (1000 + random.nextInt(9000)); // Generates number between 1000 and 9999
+                finalVariantSku += uniquePart; // No length truncation here
             }
             attempt++;
-        } while (materialVariantRepository.findBySku(finalVariantSku).isPresent() && attempt < 10);
+        } while (materialVariantRepository.findBySkuAndCompany(finalVariantSku, company).isPresent());
 
         return finalVariantSku;
     }
@@ -306,13 +307,15 @@ public class MaterialServiceImpl implements MaterialService{
     private AddMaterialResponse mapProductToProductResponse(Material material) {
         List<MaterialVariantResponse> variantResponses = material.getVariants() != null ?
                 material.getVariants().stream()
-                        .map(variant -> new MaterialVariantResponse(variant)).toList() : List.of();
-        
+                        .map(variant -> {
+                            return new MaterialVariantResponse(variant);
+                        }).toList() : List.of();
+
         List<MaterialSupplierResponse> supplierResponses = materialSupplierRepository.findByMaterial(material)
                 .stream()
                 .map(supplier -> new MaterialSupplierResponse(supplier))
                 .toList();
-        
+                
         return new AddMaterialResponse(
                 material.getSku(),
                 material.getName(),
@@ -329,32 +332,42 @@ public class MaterialServiceImpl implements MaterialService{
         );
     }
 
+    /*
+     * To return all available materials those were stored in database
+     */
+    @Override
+    public Page<SearchMaterialResponse> findAllMaterials(Pageable pageable, User currentUser) {
+        Page<Material> materials = materialRepository.findAllActiveByCompany(currentUser.getCompany(), pageable);
+        return materials.map(SearchMaterialResponse::new);
+    }
 
     /**
      * Search and filter by param.
      * @param search search by (SKU, Name, ShortDescription) + recommend drop down
      * @param groupMaterials filter by group
      * @param statuses fiter by status
-     * @return Page<SearchProductResponse>
+     * @param currentUser current user for company context
+     * @return Page<SearchMaterialResponse>
      */
     @Override
     public Page<SearchMaterialResponse> findMaterial(
             String search,
             List<String> groupMaterials,
             List<String> statuses,
-            Pageable pageable) {
+            Pageable pageable,
+            User currentUser) {
 
-        // Handle search
+        // handle search
         String processedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
 
-        // convert groupMaterial from List<String> to List<Long>
+        // convert groupMaterials fromList<String> to List<Long>
         List<Long> processedGroupMaterialIds = null;
-        if(!CollectionUtils.isEmpty(groupMaterials)) {
+        if (!CollectionUtils.isEmpty(groupMaterials)) {
             processedGroupMaterialIds = groupMaterials.stream()
-                .map(s-> {
+                .map(s -> {
                     try {
                         return Long.parseLong(s);
-                    } catch (NumberFormatException e){
+                    } catch (NumberFormatException e) {
                         System.err.println("Invalid groupMaterial id: " + s);
                         return null;
                     }
@@ -362,10 +375,10 @@ public class MaterialServiceImpl implements MaterialService{
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
-            if(processedGroupMaterialIds.isEmpty()){
+            if (processedGroupMaterialIds.isEmpty()) {
                 processedGroupMaterialIds = null;
             }
-        } 
+        }
 
         // convert status from String -> Enum
         List<MaterialStatus> processedStatuses = null;
@@ -391,11 +404,12 @@ public class MaterialServiceImpl implements MaterialService{
         System.out.println("Statuses: " + processedStatuses);
         
         try {
-            // call repository
-            Page<Material> materials = materialRepository.findByCriteria(
+            // call repository with company context
+            Page<Material> materials = materialRepository.findByCriteriaAndCompany(
                 processedSearch,
                 processedGroupMaterialIds,
                 processedStatuses,
+                currentUser.getCompany(),
                 pageable
             );
             System.out.println("Repository returned " + materials.getTotalElements() + " materials");
@@ -407,23 +421,29 @@ public class MaterialServiceImpl implements MaterialService{
         }
     }
 
+    /**
+     * Query all materials (autocomplete in frontend).
+     */
     @Override
-    public List<AllMaterialSearchResponse> getAllMaterialsForAutocomplete(String search) {
-        return materialRepository.findBySearchKeyword(search).stream()
+    public List<AllMaterialSearchResponse> getAllMaterialsForAutocomplete(String search, User currentUser) {
+        return materialRepository.findBySearchKeywordAndCompany(search, currentUser.getCompany()).stream()
                 .map(AllMaterialSearchResponse::new)
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Query all material variants (autocomplete in frontend).
+     */
     @Override
-    public List<MaterialVariantAutoCompleteResponse> getAllMaterialVariantsForAutocomplete(String search) {
+    public List<MaterialVariantAutoCompleteResponse> getAllMaterialVariantsForAutocomplete(String search, User currentUser) {
         List<MaterialVariant> variants;
         
-        if (search == null || search.trim().isEmpty()) {
-            // Return all active material variants when search is empty
-            variants = materialVariantRepository.findByIsActiveTrue();
+        if (StringUtils.hasText(search)) {
+            // Search by material name, material SKU, variant SKU, or variant name
+            variants = materialVariantRepository.findBySearchKeywordAndCompany(search, currentUser.getCompany());
         } else {
-            // Search with keyword
-            variants = materialVariantRepository.findBySearchKeyword(search);
+            // Get all active variants
+            variants = materialVariantRepository.findByCompanyAndIsActiveTrue(currentUser.getCompany());
         }
         
         return variants.stream()
@@ -438,58 +458,54 @@ public class MaterialServiceImpl implements MaterialService{
                 .collect(Collectors.toList());
     }
 
+    /**
+     * get Material by ID.
+     */
     @Override
-    public Page<SearchMaterialResponse> findAllMaterials (Pageable pageable){
-        Page<Material> materials = materialRepository.findAllActive(pageable);
-        return materials.map(SearchMaterialResponse::new);
-    }
+    public MaterialDetailResponse getMaterialById(Long id, User currentUser) {
+        Material material = materialRepository.findByIdWithVariantsAndInventoryAndCompany(id, currentUser.getCompany())
+                .orElseThrow(() -> new RuntimeException("Material not found with ID: " + id));
 
+        List<MaterialVariantInventoryResponse> variantInventory = material.getVariants() != null
+                ? material.getVariants().stream()
+                    .map(variant -> {
+                        MaterialVariantResponse variantResponse = new MaterialVariantResponse(variant);
+                        InventoryResponse inventoryResponse = null;
 
-    @Override
-    public MaterialDetailResponse getMaterialById(Long id) {
-    Material material = materialRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Product not found with ID: " + id));
+                        if (variant.getMaterialInventory() != null) {
+                            inventoryResponse = new InventoryResponse(variant.getMaterialInventory());
+                        }
 
-    List<MaterialVariantInventoryResponse> variantInventory = material.getVariants() != null
-            ? material.getVariants().stream()
-                .map(variant -> {
-                    MaterialVariantResponse variantResponse = new MaterialVariantResponse(variant);
-                    InventoryResponse inventoryResponse = null;
+                        return new MaterialVariantInventoryResponse(variantResponse, inventoryResponse);
+                    })
+                    .collect(Collectors.toList())
+                : Collections.emptyList();
+        
+        List<MaterialSupplierResponse> materialSupplier = material.getMaterialSuppliers() != null 
+                ? material.getMaterialSuppliers().stream()
+                    .map(supplier -> {
+                        return new MaterialSupplierResponse(supplier);
+                    })
+                    .collect(Collectors.toList())
+                : Collections.emptyList();
 
-                    if (variant.getMaterialInventory() != null) {
-                        inventoryResponse = new InventoryResponse(variant.getMaterialInventory());
-                    }
-
-                    return new MaterialVariantInventoryResponse(variantResponse, inventoryResponse);
-                })
-                .collect(Collectors.toList())
-            : Collections.emptyList();
-    
-    List<MaterialSupplierResponse> materialSupplier = material.getMaterialSuppliers() != null 
-            ? material.getMaterialSuppliers().stream()
-                .map(supplier -> {
-                    return new MaterialSupplierResponse(supplier);
-                })
-                .collect(Collectors.toList())
-            :Collections.emptyList();
-
-    return new MaterialDetailResponse(
-        material.getId(),
-        material.getSku(),
-        material.getName(),
-        material.getShortDes(),
-        material.getGroup() != null ? material.getGroup().getName() : null,
-        material.getStatus() != null ? material.getStatus().name() : null,
-        material.getUom() != null ? material.getUom().name() : null,
-        material.getImageUrl(),
-        variantInventory,
-        materialSupplier
-    );
+        return new MaterialDetailResponse(
+            material.getId(),
+            material.getSku(),
+            material.getName(),
+            material.getShortDes(),
+            material.getGroup() != null ? material.getGroup().getName() : null,
+            material.getStatus() != null ? material.getStatus().name() : null,
+            material.getUom() != null ? material.getUom().name() : null,
+            material.getImageUrl(),
+            variantInventory,
+            materialSupplier
+        );
     }
 
     @Override
-    public List<MaterialGroupResponse> getAllGroupName(){
-        return materialGroupRepository.findByIsActiveTrueAndNameIsNotNull().stream()
+    public List<MaterialGroupResponse> getAllGroupName(User currentUser) {
+        return materialGroupRepository.findByCompanyAndIsActiveTrue(currentUser.getCompany()).stream()
                 .map(MaterialGroupResponse::new)
                 .collect(Collectors.toList());
     }
@@ -499,7 +515,7 @@ public class MaterialServiceImpl implements MaterialService{
     @PreAuthorize("hasRole('OWNER')")
     public UpdateMaterialResponse updateMaterial(Long id, UpdateMaterialRequest request, User updatedByUser) {
         // Find existing material
-        Material material = materialRepository.findById(id)
+        Material material = materialRepository.findByIdAndCompany(id, updatedByUser.getCompany())
                 .orElseThrow(() -> new RuntimeException("Material not found with ID: " + id));
 
         // Update basic fields (excluding SKU)
@@ -515,15 +531,15 @@ public class MaterialServiceImpl implements MaterialService{
         if (request.getMaterialGroupId() != null) {
             // Choose Existing Material Group
             Long materialGroupId = Long.parseLong(request.getMaterialGroupId());
-            materialGroup = materialGroupRepository.findByIdAndIsActiveTrue(materialGroupId)
+            materialGroup = materialGroupRepository.findByIdAndCompanyAndIsActiveTrue(materialGroupId, updatedByUser.getCompany())
                     .orElseThrow(() -> new RuntimeException("Material Group not found with ID: " + request.getMaterialGroupId()));
         } else if (StringUtils.hasText(request.getNewMaterialGroupName())) {
             // Create New Material Group
             String newGroupName = request.getNewMaterialGroupName().trim();
-            if (materialGroupRepository.findByNameAndIsActiveTrue(newGroupName).isPresent()) {
+            if (materialGroupRepository.findByNameAndCompanyAndIsActiveTrue(newGroupName, updatedByUser.getCompany()).isPresent()) {
                 throw new IllegalArgumentException("Group name already exists: " + newGroupName);
             }
-            materialGroup = new MaterialGroup(newGroupName, updatedByUser);
+            materialGroup = new MaterialGroup(newGroupName, updatedByUser, updatedByUser.getCompany());
             materialGroupRepository.save(materialGroup);
         }
         material.setGroup(materialGroup);
@@ -556,7 +572,7 @@ public class MaterialServiceImpl implements MaterialService{
                 
                 // Delete material_inventory_log first
                 materialInventoryLogRepository.deleteByMaterialInventory(
-                    materialInventoryRepository.findByMaterialVariant_Id(variantToDelete.getId()).orElse(null)
+                    materialInventoryRepository.findByMaterialVariant_IdAndMaterialVariant_Material_Company(variantToDelete.getId(), updatedByUser.getCompany()).orElse(null)
                 );
                 // Delete material_inventory
                 materialInventoryRepository.deleteByMaterialVariant(variantToDelete);
@@ -589,7 +605,7 @@ public class MaterialServiceImpl implements MaterialService{
                     System.out.println("Creating new variant: " + variantRequest.getName());
                     
                     // Generate SKU for new variant
-                    String sku = generateVariantSku(material.getSku(), newVariantIndex);
+                    String sku = generateVariantSku(material.getSku(), newVariantIndex, updatedByUser.getCompany());
                     System.out.println("Generated SKU for new variant: " + sku);
                     
                     MaterialVariant newVariant = new MaterialVariant(
@@ -692,7 +708,7 @@ public class MaterialServiceImpl implements MaterialService{
     @PreAuthorize("hasAnyRole('OWNER', 'WAREHOUSE_STAFF')")
     public ChangeMaterialStatusResponse changeMaterialStatus(Long materialId, ChangeMaterialStatusRequest request, User changedByUser) {
         // Step 1: Find the material
-        Material material = materialRepository.findById(materialId)
+        Material material = materialRepository.findByIdAndCompany(materialId, changedByUser.getCompany())
                 .orElseThrow(() -> new RuntimeException("Material not found with ID: " + materialId));
 
         // Step 2: Get current status
@@ -731,30 +747,27 @@ public class MaterialServiceImpl implements MaterialService{
     }
 
     @Override
-    public MaterialStatusTransitionResponse getAvailableStatusTransitions(Long materialId) {
-        // Step 1: Find the material
-        Material material = materialRepository.findById(materialId)
+    public MaterialStatusTransitionResponse getAvailableStatusTransitions(Long materialId, User currentUser) {
+        Material material = materialRepository.findByIdAndCompany(materialId, currentUser.getCompany())
                 .orElseThrow(() -> new RuntimeException("Material not found with ID: " + materialId));
 
-        // Step 2: Get current status and available transitions
         MaterialStatus currentStatus = material.getStatus();
         Set<MaterialStatus> availableTransitions = materialStatusValidator.getValidTransitions(currentStatus);
 
-        // Step 3: Return response
         String message = String.format("Available status transitions for material '%s' (current status: %s)", 
                                      material.getName(), currentStatus);
         return new MaterialStatusTransitionResponse(materialId, currentStatus, availableTransitions, message);
     }
 
     @Override
-    public List<MaterialSupplierResponse> getSuppliersByMaterialVariantSku(String materialVariantSku) {
+    public List<MaterialSupplierResponse> getSuppliersByMaterialVariantSku(String materialVariantSku, User currentUser) {
         // Validate input parameter
         if (materialVariantSku == null || materialVariantSku.trim().isEmpty()) {
             throw new IllegalArgumentException("Material variant SKU cannot be null or empty");
         }
 
         // Step 1: Find the material variant by SKU
-        MaterialVariant materialVariant = materialVariantRepository.findBySku(materialVariantSku)
+        MaterialVariant materialVariant = materialVariantRepository.findBySkuAndCompany(materialVariantSku, currentUser.getCompany())
                 .orElseThrow(() -> new RuntimeException("Material variant not found with SKU: " + materialVariantSku));
 
         // Step 2: Get the material from the variant
@@ -785,4 +798,49 @@ public class MaterialServiceImpl implements MaterialService{
         return supplierResponses;
     }
 
+    @Override
+    @Transactional
+    @PreAuthorize("hasRole('OWNER')")
+    public DeleteMaterialResponse deleteMaterial(Long id, User deletedByUser) {
+        // Step 1: Find the material with company context
+        Material material = materialRepository.findByIdAndCompany(id, deletedByUser.getCompany())
+                .orElseThrow(() -> new RuntimeException("Material not found with ID: " + id));
+
+        // Step 2: Check if material is already deleted
+        if (material.getStatus() == MaterialStatus.DELETED) {
+            throw new RuntimeException("Material is already deleted");
+        }
+
+        // Step 3: Soft delete the material
+        material.setStatus(MaterialStatus.DELETED);
+        material.setActive(false);
+        material.setUpdated_by(deletedByUser);
+        material.setUpdatedAt(java.time.LocalDateTime.now());
+
+        // Step 4: Save the updated material
+        materialRepository.save(material);
+
+        // Step 5: Return success response
+        return new DeleteMaterialResponse(
+            material.getId(),
+            material.getSku(),
+            material.getName(),
+            material.getStatus().name(),
+            material.isActive(),
+            material.getUpdatedAt(),
+            deletedByUser.getUsername()
+        );
+    }
+
+    private MaterialSupplierResponse mapMaterialSupplierToResponse(MaterialSupplier materialSupplier) {
+        return new MaterialSupplierResponse(
+            materialSupplier.getSupplier().getId(),
+            materialSupplier.getSupplier().getName(),
+            materialSupplier.getPrice(),
+            materialSupplier.getCurrency(),
+            materialSupplier.getLeadTimeDays(),
+            materialSupplier.getMinOrderQuantity(),
+            materialSupplier.getSupplierMaterialCode()
+        );
+    }
 }

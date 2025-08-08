@@ -168,6 +168,24 @@ export const usePurchasingTicket = () => {
     }
   }, [getPurchasingTicketById, getPurchasingTicketDetails]);
 
+  // Delete purchasing ticket from catalog
+  const deletePurchasingTicket = useCallback(async (ticketId: number, reason: string) => {
+    setCancelling(true);
+    setError(null);
+    try {
+      const result = await purchasingTicketService.deletePurchasingTicket(ticketId, reason);
+      // Refresh the list after deletion
+      await getPurchasingTickets();
+      return result;
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to delete purchasing ticket';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setCancelling(false);
+    }
+  }, [getPurchasingTickets]);
+
   // Get status transition rules
   const getStatusTransitionRules = useCallback(async () => {
     setLoading(true);
@@ -268,6 +286,7 @@ export const usePurchasingTicket = () => {
     updateDetailStatus,
     cancelPurchasingTicket,
     cancelPurchasingTicketDetail,
+    deletePurchasingTicket,
     getStatusTransitionRules,
     getAllPurchasingTicketStatuses,
     getAutoComplete,

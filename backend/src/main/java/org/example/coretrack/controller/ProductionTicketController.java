@@ -70,9 +70,10 @@ public class ProductionTicketController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ProductionTicketResponse> getProductionTicketById(@PathVariable Long id) {
+    public ResponseEntity<ProductionTicketResponse> getProductionTicketById(@PathVariable Long id, Authentication authentication) {
         try {
-            ProductionTicketResponse ticket = productionTicketService.getProductionTicketById(id);
+             User user = (User) authentication.getPrincipal();
+            ProductionTicketResponse ticket = productionTicketService.getProductionTicketById(id,user);
             return ResponseEntity.ok(ticket);
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
@@ -83,9 +84,11 @@ public class ProductionTicketController {
     public ResponseEntity<Page<ProductionTicketCardResponse>> getProductionTickets(
             @RequestParam(required = false) String search,
             @RequestParam(name = "ticketStatus", required = false) List<String> ticketStatus,        
-            @PageableDefault(page = 0, size = 20) Pageable pageable) {
+            @PageableDefault(page = 0, size = 20) Pageable pageable,
+            Authentication authentication) {
         try {
-            Page<ProductionTicketCardResponse> tickets = productionTicketService.getProductionTickets(search, ticketStatus, pageable);
+            User user = (User) authentication.getPrincipal();
+            Page<ProductionTicketCardResponse> tickets = productionTicketService.getProductionTickets(search, ticketStatus, pageable, user);
             return ResponseEntity.ok(tickets);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -97,9 +100,11 @@ public class ProductionTicketController {
      */
     @GetMapping("/autocomplete")
     public ResponseEntity<List<ProductionTicketCardResponse>> getAutoComplete(
-        @RequestParam(required = false) String search){
+        @RequestParam(required = false) String search,
+        Authentication authentication){
            try {
-            List<ProductionTicketCardResponse> tickets = productionTicketService.getAutoComplete(search);
+            User user = (User) authentication.getPrincipal();
+            List<ProductionTicketCardResponse> tickets = productionTicketService.getAutoComplete(search, user);
             return ResponseEntity.ok(tickets);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -158,7 +163,7 @@ public class ProductionTicketController {
             return ResponseEntity.badRequest().build();
         }
     }
-
+    
     @PutMapping("/{ticketId}/details/{detailId}/cancel")
     @PreAuthorize("hasAnyRole('OWNER', 'WAREHOUSE_STAFF','PRODUCTION_STAFF')")
     public ResponseEntity<ProductionTicketDetailResponse> cancelProductionTicketDetail(
@@ -178,9 +183,11 @@ public class ProductionTicketController {
     @GetMapping("/{id}/details/{detailId}")
     public ResponseEntity<ProductionTicketDetailResponse> getProductionTicketDetails(
         @PathVariable Long id,
-        @PathVariable Long detailId) {
+        @PathVariable Long detailId,
+        Authentication authentication) {
         try {
-            ProductionTicketDetailResponse details = productionTicketService.getProductionTicketDetails(id, detailId);
+            User user = (User) authentication.getPrincipal();
+            ProductionTicketDetailResponse details = productionTicketService.getProductionTicketDetails(id, detailId, user);
             return ResponseEntity.ok(details);
         } catch (Exception e) {
             return ResponseEntity.notFound().build();

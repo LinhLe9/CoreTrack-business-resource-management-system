@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.example.coretrack.model.auth.User;
+import org.example.coretrack.model.auth.Company;
 
 import jakarta.persistence.*;
 
@@ -24,6 +25,11 @@ public class ProductGroup {
     @OneToMany(mappedBy = "group", cascade = CascadeType.ALL)
     List<Product> products = new ArrayList<>();
 
+    // Multi-tenancy: Company relationship
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
     //logging element
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_user_id", nullable = false)
@@ -40,10 +46,11 @@ public class ProductGroup {
     public ProductGroup() {
     }
 
-    public ProductGroup(String name, User created_by) {
+    public ProductGroup(String name, User created_by, Company company) {
         this.name = name;
         this.created_by = created_by;
         this.updated_by = created_by;
+        this.company = company;
         this.isActive = true;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -66,6 +73,14 @@ public class ProductGroup {
         this.name = name; 
     }
 
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
+    }
+
     public User getCreated_by() { 
         return created_by; 
     }
@@ -82,13 +97,6 @@ public class ProductGroup {
         this.updated_by = updatedBy; 
     }
 
-    public LocalDateTime getCreatedAt() { 
-        return createdAt; 
-    }
-    public void setCreatedAt(LocalDateTime createdAt) { 
-        this.createdAt = createdAt; 
-    }
-
     public LocalDateTime getUpdatedAt() { 
         return updatedAt; 
     }
@@ -97,7 +105,15 @@ public class ProductGroup {
         this.updatedAt = updatedAt; 
     }
 
-    public boolean getIsActive() { 
+    public LocalDateTime getCreatedAt() { 
+        return createdAt; 
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) { 
+        this.createdAt = createdAt; 
+    }
+
+    public boolean isActive() { 
         return isActive; 
     }
 
@@ -105,11 +121,11 @@ public class ProductGroup {
         isActive = active; 
     }
 
-    public List<Product> getProducts() {
-        return products;
+    public List<Product> getProducts() { 
+        return products; 
     }
 
-    public void setProducts(List<Product> products) {
-        this.products = products;
+    public void setProducts(List<Product> products) { 
+        this.products = products; 
     }
 }

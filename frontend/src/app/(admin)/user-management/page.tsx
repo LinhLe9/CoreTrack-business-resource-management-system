@@ -27,6 +27,7 @@ import {
   Alert,
   AlertIcon,
 } from '@chakra-ui/react';
+import { useRouter } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
 import { CreateUserRequest } from '@/services/userService';
 import { getErrorMessage } from '@/lib/utils';
@@ -40,17 +41,40 @@ const AdminPage: React.FC = () => {
     fetchUsers, 
     fetchCurrentUser, 
     createUser,
-    clearError 
+    clearError,
+    user,
+    isOwner
   } = useUser();
   
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
+  const router = useRouter();
 
   const [formData, setFormData] = useState<CreateUserRequest>({
     email: '',
     role: 'WAREHOUSE_STAFF',
     createdBy: 0,
   });
+
+  // Check if user has permission to access this page
+  useEffect(() => {
+    console.log('=== User Management Page Debug ===');
+    console.log('User from useUser:', user);
+    console.log('isOwner():', isOwner());
+    console.log('====================================');
+    
+    if (user && !isOwner()) {
+      console.log('Access denied - redirecting to /dashboard');
+      toast({
+        title: 'Access Denied',
+        description: 'Only owners can access the admin dashboard.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      router.push('/dashboard');
+    }
+  }, [user, isOwner, router, toast]);
 
   useEffect(() => {
     // Luôn lấy thông tin user hiện tại

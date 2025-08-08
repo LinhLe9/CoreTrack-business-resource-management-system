@@ -8,7 +8,19 @@ export default function PublicHeader() {
   const router = useRouter();
 
   return (
-    <Box as="header" w="100%" py={4} px={8} bg="white" boxShadow="sm" borderBottom="1px solid" borderColor="gray.200">
+    <Box 
+      as="header" 
+      w="100%" 
+      py={4} 
+      px={8} 
+      bg="white" 
+      boxShadow="sm" 
+      borderBottom="1px solid" 
+      borderColor="gray.200"
+      position="sticky"
+      top={0}
+      zIndex={1000}
+    >
       <Flex maxW="7xl" mx="auto" justify="space-between" align="center">
         {/* Left side: Logo */}
         <Link href="/">

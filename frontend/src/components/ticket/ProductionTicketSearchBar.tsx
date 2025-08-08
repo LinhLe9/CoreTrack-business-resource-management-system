@@ -149,7 +149,7 @@ const ProductionTicketSearchBar: React.FC<ProductionTicketSearchBarProps> = ({
           borderColor="gray.200"
           borderRadius="md"
           boxShadow="lg"
-          zIndex={1000}
+          zIndex={9999}
           maxH="300px"
           overflowY="auto"
         >
@@ -197,7 +197,7 @@ const ProductionTicketSearchBar: React.FC<ProductionTicketSearchBarProps> = ({
           borderColor="gray.200"
           borderRadius="md"
           boxShadow="lg"
-          zIndex={1000}
+          zIndex={9999}
           p={4}
         >
           <Text color="gray.500" textAlign="center">

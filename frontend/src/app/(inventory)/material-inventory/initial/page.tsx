@@ -29,6 +29,7 @@ import MaterialVariantSearchBar from '../../../../components/material/MaterialVa
 import { getAllMaterialVariantsForAutocomplete } from '../../../../services/materialService';
 import { bulkInitMaterialInventory } from '../../../../services/materialInventoryService';
 import { MaterialVariantAutoComplete } from '../../../../types/material';
+import ProtectedRoute from '../../../../components/auth/ProtectedRoute';
 
 interface SelectedMaterial {
   variantId: number;
@@ -182,147 +183,149 @@ const InitialStockPage: React.FC = () => {
   };
 
   return (
-    <Box p={8} maxW="800px" mx="auto">
-      <Heading as="h1" size="xl" textAlign="center" mb={8} color="teal.700">
-        Initialize Material Stock
-      </Heading>
+    <ProtectedRoute requiredRoles={['OWNER', 'WAREHOUSE_STAFF']}>
+      <Box p={8} maxW="800px" mx="auto">
+        <Heading as="h1" size="xl" textAlign="center" mb={8} color="teal.700">
+          Initialize Material Stock
+        </Heading>
 
-      <VStack spacing={6} align="stretch">
-        {/* Search Bar */}
-        <Box>
-          <Text fontSize="lg" fontWeight="bold" mb={3}>
-            Search and Select Materials
-          </Text>
-          <MaterialVariantSearchBar
-            onSearch={handleMaterialVariantSearch}
-            onSelectMaterialVariant={handleSelectMaterialVariant}
-            materialVariantsForAutocomplete={allMaterialVariantsForAutocomplete}
-          />
-        </Box>
-
-        {/* Selected Materials */}
-        {selectedMaterials.length > 0 && (
+        <VStack spacing={6} align="stretch">
+          {/* Search Bar */}
           <Box>
             <Text fontSize="lg" fontWeight="bold" mb={3}>
-              Selected Materials ({selectedMaterials.length})
+              Search and Select Materials
             </Text>
-            <VStack spacing={2} align="stretch">
-              {selectedMaterials.map((material) => (
-                <Card key={material.variantId} size="sm">
-                  <CardBody>
-                    <HStack justify="space-between">
-                      <VStack align="start" spacing={1}>
-                        <Text fontWeight="bold">{material.materialName}</Text>
-                        <Text fontSize="sm" color="gray.600">
-                          Material SKU: {material.materialSku}
-                        </Text>
-                        <Text fontSize="sm" color="gray.600">
-                          Variant SKU: {material.variantSku}
-                        </Text>
-                        <Text fontSize="sm" color="gray.600">
-                          Variant: {material.variantName}
-                        </Text>
-                        {material.materialGroup && (
+            <MaterialVariantSearchBar
+              onSearch={handleMaterialVariantSearch}
+              onSelectMaterialVariant={handleSelectMaterialVariant}
+              materialVariantsForAutocomplete={allMaterialVariantsForAutocomplete}
+            />
+          </Box>
+
+          {/* Selected Materials */}
+          {selectedMaterials.length > 0 && (
+            <Box>
+              <Text fontSize="lg" fontWeight="bold" mb={3}>
+                Selected Materials ({selectedMaterials.length})
+              </Text>
+              <VStack spacing={2} align="stretch">
+                {selectedMaterials.map((material) => (
+                  <Card key={material.variantId} size="sm">
+                    <CardBody>
+                      <HStack justify="space-between">
+                        <VStack align="start" spacing={1}>
+                          <Text fontWeight="bold">{material.materialName}</Text>
                           <Text fontSize="sm" color="gray.600">
-                            Group: {material.materialGroup}
+                            Material SKU: {material.materialSku}
                           </Text>
-                        )}
-                      </VStack>
-                      <IconButton
-                        icon={<CloseIcon />}
-                        aria-label="Remove material variant"
-                        size="sm"
-                        colorScheme="red"
-                        variant="ghost"
-                        onClick={() => handleRemoveMaterial(material.variantId)}
-                      />
-                    </HStack>
-                  </CardBody>
-                </Card>
-              ))}
+                          <Text fontSize="sm" color="gray.600">
+                            Variant SKU: {material.variantSku}
+                          </Text>
+                          <Text fontSize="sm" color="gray.600">
+                            Variant: {material.variantName}
+                          </Text>
+                          {material.materialGroup && (
+                            <Text fontSize="sm" color="gray.600">
+                              Group: {material.materialGroup}
+                            </Text>
+                          )}
+                        </VStack>
+                        <IconButton
+                          icon={<CloseIcon />}
+                          aria-label="Remove material variant"
+                          size="sm"
+                          colorScheme="red"
+                          variant="ghost"
+                          onClick={() => handleRemoveMaterial(material.variantId)}
+                        />
+                      </HStack>
+                    </CardBody>
+                  </Card>
+                ))}
+              </VStack>
+            </Box>
+          )}
+
+          <Divider />
+
+          {/* Stock Level Configuration */}
+          <Box>
+            <Text fontSize="lg" fontWeight="bold" mb={3}>
+              Stock Level Configuration
+            </Text>
+            <VStack spacing={4} align="stretch">
+              <FormControl>
+                <FormLabel>Initial Stock</FormLabel>
+                <NumberInput
+                  value={initialStock}
+                  onChange={(_, value) => setInitialStock(value)}
+                  min={0}
+                  precision={2}
+                >
+                  <NumberInputField />
+                  <NumberInputStepper>
+                    <NumberIncrementStepper />
+                    <NumberDecrementStepper />
+                  </NumberInputStepper>
+                </NumberInput>
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>Min Alert Stock</FormLabel>
+                <NumberInput
+                  value={minAlertStock}
+                  onChange={(_, value) => setMinAlertStock(value)}
+                  min={0}
+                  precision={2}
+                >
+                  <NumberInputField />
+                  <NumberInputStepper>
+                    <NumberIncrementStepper />
+                    <NumberDecrementStepper />
+                  </NumberInputStepper>
+                </NumberInput>
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>Max Stock Level</FormLabel>
+                <NumberInput
+                  value={maxStockLevel}
+                  onChange={(_, value) => setMaxStockLevel(value)}
+                  min={0}
+                  precision={2}
+                >
+                  <NumberInputField />
+                  <NumberInputStepper>
+                    <NumberIncrementStepper />
+                    <NumberDecrementStepper />
+                  </NumberInputStepper>
+                </NumberInput>
+              </FormControl>
             </VStack>
           </Box>
-        )}
 
-        <Divider />
-
-        {/* Stock Level Configuration */}
-        <Box>
-          <Text fontSize="lg" fontWeight="bold" mb={3}>
-            Stock Level Configuration
-          </Text>
-          <VStack spacing={4} align="stretch">
-            <FormControl>
-              <FormLabel>Initial Stock</FormLabel>
-              <NumberInput
-                value={initialStock}
-                onChange={(_, value) => setInitialStock(value)}
-                min={0}
-                precision={2}
-              >
-                <NumberInputField />
-                <NumberInputStepper>
-                  <NumberIncrementStepper />
-                  <NumberDecrementStepper />
-                </NumberInputStepper>
-              </NumberInput>
-            </FormControl>
-
-            <FormControl>
-              <FormLabel>Min Alert Stock</FormLabel>
-              <NumberInput
-                value={minAlertStock}
-                onChange={(_, value) => setMinAlertStock(value)}
-                min={0}
-                precision={2}
-              >
-                <NumberInputField />
-                <NumberInputStepper>
-                  <NumberIncrementStepper />
-                  <NumberDecrementStepper />
-                </NumberInputStepper>
-              </NumberInput>
-            </FormControl>
-
-            <FormControl>
-              <FormLabel>Max Stock Level</FormLabel>
-              <NumberInput
-                value={maxStockLevel}
-                onChange={(_, value) => setMaxStockLevel(value)}
-                min={0}
-                precision={2}
-              >
-                <NumberInputField />
-                <NumberInputStepper>
-                  <NumberIncrementStepper />
-                  <NumberDecrementStepper />
-                </NumberInputStepper>
-              </NumberInput>
-            </FormControl>
-          </VStack>
-        </Box>
-
-        {/* Action Buttons */}
-        <HStack spacing={4} justify="center">
-          <Button
-            colorScheme="gray"
-            onClick={handleCancel}
-            isDisabled={loading}
-          >
-            Cancel
-          </Button>
-          <Button
-            colorScheme="teal"
-            onClick={handleSubmit}
-            isLoading={loading}
-            loadingText="Initializing..."
-            isDisabled={selectedMaterials.length === 0}
-          >
-            Initialize Stock
-          </Button>
-        </HStack>
-      </VStack>
-    </Box>
+          {/* Action Buttons */}
+          <HStack spacing={4} justify="center">
+            <Button
+              colorScheme="gray"
+              onClick={handleCancel}
+              isDisabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              colorScheme="teal"
+              onClick={handleSubmit}
+              isLoading={loading}
+              loadingText="Initializing..."
+              isDisabled={selectedMaterials.length === 0}
+            >
+              Initialize Stock
+            </Button>
+          </HStack>
+        </VStack>
+      </Box>
+    </ProtectedRoute>
   );
 };
 

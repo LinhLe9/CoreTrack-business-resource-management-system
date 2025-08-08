@@ -114,13 +114,22 @@ const PurchasingTicketCard: React.FC<PurchasingTicketCardProps> = ({
         <Divider />
 
         {/* Details */}
-        <VStack spacing={2} align="stretch">
+        <VStack spacing={3} align="stretch">
           <HStack justify="space-between">
             <Text fontSize="sm" color="gray.600">
               Created:
             </Text>
             <Text fontSize="sm" fontWeight="medium">
               {formatDate(purchasingTicket.createdAt)}
+            </Text>
+          </HStack>
+
+          <HStack justify="space-between">
+            <Text fontSize="sm" color="gray.600">
+              Updated:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {formatDate(purchasingTicket.updatedAt)}
             </Text>
           </HStack>
 
@@ -134,35 +143,75 @@ const PurchasingTicketCard: React.FC<PurchasingTicketCardProps> = ({
               </Text>
             </HStack>
           )}
+
+          <HStack justify="space-between">
+            <Text fontSize="sm" color="gray.600">
+              Created By:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {purchasingTicket.createdBy}
+            </Text>
+          </HStack>
+
+          <HStack justify="space-between">
+            <Text fontSize="sm" color="gray.600">
+              Role:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {purchasingTicket.createdByRole}
+            </Text>
+          </HStack>
+
+          <HStack justify="space-between">
+            <Text fontSize="sm" color="gray.600">
+              Updated By:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {purchasingTicket.updatedBy}
+            </Text>
+          </HStack>
+
+          <HStack justify="space-between">
+            <Text fontSize="sm" color="gray.600">
+              Updated By Role:
+            </Text>
+            <Text fontSize="sm" fontWeight="medium">
+              {purchasingTicket.updatedByRole}
+            </Text>
+          </HStack>
         </VStack>
 
         {/* Actions */}
-        <HStack spacing={2} justify="flex-end">
+        <HStack spacing={2} justify="center">
           <Button
+            leftIcon={<ViewIcon />}
             size="sm"
             colorScheme="blue"
-            leftIcon={<ViewIcon />}
+            variant="outline"
             onClick={() => onViewDetails(purchasingTicket.id)}
+            flex={1}
           >
             View Details
           </Button>
           
           {onEdit && (
             <IconButton
+              aria-label="Edit purchasing ticket"
+              icon={<EditIcon />}
               size="sm"
               colorScheme="yellow"
-              aria-label="Edit ticket"
-              icon={<EditIcon />}
+              variant="outline"
               onClick={() => onEdit(purchasingTicket.id)}
             />
           )}
           
           {onDelete && (
             <IconButton
+              aria-label="Delete purchasing ticket"
+              icon={<DeleteIcon />}
               size="sm"
               colorScheme="red"
-              aria-label="Delete ticket"
-              icon={<DeleteIcon />}
+              variant="outline"
               onClick={() => onDelete(purchasingTicket.id)}
             />
           )}

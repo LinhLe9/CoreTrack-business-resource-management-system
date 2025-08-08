@@ -4,6 +4,7 @@ public class RegistrationRequest {
     private String username;
     private String email;
     private String password;
+    private String companyName;
 
     // Getters and setters
 
@@ -29,5 +30,13 @@ public class RegistrationRequest {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+    
+    public String getCompanyName() {
+        return companyName;
+    }
+    
+    public void setCompanyName(String companyName) {
+        this.companyName = companyName;
     }
 }

@@ -32,6 +32,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
   SuppliersForAutocomplete = [],
 }) => {
   const [selectedOption, setSelectedOption] = useState<OptionType | null>(null);
+  const [inputValue, setInputValue] = useState(initialSearchTerm);
 
   const options: OptionType[] = (SuppliersForAutocomplete || []).map((supplier) => ({
     value: supplier.id,
@@ -54,9 +55,21 @@ const SearchBar: React.FC<SearchBarProps> = ({
     }
   };
 
+  const handleInputChange = (newValue: string) => {
+    setInputValue(newValue);
+  };
+
   const handleSearch = () => {
-    if (selectedOption) {
-      onSearch(selectedOption.label);
+    // Search with selected option if available, otherwise use input value
+    const searchTerm = selectedOption ? selectedOption.label : inputValue;
+    if (searchTerm && searchTerm.trim()) {
+      onSearch(searchTerm.trim());
+    }
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      handleSearch();
     }
   };
 
@@ -73,29 +86,41 @@ const SearchBar: React.FC<SearchBarProps> = ({
   );
 
   return (
-    <Flex gap={2}>
-      <Box flex="1">
-        <Select
-          options={options}
-          placeholder="Search by name, phone, email, address, contact person"
-          onChange={handleChange}
-          value={selectedOption}
-          isClearable
-          components={{ SingleValue: customSingleValue, Option: customOption }}
-          filterOption={(option, inputValue) => {
-            const nameMatch = option.label.toLowerCase().includes(inputValue.toLowerCase());
-            const addressMatch = option.data.address?.toLowerCase().includes(inputValue.toLowerCase()) || false;
-            const countryMatch = option.data.country?.toLowerCase().includes(inputValue.toLowerCase()) || false;
-            const contactNameMatch = option.data.contactPerson?.toLowerCase().includes(inputValue.toLowerCase()) || false;
-            const emailMatch = option.data.email?.toLowerCase().includes(inputValue.toLowerCase()) || false;
-            const phoneMatch = option.data.phone?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+    <Box width="500px" minWidth="400px" maxWidth="700px">
+      <Select
+        options={options}
+        placeholder="Search by name, phone, email, address, contact person"
+        onChange={handleChange}
+        value={selectedOption}
+        inputValue={inputValue}
+        onInputChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        isClearable
+        components={{ SingleValue: customSingleValue, Option: customOption }}
+        filterOption={(option, inputValue) => {
+          const nameMatch = option.label.toLowerCase().includes(inputValue.toLowerCase());
+          const addressMatch = option.data.address?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+          const countryMatch = option.data.country?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+          const contactNameMatch = option.data.contactPerson?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+          const emailMatch = option.data.email?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+          const phoneMatch = option.data.phone?.toLowerCase().includes(inputValue.toLowerCase()) || false;
 
-            return nameMatch || addressMatch || countryMatch || contactNameMatch || emailMatch || phoneMatch;
-          }}
-        />
-      </Box>
-      <Button colorScheme="blue" onClick={handleSearch}>Search</Button>
-    </Flex>
+          return nameMatch || addressMatch || countryMatch || contactNameMatch || emailMatch || phoneMatch;
+        }}
+        styles={{
+          menu: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+          }),
+          menuPortal: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+          }),
+        }}
+        menuPortalTarget={document.body}
+        menuPosition="fixed"
+      />
+    </Box>
   );
 };
 

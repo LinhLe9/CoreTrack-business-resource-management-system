@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.example.coretrack.model.auth.User;
+import org.example.coretrack.model.auth.Company;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -57,9 +58,13 @@ public class PurchasingTicket {
     @JoinColumn(name = "updated_by_user_id")
     private User updatedBy;
 
+    @ManyToOne
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
     public PurchasingTicket(Long id, String name, PurchasingTicketStatus status, boolean isActive,
             List<PurchasingTicketDetail> ticketDetail, LocalDateTime completed_date, LocalDateTime createdAt,
-            LocalDateTime updatedAt, User createdBy, User updatedBy) {
+            LocalDateTime updatedAt, User createdBy, User updatedBy, Company company) {
         this.id = id;
         this.name = name;
         this.status = status;
@@ -70,6 +75,7 @@ public class PurchasingTicket {
         this.updatedAt = updatedAt;
         this.createdBy = createdBy;
         this.updatedBy = updatedBy;
+        this.company = company;
     }
     
     public PurchasingTicket(){}
@@ -160,6 +166,14 @@ public class PurchasingTicket {
 
     public void setUpdatedBy(User updatedBy) {
         this.updatedBy = updatedBy;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
     }
     
 }

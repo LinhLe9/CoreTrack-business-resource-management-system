@@ -11,6 +11,8 @@ import org.example.coretrack.dto.product.inventory.ProductInventoryDetailRespons
 import org.example.coretrack.dto.product.inventory.SearchInventoryResponse;
 import org.example.coretrack.dto.product.inventory.StockModifyRequest;
 import org.example.coretrack.dto.product.inventory.StockSetRequest;
+import org.example.coretrack.dto.product.inventory.SetMinMaxRequest;
+import org.example.coretrack.dto.product.inventory.SetMinMaxResponse;
 import org.example.coretrack.dto.product.inventory.BulkStockModifyRequest;
 import org.example.coretrack.dto.product.inventory.BulkStockSetRequest;
 import org.example.coretrack.dto.product.inventory.BulkInventoryTransactionResponse;
@@ -98,7 +100,7 @@ public class ProductInventoryController {
     /*
      * Endpoint to add stock to a specific product variant
      */
-    @PutMapping("/{variantId}/add")
+    @PostMapping("/{variantId}/add")
     @PreAuthorize("hasAnyRole('OWNER', 'WAREHOUSE_STAFF')")
     public ResponseEntity<InventoryTransactionResponse> addStock(
         @PathVariable Long variantId,
@@ -112,7 +114,7 @@ public class ProductInventoryController {
     /*
      * Endpoint to subtract stock from a specific product variant
      */
-    @PutMapping("/{variantId}/subtract")
+    @PostMapping("/{variantId}/subtract")
     @PreAuthorize("hasAnyRole('OWNER', 'WAREHOUSE_STAFF')")
     public ResponseEntity<InventoryTransactionResponse> subtractStock(
         @PathVariable Long variantId,
@@ -138,7 +140,8 @@ public class ProductInventoryController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
         }
 
-        Page<SearchInventoryResponse> productInventory = productInventoryService.findProduct(search, groupProducts, inventoryStatus, pageable);
+        User currentUser = getCurrentUserFromSecurityContext();
+        Page<SearchInventoryResponse> productInventory = productInventoryService.findProduct(search, groupProducts, inventoryStatus, pageable, currentUser);
 
         // A2: No matching results - frontend solves
         return ResponseEntity.ok(productInventory);
@@ -154,7 +157,8 @@ public class ProductInventoryController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
         }
 
-        List<AllSearchInventoryResponse> productInventory = productInventoryService.getAllForAutocomplete(search);
+        User currentUser = getCurrentUserFromSecurityContext();
+        List<AllSearchInventoryResponse> productInventory = productInventoryService.getAllForAutocomplete(search, currentUser);
 
         // A2: No matching results - frontend solves
         return ResponseEntity.ok(productInventory);
@@ -166,7 +170,8 @@ public class ProductInventoryController {
      */
     @GetMapping("/{variantId}")
     public ResponseEntity<ProductInventoryDetailResponse> getProductInventoryById(@PathVariable Long variantId) {
-        ProductInventoryDetailResponse product = productInventoryService.getProductInventoryById(variantId);
+        User currentUser = getCurrentUserFromSecurityContext();
+        ProductInventoryDetailResponse product = productInventoryService.getProductInventoryById(variantId, currentUser);
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product Inventory not found with ID: " + variantId);
         }
@@ -273,10 +278,39 @@ public class ProductInventoryController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
         }
 
-        Page<SearchInventoryResponse> productInventory = productInventoryService.getAlarmProduct(search, groupProducts, status, sortByOldest, pageable);
+        User currentUser = getCurrentUserFromSecurityContext();
+        Page<SearchInventoryResponse> productInventory = productInventoryService.getAlarmProduct(search, groupProducts, status, sortByOldest, pageable, currentUser);
 
         // A2: No matching results - frontend solves
         return ResponseEntity.ok(productInventory);
+    }
+
+    /*
+     * Endpoint to set minimum alert stock for a specific product variant
+     */
+    @PutMapping("/{variantId}/set-minimum")
+    @PreAuthorize("hasAnyRole('OWNER')")
+    public ResponseEntity<SetMinMaxResponse> setMinimumAlertStock(
+        @PathVariable Long variantId,
+        @RequestBody SetMinMaxRequest request
+    ) {
+        User currentUser = getCurrentUserFromSecurityContext();
+        SetMinMaxResponse response = productInventoryService.setMinimumAlertStock(variantId, request, currentUser);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    /*
+     * Endpoint to set maximum stock level for a specific product variant
+     */
+    @PutMapping("/{variantId}/set-maximum")
+    @PreAuthorize("hasAnyRole('OWNER')")
+    public ResponseEntity<SetMinMaxResponse> setMaximumStockLevel(
+        @PathVariable Long variantId,
+        @RequestBody SetMinMaxRequest request
+    ) {
+        User currentUser = getCurrentUserFromSecurityContext();
+        SetMinMaxResponse response = productInventoryService.setMaximumStockLevel(variantId, request, currentUser);
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 }
 

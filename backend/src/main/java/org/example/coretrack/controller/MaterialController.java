@@ -13,6 +13,7 @@ import org.example.coretrack.dto.material.UpdateMaterialResponse;
 import org.example.coretrack.dto.material.ChangeMaterialStatusRequest;
 import org.example.coretrack.dto.material.ChangeMaterialStatusResponse;
 import org.example.coretrack.dto.material.MaterialStatusTransitionResponse;
+import org.example.coretrack.dto.material.DeleteMaterialResponse;
 import org.example.coretrack.dto.material.UoMResponse;
 import org.example.coretrack.dto.material.MaterialVariantAutoCompleteResponse;
 import org.example.coretrack.dto.material.MaterialSupplierResponse;
@@ -30,6 +31,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -88,20 +90,34 @@ public class MaterialController {
 
             // Check if principal is User object directly
             if (authentication.getPrincipal() instanceof User) {
-                User user = (User) authentication.getPrincipal();
-                System.out.println("User found directly from principal: " + user.getEmail());
-                return user;
+                return (User) authentication.getPrincipal();
             }
+
             // Check if principal is UserDetails
-            else if (authentication.getPrincipal() instanceof UserDetails) {
-                String username = ((UserDetails) authentication.getPrincipal()).getUsername();
-                System.out.println("Username from UserDetails: " + username);
-                return userRepository.findByUsername(username).orElse(null);
-            }
-            else {
-                System.out.println("Unknown principal type: " + authentication.getPrincipal().getClass().getName());
+            if (authentication.getPrincipal() instanceof UserDetails) {
+                String principalName = ((UserDetails) authentication.getPrincipal()).getUsername();
+                System.out.println("Principal name from UserDetails: " + principalName);
+
+                // Try to find user by username first
+                var userOpt = userRepository.findByUsername(principalName);
+                if (userOpt.isPresent()) {
+                    System.out.println("Found user by username: " + userOpt.get().getUsername());
+                    return userOpt.get();
+                }
+
+                // Try to find user by email
+                var userByEmailOpt = userRepository.findByEmail(principalName);
+                if (userByEmailOpt.isPresent()) {
+                    System.out.println("Found user by email: " + userByEmailOpt.get().getEmail());
+                    return userByEmailOpt.get();
+                }
+
+                System.out.println("No user found for principal: " + principalName);
                 return null;
             }
+
+            System.out.println("Unknown principal type: " + authentication.getPrincipal().getClass().getName());
+            return null;
         } catch (Exception e) {
             System.err.println("Error getting current user: " + e.getMessage());
             e.printStackTrace();
@@ -125,6 +141,12 @@ public class MaterialController {
             @PageableDefault(page = 0, size = 20) Pageable pageable) { 
 
         try {
+            // Get current user for company context
+            User currentUser = getCurrentUserFromSecurityContext();
+            if (currentUser == null) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+            }
+
             System.out.println("=== Material Filter Request ===");
             System.out.println("Search: " + search);
             System.out.println("GroupMaterials: " + groupMaterials);
@@ -136,7 +158,7 @@ public class MaterialController {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
             }
 
-            Page<SearchMaterialResponse> materials = materialService.findMaterial(search, groupMaterials, status, pageable);
+            Page<SearchMaterialResponse> materials = materialService.findMaterial(search, groupMaterials, status, pageable, currentUser);
             System.out.println("Found " + materials.getTotalElements() + " materials");
 
             // A2: No matching results - frontend solves
@@ -151,14 +173,28 @@ public class MaterialController {
     @GetMapping("/all")
     public ResponseEntity<List<AllMaterialSearchResponse>> getMaterials(
             @RequestParam(required = false) String search) { 
-        List<AllMaterialSearchResponse> materials = materialService.getAllMaterialsForAutocomplete(search);
+        
+        // Get current user for company context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+
+        List<AllMaterialSearchResponse> materials = materialService.getAllMaterialsForAutocomplete(search, currentUser);
         return ResponseEntity.ok(materials);
     }
 
     @GetMapping("/variants/autocomplete")
     public ResponseEntity<List<MaterialVariantAutoCompleteResponse>> getAllMaterialVariantsForAutocomplete(
             @RequestParam(required = false) String search) { 
-        List<MaterialVariantAutoCompleteResponse> variants = materialService.getAllMaterialVariantsForAutocomplete(search);
+        
+        // Get current user for company context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+
+        List<MaterialVariantAutoCompleteResponse> variants = materialService.getAllMaterialVariantsForAutocomplete(search, currentUser);
         return ResponseEntity.ok(variants);
     }
 
@@ -167,7 +203,13 @@ public class MaterialController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<MaterialDetailResponse> getMaterialById(@PathVariable Long id) {
-        MaterialDetailResponse material = materialService.getMaterialById(id);
+        // Get current user for company context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+
+        MaterialDetailResponse material = materialService.getMaterialById(id, currentUser);
         if (material == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Material not found with ID: " + id);
         }
@@ -180,7 +222,13 @@ public class MaterialController {
     @GetMapping("/material-groups")
     public ResponseEntity<List<MaterialGroupResponse>> getAllMaterialGroups() {
         try {
-            List<MaterialGroupResponse> groups = materialService.getAllGroupName();
+            // Get current user for company context
+            User currentUser = getCurrentUserFromSecurityContext();
+            if (currentUser == null) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+            }
+
+            List<MaterialGroupResponse> groups = materialService.getAllGroupName(currentUser);
             System.out.println("Result: " + groups);
             return ResponseEntity.ok(groups);
         } catch (Exception e) {
@@ -253,7 +301,13 @@ public class MaterialController {
     @PreAuthorize("hasAnyRole('OWNER', 'WAREHOUSE_STAFF')")
     public ResponseEntity<MaterialStatusTransitionResponse> getAvailableStatusTransitions(@PathVariable Long id) {
         try {
-            MaterialStatusTransitionResponse response = materialService.getAvailableStatusTransitions(id);
+            // Get current user for company context
+            User currentUser = getCurrentUserFromSecurityContext();
+            if (currentUser == null) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+            }
+
+            MaterialStatusTransitionResponse response = materialService.getAvailableStatusTransitions(id, currentUser);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             // Handle material not found
@@ -274,7 +328,13 @@ public class MaterialController {
     public ResponseEntity<List<MaterialSupplierResponse>> getSuppliersByMaterialVariantSku(
             @PathVariable String materialVariantSku) {
         try {
-            List<MaterialSupplierResponse> suppliers = materialService.getSuppliersByMaterialVariantSku(materialVariantSku);
+            // Get current user for company context
+            User currentUser = getCurrentUserFromSecurityContext();
+            if (currentUser == null) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+            }
+
+            List<MaterialSupplierResponse> suppliers = materialService.getSuppliersByMaterialVariantSku(materialVariantSku, currentUser);
             return ResponseEntity.ok(suppliers);
         } catch (RuntimeException e) {
             // Handle material variant not found
@@ -284,5 +344,20 @@ public class MaterialController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, 
                 "Error retrieving suppliers for material variant: " + e.getMessage());
         }
+    }
+
+    /**
+     * Endpoint for deleting a material (soft delete)
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<DeleteMaterialResponse> deleteMaterial(@PathVariable Long id) {
+        // Get current user information from Spring Security Context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+        DeleteMaterialResponse response = materialService.deleteMaterial(id, currentUser);
+        return ResponseEntity.ok(response);
     }
 }

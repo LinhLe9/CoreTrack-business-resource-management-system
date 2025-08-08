@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.example.coretrack.model.auth.User;
+import org.example.coretrack.model.auth.Company;
 
 import jakarta.persistence.*;
 
@@ -52,16 +53,21 @@ public class Supplier {
     @JoinColumn(name = "updated_by_user_id")
     private User updatedBy;
 
+    @ManyToOne
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
     public Supplier() {
     }
 
-    public Supplier(String name, String contactPerson, String email, String phone, String currency, User createdBy) {
+    public Supplier(String name, String contactPerson, String email, String phone, String currency, User createdBy, Company company) {
         this.name = name;
         this.contactPerson = contactPerson;
         this.email = email;
         this.phone = phone;
         this.currency = currency; 
         this.createdBy = createdBy;
+        this.company = company;
         this.isActive = true;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -194,6 +200,14 @@ public class Supplier {
 
     public void setUpdatedBy(User updatedBy) {
         this.updatedBy = updatedBy;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
     }
 
     public List<MaterialSupplier> getMaterialSuppliers() {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Box,
   VStack,
@@ -36,9 +36,10 @@ import {
   CardBody,
   SimpleGrid,
 } from '@chakra-ui/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronDownIcon, ChevronUpIcon, AddIcon, CloseIcon } from '@chakra-ui/icons';
 import { usePurchasingTicket } from '../../../../hooks/usePurchasingTicket';
+import { useUser } from '../../../../hooks/useUser';
 import { 
   MaterialVariantAutoComplete 
 } from '../../../../types/material';
@@ -57,11 +58,119 @@ interface MaterialVariantData {
   suppliers: MaterialSupplierResponse[];
 }
 
+interface LowStockMaterial {
+  id: number;
+  name: string;
+  sku: string;
+  currentStock: string;
+  minAlertStock: string;
+  maxStockLevel: string;
+  group?: string;
+}
+
 const CreatePurchasingTicketPage: React.FC = () => {
   const [title, setTitle] = useState('');
   const [materialVariants, setMaterialVariants] = useState<MaterialVariantData[]>([]);
   const [materialVariantSearchResults, setMaterialVariantSearchResults] = useState<MaterialVariantAutoComplete[]>([]);
 
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const toast = useToast();
+  const { isOwner, user } = useUser();
+
+  // Check if user has permission to access this page
+  useEffect(() => {
+    console.log('=== Purchasing Create Page Debug ===');
+    console.log('User from useUser:', user);
+    console.log('isOwner():', isOwner());
+    console.log('=====================================');
+    
+    if (user && !isOwner()) {
+      console.log('Access denied - redirecting to /purchasing');
+      toast({
+        title: 'Access Denied',
+        description: 'Only owners can create purchasing tickets.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      router.push('/purchasing');
+    }
+  }, [user, isOwner, router, toast]);
+  
+  // Load low stock data from URL parameters
+  useEffect(() => {
+    const lowStockData = searchParams.get('lowStockData');
+    if (lowStockData) {
+      try {
+        const parsedData: LowStockMaterial[] = JSON.parse(decodeURIComponent(lowStockData));
+        
+        // Auto-generate title
+        const materialNames = parsedData.map(m => m.name).join(', ');
+        setTitle(`Purchasing for Low Stock Items: ${materialNames}`);
+        
+        // Convert low stock materials to material variants
+        const convertLowStockToMaterialVariants = async () => {
+          const variants: MaterialVariantData[] = [];
+          
+          for (const lowStockMaterial of parsedData) {
+            try {
+              // Search for the material variant by SKU
+              const searchResults = await getAllMaterialVariantsForAutocomplete(lowStockMaterial.sku);
+              const matchingVariant = searchResults?.find(v => v.variantSku === lowStockMaterial.sku);
+              
+              if (matchingVariant) {
+                // Get suppliers for the variant
+                const suppliers = await getSuppliersByMaterialVariantSku(matchingVariant.variantSku);
+                
+                // Calculate required quantity
+                const currentStock = parseFloat(lowStockMaterial.currentStock || '0');
+                const minAlert = parseFloat(lowStockMaterial.minAlertStock || '0');
+                const maxLevel = parseFloat(lowStockMaterial.maxStockLevel || '100');
+                const targetStock = maxLevel * 0.8;
+                const requiredQuantity = Math.max(targetStock - currentStock, minAlert - currentStock);
+                
+                const variantData: MaterialVariantData = {
+                  variant: matchingVariant,
+                  quantity: Math.ceil(requiredQuantity),
+                  expectedReadyDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                  suppliers,
+                };
+                
+                variants.push(variantData);
+              }
+            } catch (error) {
+              console.error(`Error processing low stock material ${lowStockMaterial.sku}:`, error);
+            }
+          }
+          
+          setMaterialVariants(variants);
+          
+          if (variants.length > 0) {
+            toast({
+              title: 'Low Stock Items Loaded',
+              description: `Pre-filled ${variants.length} material variants from low stock items.`,
+              status: 'success',
+              duration: 5000,
+              isClosable: true,
+            });
+          }
+        };
+        
+        convertLowStockToMaterialVariants();
+      } catch (error) {
+        console.error('Error parsing low stock data:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load low stock data',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    }
+  }, [searchParams, toast]);
+  
   // Helper function to convert date string to YYYY-MM-DD format
   const convertToDateString = (dateString: string): string => {
     try {
@@ -79,9 +188,6 @@ const CreatePurchasingTicketPage: React.FC = () => {
   
   const { bulkCreatePurchasingTicket, bulkCreating, error, clearError } = usePurchasingTicket();
   
-  const toast = useToast();
-  const router = useRouter();
-
   // Handle material variant search
   const handleMaterialVariantSearch = useCallback(async (search: string) => {
     try {

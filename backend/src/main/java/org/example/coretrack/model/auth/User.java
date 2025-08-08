@@ -7,7 +7,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.ArrayList;
 import java.time.LocalDateTime;
+
+import org.example.coretrack.model.notification.NotificationUser;
 
 @Entity
 @Table(name = "users")
@@ -39,22 +42,32 @@ public class User implements UserDetails {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+    
+    @OneToMany(mappedBy = "user", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true)
+    private List<NotificationUser> notificationUsers = new ArrayList<>();
+
     // Constructor
-    public User(String username, String email, String password, Role role, boolean enabled) {
+    public User(String username, String email, String password, Role role, boolean enabled, Company company) {
         this.username = username;
         this.email = email;
         this.password = password;
         this.role = role;
         this.enabled = enabled;
+        this.company = company;
+        this.createdAt = LocalDateTime.now();
     }
 
-    public User(String username, String email, String password, Role role, boolean enabled, User createdBy) {
+    public User(String username, String email, String password, Role role, boolean enabled, User createdBy, Company company) {
         this.username = username;
         this.email = email;
         this.password = password;
         this.role = role;
         this.enabled = enabled;
         this.createdBy = createdBy;
+        this.company = company;
         this.createdAt = LocalDateTime.now();
     }
 
@@ -69,7 +82,6 @@ public class User implements UserDetails {
     public void setId(Long id) {
         this.id = id;
     }
-
 
     public void setUsername(String username) {
         this.username = username;
@@ -146,5 +158,21 @@ public class User implements UserDetails {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public List<NotificationUser> getNotificationUsers() {
+        return notificationUsers;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
+    }
+
+    public void setNotificationUsers(List<NotificationUser> notificationUsers) {
+        this.notificationUsers = notificationUsers;
     }
 }

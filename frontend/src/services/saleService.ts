@@ -34,6 +34,21 @@ export const getSaleTicketById = async (id: number): Promise<SaleTicketResponse>
   return response.data;
 };
 
+// Update sale ticket
+export const updateSaleTicket = async (
+  id: number,
+  updateData: {
+    expected_complete_date?: string;
+    customerName?: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    customerAddress?: string;
+  }
+): Promise<SaleTicketResponse> => {
+  const response = await apiClient.put(`/sale/${id}`, updateData);
+  return response.data;
+};
+
 // Create a new sale ticket
 export const createSaleTicket = async (request: SaleCreateRequest): Promise<SaleCardResponse> => {
   const response = await apiClient.post('/sale/bulk-create', request);

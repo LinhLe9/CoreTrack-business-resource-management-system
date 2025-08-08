@@ -113,6 +113,12 @@ export const productionTicketService = {
     return response.data;
   },
 
+  // Delete production ticket from catalog (soft delete)
+  async deleteProductionTicket(ticketId: number, reason: string): Promise<ProductionTicket> {
+    const response = await axios.delete(`${API_BASE_URL}/${ticketId}/delete?reason=${encodeURIComponent(reason)}`);
+    return response.data;
+  },
+
   // Test endpoints for development
   async testCascadeRelationships(id: number): Promise<boolean> {
     const response = await axios.get(`${API_BASE_URL}/test-cascade/${id}`);
@@ -169,27 +175,41 @@ export const productionTicketService = {
 export const productionTicketUtils = {
   // Format date for display
   formatDate(dateString: string): string {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateString || dateString.trim() === '') {
+      return 'N/A';
+    }
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return 'Invalid Date';
+    }
   },
 
   // Get status color for UI
   getStatusColor(status: string): string {
     const statusColors: Record<string, string> = {
-      'NEW': 'bg-blue-100 text-blue-800',
-      'IN_PROGRESS': 'bg-yellow-100 text-yellow-800',
-      'PARTIAL_COMPLETE': 'bg-orange-100 text-orange-800',
-      'COMPLETE': 'bg-green-100 text-green-800',
-      'PARTIAL_CANCELLED': 'bg-red-100 text-red-800',
-      'CANCELLED': 'bg-gray-100 text-gray-800',
-      'APPROVAL': 'bg-purple-100 text-purple-800',
-      'READY': 'bg-green-100 text-green-800',
-      'CLOSED': 'bg-gray-100 text-gray-800'
+      'New': 'bg-blue-100 text-blue-800',
+      'In Progress': 'bg-yellow-100 text-yellow-800',
+      'Partial Complete': 'bg-orange-100 text-orange-800',
+      'Complete': 'bg-green-100 text-green-800',
+      'Partial Cancelled': 'bg-red-100 text-red-800',
+      'Cancelled': 'bg-gray-100 text-gray-800',
+      'Approved': 'bg-purple-100 text-purple-800',
+      'Ready': 'bg-green-100 text-green-800',
+      'Closed': 'bg-gray-100 text-gray-800'
     };
     return statusColors[status] || 'bg-gray-100 text-gray-800';
   },
@@ -197,15 +217,15 @@ export const productionTicketUtils = {
   // Get status badge text
   getStatusBadgeText(status: string): string {
     const statusDisplayNames: Record<string, string> = {
-      'NEW': 'New',
-      'IN_PROGRESS': 'In Progress',
-      'PARTIAL_COMPLETE': 'Partial Complete',
-      'COMPLETE': 'Complete',
-      'PARTIAL_CANCELLED': 'Partial Cancelled',
-      'CANCELLED': 'Cancelled',
-      'APPROVAL': 'Approval',
-      'READY': 'Ready',
-      'CLOSED': 'Closed'
+      'New': 'New',
+      'In Progress': 'In Progress',
+      'Partial Complete': 'Partial Complete',
+      'Complete': 'Complete',
+      'Partial Cancelled': 'Partial Cancelled',
+      'Cancelled': 'Cancelled',
+      'Approved': 'Approved',
+      'Ready': 'Ready',
+      'Closed': 'Closed'
     };
     return statusDisplayNames[status] || status;
   },

@@ -15,6 +15,7 @@ import org.example.coretrack.dto.product.UpdateProductResponse;
 import org.example.coretrack.dto.product.ChangeProductStatusRequest;
 import org.example.coretrack.dto.product.ChangeProductStatusResponse;
 import org.example.coretrack.dto.product.ProductStatusTransitionResponse;
+import org.example.coretrack.dto.product.DeleteProductResponse;
 import org.example.coretrack.dto.product.ProductVariantAutoCompleteResponse;
 import org.example.coretrack.model.auth.User;
 import org.example.coretrack.repository.UserRepository;
@@ -93,12 +94,18 @@ public class ProductController {
             @RequestParam(name = "status", required = false) List<String> status,
             @PageableDefault(page = 0, size = 20) Pageable pageable) { 
 
+        // Get current user for company context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+
         // Validation E1: Invalid Search Keyword/Format
         if (search != null && search.length() > 255) { // maximum 255 characters
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
         }
 
-        Page<SearchProductResponse> products = productService.findProduct(search, groupProduct, status, pageable);
+        Page<SearchProductResponse> products = productService.findProduct(search, groupProduct, status, pageable, currentUser);
 
         // A2: No matching results - frontend solves
         return ResponseEntity.ok(products);
@@ -113,12 +120,18 @@ public class ProductController {
     public ResponseEntity<List<AllProductSearchResponse>> getProducts(
             @RequestParam(required = false) String search) { 
 
+        // Get current user for company context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+
         // Validation E1: Invalid Search Keyword/Format
         if (search != null && search.length() > 255) { // maximum 255 characters
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
         }
 
-        List<AllProductSearchResponse> products = productService.getAllProductsForAutocomplete(search);
+        List<AllProductSearchResponse> products = productService.getAllProductsForAutocomplete(search, currentUser);
 
         // A2: No matching results - frontend solves
         return ResponseEntity.ok(products);
@@ -131,12 +144,18 @@ public class ProductController {
     public ResponseEntity<List<ProductVariantAutoCompleteResponse>> getProductVariantsForAutocomplete(
             @RequestParam(required = false) String search) { 
 
+        // Get current user for company context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+
         // Validation E1: Invalid Search Keyword/Format
         if (search != null && search.length() > 255) { // maximum 255 characters
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Search keyword is too long. Max 255 characters allowed.");
         }
 
-        List<ProductVariantAutoCompleteResponse> variants = productService.getAllProductVariantsForAutocomplete(search);
+        List<ProductVariantAutoCompleteResponse> variants = productService.getAllProductVariantsForAutocomplete(search, currentUser);
 
         return ResponseEntity.ok(variants);
     }
@@ -146,7 +165,13 @@ public class ProductController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<ProductDetailResponse> getProductById(@PathVariable Long id) {
-        ProductDetailResponse product = productService.getProductById(id);
+        // Get current user for company context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+
+        ProductDetailResponse product = productService.getProductById(id, currentUser);
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found with ID: " + id);
         }
@@ -159,7 +184,13 @@ public class ProductController {
     @GetMapping("/product-groups")
     public ResponseEntity<List<ProductGroupResponse>> getAllProductGroups() {
         try {
-            List<ProductGroupResponse> groups = productService.getAllGroupName();
+            // Get current user for company context
+            User currentUser = getCurrentUserFromSecurityContext();
+            if (currentUser == null) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+            }
+
+            List<ProductGroupResponse> groups = productService.getAllGroupName(currentUser);
             System.out.println("Result: " + groups);
             return ResponseEntity.ok(groups);
         } catch (Exception e) {
@@ -206,7 +237,7 @@ public class ProductController {
         if (currentUser == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
         }
-        ProductStatusTransitionResponse response = productService.getAvailableStatusTransitions(id);
+        ProductStatusTransitionResponse response = productService.getAvailableStatusTransitions(id, currentUser);
         return ResponseEntity.ok(response);
     }
 
@@ -215,7 +246,28 @@ public class ProductController {
         @PathVariable Long id,
         @PathVariable Long variantId
     ){
-        List<BOMItemResponse> response = productService.getBomItem(id, variantId);
+        // Get current user for company context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+
+        List<BOMItemResponse> response = productService.getBomItem(id, variantId, currentUser);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Endpoint for deleting a product (soft delete)
+     */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<DeleteProductResponse> deleteProduct(@PathVariable Long id) {
+        // Get current user information from Spring Security Context
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated or not found");
+        }
+        DeleteProductResponse response = productService.deleteProduct(id, currentUser);
         return ResponseEntity.ok(response);
     }
 }

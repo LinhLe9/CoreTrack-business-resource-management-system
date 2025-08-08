@@ -59,19 +59,27 @@ public class InventoryTransactionResponse {
     }
 
     public InventoryTransactionResponse(MaterialInventoryLog log){
-        this.id = log.getId();
-        this.transactionType = log.getTransactionType() != null ? log.getTransactionType().getDisplayName() : null;
-        this.transactionSource = log.getTransactionSourceType() != null ? log.getTransactionSourceType().getDisplayName() : null;
-        this.quantity = log.getQuantity();
-        this.note = log.getNote();
-        this.previousStock = log.getBeforeQuantity();
-        this.newStock = log.getAfterQuantity();
-        this.referenceDocumentType = log.getReferenceDocumentType() != null ? log.getReferenceDocumentType().getDisplayName() : null;
-        this.referenceDocumentId = log.getReferenceDocumentId();
-        this.stockType = log.getStockType() != null ? log.getStockType().getDisplayName() : null;
-        this.createdAt = log.getCreatedAt();
-        this.createdBy = log.getCreatedBy() != null ? log.getCreatedBy().getUsername() : null;
-        this.user_role = log.getCreatedBy() != null && log.getCreatedBy().getRole() != null ? log.getCreatedBy().getRole().toString() : null;
+        System.out.println("DEBUG: Creating InventoryTransactionResponse from MaterialInventoryLog ID: " + log.getId());
+        try {
+            this.id = log.getId();
+            this.transactionType = log.getTransactionType() != null ? log.getTransactionType().getDisplayName() : null;
+            this.transactionSource = log.getTransactionSourceType() != null ? log.getTransactionSourceType().getDisplayName() : null;
+            this.quantity = log.getQuantity();
+            this.note = log.getNote();
+            this.previousStock = log.getBeforeQuantity();
+            this.newStock = log.getAfterQuantity();
+            this.referenceDocumentType = log.getReferenceDocumentType() != null ? log.getReferenceDocumentType().getDisplayName() : null;
+            this.referenceDocumentId = log.getReferenceDocumentId();
+            this.stockType = log.getStockType() != null ? log.getStockType().getDisplayName() : null;
+            this.createdAt = log.getCreatedAt();
+            this.createdBy = log.getCreatedBy() != null ? log.getCreatedBy().getUsername() : null;
+            this.user_role = log.getCreatedBy() != null && log.getCreatedBy().getRole() != null ? log.getCreatedBy().getRole().toString() : null;
+            System.out.println("DEBUG: Successfully created InventoryTransactionResponse for log ID: " + log.getId());
+        } catch (Exception e) {
+            System.err.println("DEBUG: Error creating InventoryTransactionResponse for log ID " + log.getId() + ": " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
     
     public Long getId() {

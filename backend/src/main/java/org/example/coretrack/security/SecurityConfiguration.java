@@ -46,7 +46,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() 
                         .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/verify", "/api/auth/reset-password").permitAll()
                         .requestMatchers("/api/products/test").permitAll()
-                        .requestMatchers("/api/test/websocket/**").permitAll()
+        
                         .requestMatchers("/api/admin/**").hasRole("OWNER")
                         .anyRequest().authenticated()
                 )

@@ -77,14 +77,25 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
   // Mark notification as read
   const handleMarkAsRead = async (notificationId: number) => {
     try {
+      console.log('Marking notification as read:', notificationId);
+      console.log('Current notifications before update:', notifications);
+      
       await markAsRead(notificationId);
-      setNotifications(prev => 
-        prev.map(notif => 
-          notif.id === notificationId 
-            ? { ...notif, isRead: true, readAt: new Date().toISOString() }
-            : notif
-        )
-      );
+      console.log('Successfully marked notification as read:', notificationId);
+      
+      setNotifications(prev => {
+        console.log('Updating notifications state, prev:', prev);
+        const updated = prev.map(notif => {
+          if (notif.id === notificationId) {
+            console.log('Found notification to update:', notif.id, 'setting isRead to true');
+            return { ...notif, isRead: true, readAt: new Date().toISOString() };
+          }
+          return notif;
+        });
+        console.log('Updated notifications:', updated);
+        return updated;
+      });
+      
       fetchUnreadCount();
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -94,7 +105,9 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
   // Mark all as read
   const handleMarkAllAsRead = async () => {
     try {
+      console.log('Marking all notifications as read');
       await markAllAsRead();
+      console.log('Successfully marked all notifications as read');
       setNotifications(prev => 
         prev.map(notif => ({ ...notif, isRead: true, readAt: new Date().toISOString() }))
       );
@@ -396,7 +409,10 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
                        }}>
                          {!notification.isRead && (
                            <button
-                             onClick={() => handleMarkAsRead(notification.id)}
+                             onClick={() => {
+                               console.log('Mark as read button clicked for notification:', notification.id, 'type:', typeof notification.id);
+                               handleMarkAsRead(notification.id);
+                             }}
                              style={{ 
                                color: '#9ca3af',
                                background: 'none',

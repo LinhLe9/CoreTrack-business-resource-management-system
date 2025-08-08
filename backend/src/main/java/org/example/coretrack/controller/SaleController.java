@@ -6,6 +6,7 @@ import org.example.coretrack.dto.sale.SaleCreateRequest;
 import org.example.coretrack.dto.sale.SaleStatusTransitionRule;
 import org.example.coretrack.dto.sale.SaleTicketResponse;
 import org.example.coretrack.dto.sale.UpdateSaleOrderStatusRequest;
+import org.example.coretrack.dto.sale.UpdateSaleRequest;
 import org.example.coretrack.model.Sale.Order;
 import org.example.coretrack.model.auth.User;
 import org.example.coretrack.service.SaleService;
@@ -48,10 +49,26 @@ public class SaleController {
         }
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<SaleTicketResponse> getSaleTicketById(@PathVariable Long id) {
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('OWNER', 'SALE_STAFF')")
+    public ResponseEntity<SaleTicketResponse> updateSaleTicket(
+            @PathVariable Long id,
+            @RequestBody UpdateSaleRequest request,
+            Authentication authentication) {
         try {
-            SaleTicketResponse ticket = saleService.getSaleTicketById(id);
+            User user = (User) authentication.getPrincipal();
+            SaleTicketResponse response = saleService.updateSaleTicket(id, request, user);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<SaleTicketResponse> getSaleTicketById(@PathVariable Long id, Authentication authentication) {
+        try {
+            User user = (User) authentication.getPrincipal();
+            SaleTicketResponse ticket = saleService.getSaleTicketById(id, user);
             return ResponseEntity.ok(ticket);
         } catch (Exception e) {
             return ResponseEntity.notFound().build();
@@ -62,9 +79,11 @@ public class SaleController {
     public ResponseEntity<Page<SaleCardResponse>> getSaleTickets(
             @RequestParam(required = false) String search,
             @RequestParam(name = "ticketStatus", required = false) List<String> ticketStatus,        
-            @PageableDefault(page = 0, size = 20) Pageable pageable) {
+            @PageableDefault(page = 0, size = 20) Pageable pageable,
+            Authentication authentication) {
         try {
-            Page<SaleCardResponse> tickets = saleService.getSaleTickets(search, ticketStatus, pageable);
+            User user = (User) authentication.getPrincipal();
+            Page<SaleCardResponse> tickets = saleService.getSaleTickets(search, ticketStatus, pageable, user);
             return ResponseEntity.ok(tickets);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
@@ -76,9 +95,11 @@ public class SaleController {
      */
     @GetMapping("/autocomplete")
     public ResponseEntity<List<SaleCardResponse>> getAutoComplete(
-        @RequestParam(required = false) String search){
-           try {
-            List<SaleCardResponse> tickets = saleService.getAutoComplete(search);
+        @RequestParam(required = false) String search,
+        Authentication authentication) {
+        try {
+            User user = (User) authentication.getPrincipal();
+            List<SaleCardResponse> tickets = saleService.getAutoComplete(search, user);
             return ResponseEntity.ok(tickets);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();

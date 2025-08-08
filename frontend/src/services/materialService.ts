@@ -99,3 +99,13 @@ export const getSuppliersByMaterialVariantSku = async (materialVariantSku: strin
   const response = await apiClient.get(`/materials/variants/${materialVariantSku}/suppliers`);
   return response.data;
 };
+
+// to delete a material (soft delete)
+export const deleteMaterial = async (id: number): Promise<any> => {
+  try {
+    const response = await apiClient.delete(`/materials/${id}`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};

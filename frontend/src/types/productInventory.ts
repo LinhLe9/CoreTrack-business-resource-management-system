@@ -133,4 +133,15 @@ export interface AddProductInventoryResponse {
   inventoryStatus: string;
 }
 
+export interface SetMinMaxResponse {
+  inventoryId: number;
+  sku: string;
+  productName: string;
+  oldValue: string; // BigDecimal as string
+  newValue: string; // BigDecimal as string
+  message: string;
+  updatedBy: string;
+  updatedAt: string; // ISO date string
+}
+
 export type { InventoryTransactionResponse } from './inventory'; 

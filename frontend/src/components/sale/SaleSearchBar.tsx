@@ -34,6 +34,7 @@ const SaleSearchBar: React.FC<SearchBarProps> = ({
 }) => {
   const [selectedOption, setSelectedOption] = useState<OptionType | null>(null);
   const router = useRouter();
+  const [inputValue, setInputValue] = useState(initialSearchTerm);
 
   const options: OptionType[] = saleForAutocomplete
     .filter(item => item && item.id && item.sku) // Filter out null/undefined items
@@ -53,14 +54,17 @@ const SaleSearchBar: React.FC<SearchBarProps> = ({
   };
 
   const handleInputChange = (inputValue: string) => {
+    setInputValue(inputValue);
     if (onSearchInputChange) {
       onSearchInputChange(inputValue);
     }
   };
 
-  const handleSearch = () => {
-    if (selectedOption) {
-      onSearch(selectedOption.label);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && inputValue.trim()) {
+      onSearch(inputValue.trim());
+      setInputValue('');
+      setSelectedOption(null);
     }
   };
 
@@ -80,30 +84,40 @@ const SaleSearchBar: React.FC<SearchBarProps> = ({
   );
 
   return (
-    <Flex gap={2} align="center">
-      <Box width="400px" minWidth="300px" maxWidth="600px">
-        <Select
-          instanceId="sale-search"
-          options={options}
-          placeholder="Search by sale SKU, customer name, or status"
-          onChange={handleChange}
-          value={selectedOption}
-          isClearable
-          components={{ SingleValue: customSingleValue, Option: customOption }}
-          filterOption={(option, inputValue) => {
-            if (!option || !option.data) return false;
-            
-            const skuMatch = option.label?.toLowerCase().includes(inputValue.toLowerCase()) || false;
-            const customerMatch = option.data.customerName?.toLowerCase().includes(inputValue.toLowerCase()) || false;
-            const statusMatch = option.data.status?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+    <Box width="400px" minWidth="300px" maxWidth="600px">
+      <Select
+        options={options}
+        placeholder="Search by sale SKU, customer name, or status"
+        onChange={handleChange}
+        value={selectedOption}
+        inputValue={inputValue}
+        onInputChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        isClearable
+        components={{ SingleValue: customSingleValue, Option: customOption }}
+        filterOption={(option, inputValue) => {
+          if (!option || !option.data) return false;
+          
+          const skuMatch = option.label?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+          const customerMatch = option.data.customerName?.toLowerCase().includes(inputValue.toLowerCase()) || false;
+          const statusMatch = option.data.status?.toLowerCase().includes(inputValue.toLowerCase()) || false;
 
-            return skuMatch || customerMatch || statusMatch;
-          }}
-          onInputChange={handleInputChange}
-        />
-      </Box>
-      <Button colorScheme="blue" onClick={handleSearch}>Search</Button>
-    </Flex>
+          return skuMatch || customerMatch || statusMatch;
+        }}
+        styles={{
+          menu: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+          }),
+          menuPortal: (provided) => ({
+            ...provided,
+            zIndex: 9999,
+          }),
+        }}
+        menuPortalTarget={document.body}
+        menuPosition="fixed"
+      />
+    </Box>
   );
 };
 

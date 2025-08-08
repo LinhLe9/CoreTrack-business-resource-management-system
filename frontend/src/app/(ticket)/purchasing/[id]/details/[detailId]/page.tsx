@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Box,
   Heading,
@@ -36,6 +36,7 @@ import {
   FormControl,
   FormLabel,
   Input,
+  Textarea,
   Card,
   CardBody,
   SimpleGrid,
@@ -43,6 +44,7 @@ import {
 import { purchasingTicketService } from '@/services/purchasingTicketService';
 import { PurchasingTicketDetailResponse } from '@/types/purchasingTicket';
 import { MaterialSupplierResponse } from '@/types/material';
+import { useUser } from '@/hooks/useUser';
 
 const PurchasingTicketDetailPage = () => {
   const router = useRouter();
@@ -50,16 +52,20 @@ const PurchasingTicketDetailPage = () => {
   const ticketId = params?.id;
   const detailId = params?.detailId;
   const toast = useToast();
+  const { isOwner, isWarehouseStaff } = useUser();
   
   const [detail, setDetail] = useState<PurchasingTicketDetailResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<boolean>(false);
-  const [newStatus, setNewStatus] = useState<string>('');
+  const [statusTransitionRules, setStatusTransitionRules] = useState<any[]>([]);
+  const [selectedNewStatus, setSelectedNewStatus] = useState<string>('');
   const [statusNote, setStatusNote] = useState<string>('');
+  const [cancelReason, setCancelReason] = useState<string>('');
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen: isCancelOpen, onOpen: onCancelOpen, onClose: onCancelClose } = useDisclosure();
 
-  const refreshDetail = async () => {
+  const refreshDetail = useCallback(async () => {
     if (!ticketId || !detailId) return;
     setLoading(true);
     try {
@@ -78,12 +84,122 @@ const PurchasingTicketDetailPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [ticketId, detailId, toast]);
 
   useEffect(() => {
     if (!ticketId || !detailId) return;
     refreshDetail();
-  }, [ticketId, detailId]);
+  }, [ticketId, detailId, refreshDetail]);
+
+  // Load status transition rules
+  const loadStatusTransitionRules = useCallback(async () => {
+    try {
+      const rules = await purchasingTicketService.getStatusTransitionRules();
+      setStatusTransitionRules(rules);
+    } catch (err) {
+      console.error('Failed to load status transition rules:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStatusTransitionRules();
+  }, [loadStatusTransitionRules]);
+
+  // Get next available status for current status
+  const getNextStatus = useCallback((currentStatus: string) => {
+    console.log('Current status:', currentStatus);
+    console.log('Available rules:', statusTransitionRules);
+    // Convert to uppercase for case-insensitive matching
+    const upperCurrentStatus = currentStatus.toUpperCase();
+    const rule = statusTransitionRules.find(r => r.currentStatus === upperCurrentStatus);
+    console.log('Found rule:', rule);
+    const nextStatus = rule?.allowedTransitions?.[0] || null;
+    console.log('Next status:', nextStatus);
+    return nextStatus;
+  }, [statusTransitionRules]);
+
+  const handleUpdateStatus = useCallback(async () => {
+    if (!selectedNewStatus || !ticketId || !detailId) return;
+    
+    setUpdatingStatus(true);
+    try {
+      await purchasingTicketService.updateDetailStatus(
+        Number(ticketId), 
+        Number(detailId), 
+        {
+          newStatus: selectedNewStatus as any, // Cast to enum
+          note: statusNote.trim() || undefined
+        }
+      );
+      toast({
+        title: 'Success',
+        description: `Status updated to ${selectedNewStatus}`,
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+      // Refresh the detail data to show updated status
+      await refreshDetail();
+      onClose();
+      setSelectedNewStatus('');
+      setStatusNote('');
+    } catch (err: any) {
+      console.error('Error updating status:', err);
+      toast({
+        title: 'Error',
+        description: err.response?.data?.message || 'Failed to update status.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setUpdatingStatus(false);
+    }
+  }, [selectedNewStatus, ticketId, detailId, statusNote, toast, refreshDetail, onClose]);
+
+  // Open status update modal
+  const openStatusUpdateModal = useCallback((newStatus: string) => {
+    setSelectedNewStatus(newStatus);
+    setStatusNote('');
+    onOpen();
+  }, [onOpen]);
+
+  // Handle cancel ticket detail
+  const handleCancelTicket = useCallback(async (reason: string) => {
+    if (!ticketId || !detailId) return;
+    
+    setUpdatingStatus(true);
+    try {
+      await purchasingTicketService.cancelPurchasingTicketDetail(
+        Number(ticketId), 
+        Number(detailId), 
+        reason
+      );
+      
+      toast({
+        title: 'Success',
+        description: 'Purchasing ticket detail cancelled successfully',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+      
+      // Refresh detail data
+      await refreshDetail();
+      onCancelClose();
+      setCancelReason('');
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.response?.data?.message || 'Failed to cancel ticket detail',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setUpdatingStatus(false);
+    }
+  }, [ticketId, detailId, toast, refreshDetail, onCancelClose]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -107,69 +223,27 @@ const PurchasingTicketDetailPage = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const handleUpdateStatus = async () => {
-    if (!detail || !ticketId || !detailId) return;
-    
-    if (!newStatus.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Please select a new status.',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
+    if (!dateString || dateString.trim() === '') {
+      return 'N/A';
     }
     
-    setUpdatingStatus(true);
     try {
-      await purchasingTicketService.updateDetailStatus(
-        Number(ticketId), 
-        Number(detailId), 
-        {
-          newStatus: newStatus as any, // Cast to enum
-          note: statusNote.trim() || undefined
-        }
-      );
-      toast({
-        title: 'Success',
-        description: 'Status updated successfully.',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
       });
-      // Refresh the detail data to show updated status
-      await refreshDetail();
-      onClose();
-      setNewStatus('');
-      setStatusNote('');
-    } catch (err: any) {
-      console.error('Error updating status:', err);
-      toast({
-        title: 'Error',
-        description: err.response?.data?.message || 'Failed to update status.',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setUpdatingStatus(false);
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return 'Invalid Date';
     }
-  };
-
-  const openUpdateStatusModal = () => {
-    setNewStatus('');
-    setStatusNote('');
-    onOpen();
   };
 
   if (loading) {
@@ -353,18 +427,68 @@ const PurchasingTicketDetailPage = () => {
 
       {/* Action Buttons */}
       <Box textAlign="center">
-        <HStack spacing={4} justify="center">
-          {detail.status !== 'CANCELLED' && detail.status !== 'Cancelled' && (
-            <Button 
-              colorScheme="blue" 
-              size="lg"
-              onClick={openUpdateStatusModal}
-              isLoading={updatingStatus}
-              loadingText="Updating..."
-            >
-              Update Status
-            </Button>
+        <VStack spacing={4}>
+          {/* Status Update and Cancel Buttons - Side by Side */}
+          {(isOwner() || isWarehouseStaff()) && (
+            <HStack spacing={4} justify="center">
+              {/* Status Update Button */}
+              {detail && (() => {
+                const nextStatus = getNextStatus(detail.status);
+                if (!nextStatus) return null;
+                
+                const getButtonText = (status: string) => {
+                  switch (status) {
+                    case 'APPROVAL': return 'Approve';
+                    case 'SUCCESSFUL': return 'Mark Successful';
+                    case 'SHIPPING': return 'Start Shipping';
+                    case 'READY': return 'Make Ready';
+                    case 'CLOSED': return 'Close';
+                    default: return `Change to ${status}`;
+                  }
+                };
+                
+                const getButtonColor = (status: string) => {
+                  switch (status) {
+                    case 'APPROVAL': return 'purple';
+                    case 'SUCCESSFUL': return 'green';
+                    case 'SHIPPING': return 'cyan';
+                    case 'READY': return 'blue';
+                    case 'CLOSED': return 'gray';
+                    default: return 'blue';
+                  }
+                };
+                
+                return (
+                  <Button
+                    colorScheme={getButtonColor(nextStatus)}
+                    size="lg"
+                    onClick={() => openStatusUpdateModal(nextStatus)}
+                    isLoading={updatingStatus}
+                    loadingText="Updating..."
+                  >
+                    {getButtonText(nextStatus)}
+                  </Button>
+                );
+              })()}
+              
+              {/* Cancel Ticket Button */}
+              <Button 
+                colorScheme="red" 
+                size="lg"
+                onClick={() => {
+                  setCancelReason('');
+                  onCancelOpen();
+                }}
+                isLoading={updatingStatus}
+                loadingText="Cancelling..."
+                isDisabled={detail.status === 'CANCELLED' || detail.status === 'Cancelled'}
+              >
+                Cancel Ticket
+              </Button>
+            </HStack>
           )}
+          
+          {/* Back to Purchasing Ticket Button - Below */}
           <Button 
             variant="outline" 
             size="lg"
@@ -372,33 +496,34 @@ const PurchasingTicketDetailPage = () => {
           >
             Back to Purchasing Ticket
           </Button>
-        </HStack>
+        </VStack>
       </Box>
 
-      {/* Update Status Modal */}
+      {/* Status Update Modal */}
       <Modal isOpen={isOpen} onClose={onClose}>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>Update Detail Status</ModalHeader>
+          <ModalHeader>Update Status</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <VStack spacing={4}>
-              <FormControl>
-                <FormLabel>New Status</FormLabel>
-                <Input
-                  value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value)}
-                  placeholder="Enter new status..."
-                  size="md"
-                />
-              </FormControl>
+              <Text>
+                Are you sure you want to change the status from{' '}
+                <Badge colorScheme={getStatusColor(detail?.status || '')}>
+                  {detail?.status}
+                </Badge>{' '}
+                to{' '}
+                <Badge colorScheme={getStatusColor(selectedNewStatus)}>
+                  {selectedNewStatus}
+                </Badge>?
+              </Text>
               <FormControl>
                 <FormLabel>Note (Optional)</FormLabel>
-                <Input
+                <Textarea
                   value={statusNote}
                   onChange={(e) => setStatusNote(e.target.value)}
-                  placeholder="Enter note for status change..."
-                  size="md"
+                  placeholder="Enter a note for this status change..."
+                  rows={3}
                 />
               </FormControl>
             </VStack>
@@ -413,7 +538,59 @@ const PurchasingTicketDetailPage = () => {
               isLoading={updatingStatus}
               loadingText="Updating..."
             >
-              Update Status
+              Confirm Update
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Cancel Ticket Modal */}
+      <Modal isOpen={isCancelOpen} onClose={onCancelClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Cancel Purchasing Ticket Detail</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4}>
+              <Text>
+                Are you sure you want to cancel this purchasing ticket detail?
+              </Text>
+              <FormControl>
+                <FormLabel>Reason for Cancellation</FormLabel>
+                <Textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Enter a reason for cancellation..."
+                  rows={3}
+                  isRequired
+                />
+              </FormControl>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onCancelClose}>
+              Cancel
+            </Button>
+            <Button 
+              colorScheme="red" 
+              onClick={() => {
+                if (!cancelReason.trim()) {
+                  toast({
+                    title: 'Error',
+                    description: 'Please enter a reason for cancellation',
+                    status: 'error',
+                    duration: 3000,
+                    isClosable: true,
+                  });
+                  return;
+                }
+                handleCancelTicket(cancelReason);
+              }}
+              isLoading={updatingStatus}
+              loadingText="Cancelling..."
+              isDisabled={!cancelReason.trim()}
+            >
+              Confirm Cancel
             </Button>
           </ModalFooter>
         </ModalContent>

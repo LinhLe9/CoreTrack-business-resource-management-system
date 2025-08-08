@@ -38,11 +38,10 @@ export interface ProductVariantInfoResponse {
 
 export interface BOMItemResponse {
   id: number;
-  materialSku: string; // Changed from materialId to materialSku to match backend
+  materialSku: string;
   materialName: string;
   quantity: string; // BigDecimal from backend
-  uom: string;
-  notes?: string;
+  uomDisplayName: string; // Changed from uom to uomDisplayName to match backend
 }
 
 export interface InventoryResponse {

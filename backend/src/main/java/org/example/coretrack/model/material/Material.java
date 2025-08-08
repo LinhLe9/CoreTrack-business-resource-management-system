@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.example.coretrack.model.auth.User;
+import org.example.coretrack.model.auth.Company;
 import org.example.coretrack.model.supplier.MaterialSupplier;
 
 import jakarta.persistence.*;
@@ -51,6 +52,11 @@ public class Material {
     @OneToMany(mappedBy = "material")
     private Set<MaterialSupplier> materialSuppliers = new HashSet<>();
 
+    // Multi-tenancy: Company relationship
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
     // logging elements
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_user_id", nullable = false)
@@ -64,7 +70,7 @@ public class Material {
     private LocalDateTime updatedAt;
     
     public Material(String sku, String name, String shortDes, UoM uom, String imageUrl,
-            List<MaterialVariant> variants, MaterialGroup group, User created_by) {
+            List<MaterialVariant> variants, MaterialGroup group, User created_by, Company company) {
         this.sku = sku;
         this.name = name;
         this.shortDes = shortDes;
@@ -75,13 +81,14 @@ public class Material {
         this.variants = variants;
         this.group = group;
         this.created_by = created_by;
+        this.company = company;
         this.updated_by = created_by;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
 
     public Material(String sku, String name, String shortDes,
-        MaterialGroup group, User created_by) {
+        MaterialGroup group, User created_by, Company company) {
         this.sku = sku;
         this.name = name;
         this.shortDes = shortDes;
@@ -89,6 +96,7 @@ public class Material {
         this.status = MaterialStatus.ACTIVE;
         this.group = group;
         this.created_by = created_by;
+        this.company = company;
         this.updated_by = created_by;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -168,6 +176,14 @@ public class Material {
 
     public void setGroup(MaterialGroup group) {
         this.group = group;
+    }
+
+    public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
     }
 
     public User getCreated_by() {

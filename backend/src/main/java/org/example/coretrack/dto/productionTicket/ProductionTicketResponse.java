@@ -3,17 +3,22 @@ package org.example.coretrack.dto.productionTicket;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 public class ProductionTicketResponse {
     private Long id;
     private String name;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime completed_date;
     private String status;
 
     // audit
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;
     private String createdBy;
     private String createdBy_role;
 
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime lastUpdatedAt;
     private String lastUpdateBy;
     private String lastUpdateBy_role;

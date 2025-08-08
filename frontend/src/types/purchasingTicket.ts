@@ -128,6 +128,11 @@ export interface PurchasingTicketCardResponse {
   completed_date?: string;
   status: string;
   createdAt: string;
+  createdBy: string;
+  createdByRole: string;
+  updatedAt: string;
+  updatedBy: string;
+  updatedByRole: string;
 }
 
 export interface PurchasingTicketDetailResponse {

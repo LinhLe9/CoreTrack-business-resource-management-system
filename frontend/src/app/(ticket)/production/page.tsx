@@ -26,6 +26,7 @@ import { PageResponse } from '../../../types/PageResponse';
 import ProductionTicketSearchBar from '../../../components/ticket/ProductionTicketSearchBar';
 import ProductionTicketFilters from '../../../components/ticket/ProductionTicketFilters';
 import ProductionTicketCard from '../../../components/ticket/ProductionTicketCard';
+import { useUser } from '../../../hooks/useUser';
 
 const ProductionTicketPage: React.FC = () => {
   const [pageData, setPageData] = useState<PageResponse<ProductionTicketCardResponse> | null>(null);
@@ -42,6 +43,7 @@ const ProductionTicketPage: React.FC = () => {
   
   const toast = useToast();
   const router = useRouter();
+  const { isOwner } = useUser();
 
   // Fetch autocomplete results
   const fetchAutocomplete = useCallback(async (search: string) => {
@@ -102,7 +104,7 @@ const ProductionTicketPage: React.FC = () => {
   const handleFilter = (filters: any) => {
     setQueryParams(prev => ({
       ...prev,
-      ...filters,
+      ticketStatus: filters.ticketStatus,
       page: 0 // Reset to first page when filtering
     }));
   };
@@ -146,15 +148,17 @@ const ProductionTicketPage: React.FC = () => {
                 />
               </Box>
               
-              <Button
-                leftIcon={<AddIcon />}
-                colorScheme="teal"
-                onClick={handleCreateTicket}
-                size="md"
-                flexShrink={0}
-              >
-                Create Ticket
-              </Button>
+              {isOwner() && (
+                <Button
+                  leftIcon={<AddIcon />}
+                  colorScheme="teal"
+                  onClick={handleCreateTicket}
+                  size="md"
+                  flexShrink={0}
+                >
+                  Create Ticket
+                </Button>
+              )}
             </HStack>
           </VStack>
         </Center>

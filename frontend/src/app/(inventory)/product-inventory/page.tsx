@@ -19,7 +19,7 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
-import { AddIcon, MinusIcon, CheckIcon } from '@chakra-ui/icons';
+import { AddIcon, MinusIcon, CheckIcon, SettingsIcon } from '@chakra-ui/icons';
 
 import InventoryProductSearchBar from '../../../components/inventory/InventoryProductSearchBar';
 import InventoryProductFilters from '../../../components/inventory/InventoryProductFilters';
@@ -28,6 +28,7 @@ import BulkStockTransactionModal from '../../../components/inventory/BulkStockTr
 import { getProductInventoryFilter, getAllProductInventoryForAutocomplete } from '../../../services/productInventoryService';
 import { SearchInventoryResponse, ProductInventoryAutoComplete, ProductInventoryQueryParams, ProductInventoryFilterParams, AllSearchInventoryResponse } from '../../../types/productInventory';
 import { PageResponse } from '../../../types/PageResponse';
+import { useUser } from '../../../hooks/useUser';
 
 const ProductInventoryPage: React.FC = () => {
   const [pageData, setPageData] = useState<PageResponse<SearchInventoryResponse> | null>(null);
@@ -42,9 +43,14 @@ const ProductInventoryPage: React.FC = () => {
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const { isOpen: isBulkAddOpen, onOpen: onBulkAddOpen, onClose: onBulkAddClose } = useDisclosure();
   const { isOpen: isBulkSubtractOpen, onOpen: onBulkSubtractOpen, onClose: onBulkSubtractClose } = useDisclosure();
+  const { isOpen: isBulkSetOpen, onOpen: onBulkSetOpen, onClose: onBulkSetClose } = useDisclosure();
   
   const toast = useToast();
   const router = useRouter();
+  const { isOwner, isWarehouseStaff } = useUser();
+
+  // Check if user has permission for inventory operations
+  const hasInventoryPermission = () => isOwner() || isWarehouseStaff();
 
   // Fetch autocomplete list only when needed
   const fetchAllProductInventory = useCallback(async (search?: string) => {
@@ -116,7 +122,8 @@ const ProductInventoryPage: React.FC = () => {
   const handleFilter = (filters: ProductInventoryFilterParams) => {
     setQueryParams((prev: ProductInventoryQueryParams) => ({
       ...prev,
-      ...filters,
+      groupProducts: filters.groupProducts,
+      inventoryStatus: filters.inventoryStatus,
       page: 0,
     }));
   };
@@ -138,6 +145,11 @@ const ProductInventoryPage: React.FC = () => {
 
   const handleStockUpdate = () => {
     // Refresh the product inventory data after stock update
+    fetchProductInventory(queryParams);
+  };
+
+  const handleDelete = () => {
+    // Refresh the product inventory list after deletion
     fetchProductInventory(queryParams);
   };
 
@@ -191,15 +203,31 @@ const ProductInventoryPage: React.FC = () => {
   const handleBulkSubtract = () => {
     if (selectedItems.size === 0) {
       toast({
-        title: 'No Items Selected',
-        description: 'Please select at least one item',
+        title: 'No items selected',
+        description: 'Please select at least one item to subtract stock.',
         status: 'warning',
         duration: 3000,
         isClosable: true,
       });
       return;
     }
+
     onBulkSubtractOpen();
+  };
+
+  const handleBulkSet = () => {
+    if (selectedItems.size === 0) {
+      toast({
+        title: 'No items selected',
+        description: 'Please select at least one item to set stock.',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    onBulkSetOpen();
   };
 
   const handleBulkSuccess = () => {
@@ -241,15 +269,17 @@ const ProductInventoryPage: React.FC = () => {
                 />
               </Box>
               
-              <Button
-                leftIcon={<AddIcon />}
-                colorScheme="teal"
-                onClick={handleInitialStock}
-                size="md"
-                flexShrink={0}
-              >
-                Initial Stock
-              </Button>
+              {hasInventoryPermission() ? (
+                <Button
+                  leftIcon={<AddIcon />}
+                  colorScheme="teal"
+                  onClick={handleInitialStock}
+                  size="md"
+                  flexShrink={0}
+                >
+                  Initial Stock
+                </Button>
+              ) : null}
             </HStack>
           </VStack>
         </Center>
@@ -295,23 +325,36 @@ const ProductInventoryPage: React.FC = () => {
               />
               <Text fontSize="sm">Cancel</Text>
               
-              <IconButton
-                aria-label="Bulk add stock"
-                icon={<AddIcon />}
-                size="sm"
-                colorScheme="green"
-                onClick={handleBulkAdd}
-              />
-              <Text fontSize="sm">Add</Text>
-              
-              <IconButton
-                aria-label="Bulk subtract stock"
-                icon={<MinusIcon />}
-                size="sm"
-                colorScheme="red"
-                onClick={handleBulkSubtract}
-              />
-              <Text fontSize="sm">Subtract</Text>
+              {hasInventoryPermission() ? (
+                <>
+                  <IconButton
+                    aria-label="Bulk add stock"
+                    icon={<AddIcon />}
+                    size="sm"
+                    colorScheme="green"
+                    onClick={handleBulkAdd}
+                  />
+                  <Text fontSize="sm">Add</Text>
+                  
+                  <IconButton
+                    aria-label="Bulk subtract stock"
+                    icon={<MinusIcon />}
+                    size="sm"
+                    colorScheme="red"
+                    onClick={handleBulkSubtract}
+                  />
+                  <Text fontSize="sm">Subtract</Text>
+                  
+                  <IconButton
+                    aria-label="Bulk set stock"
+                    icon={<SettingsIcon />}
+                    size="sm"
+                    colorScheme="blue"
+                    onClick={handleBulkSet}
+                  />
+                  <Text fontSize="sm">Set</Text>
+                </>
+              ) : null}
               
               <Text fontSize="sm" color="gray.600">
                 ({selectedItems.size} selected)
@@ -382,22 +425,26 @@ const ProductInventoryPage: React.FC = () => {
       </VStack>
 
       {/* Bulk Add Modal */}
-      <BulkStockTransactionModal
-        isOpen={isBulkAddOpen}
-        onClose={onBulkAddClose}
-        selectedItems={getSelectedItemsData()}
-        transactionType="add"
-        onSuccess={handleBulkSuccess}
-      />
+      {hasInventoryPermission() ? (
+        <BulkStockTransactionModal
+          isOpen={isBulkAddOpen}
+          onClose={onBulkAddClose}
+          selectedItems={getSelectedItemsData()}
+          transactionType="add"
+          onSuccess={handleBulkSuccess}
+        />
+      ) : null}
 
       {/* Bulk Subtract Modal */}
-      <BulkStockTransactionModal
-        isOpen={isBulkSubtractOpen}
-        onClose={onBulkSubtractClose}
-        selectedItems={getSelectedItemsData()}
-        transactionType="subtract"
-        onSuccess={handleBulkSuccess}
-      />
+      {hasInventoryPermission() ? (
+        <BulkStockTransactionModal
+          isOpen={isBulkSubtractOpen}
+          onClose={onBulkSubtractClose}
+          selectedItems={getSelectedItemsData()}
+          transactionType="subtract"
+          onSuccess={handleBulkSuccess}
+        />
+      ) : null}
     </Box>
   );
 };

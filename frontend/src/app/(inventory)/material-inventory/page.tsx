@@ -19,7 +19,7 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
-import { AddIcon, MinusIcon, CheckIcon } from '@chakra-ui/icons';
+import { AddIcon, MinusIcon, CheckIcon, SettingsIcon } from '@chakra-ui/icons';
 
 import InventoryMaterialSearchBar from '../../../components/inventory/InventoryMaterialSearchBar';
 import InventoryMaterialFilters from '../../../components/inventory/InventoryMaterialFilters';
@@ -29,6 +29,7 @@ import { getMaterialInventoryFilter, getAllMaterialInventoryForAutocomplete } fr
 import { MaterialInventoryQueryParams, MaterialInventoryFilterParams, MaterialInventoryAutoComplete } from '../../../types/materialInventory';
 import { SearchInventoryResponse, AllSearchInventoryResponse } from '../../../types/productInventory';
 import { PageResponse } from '../../../types/PageResponse';
+import { useUser } from '../../../hooks/useUser';
 
 const MaterialInventoryPage: React.FC = () => {
   const [pageData, setPageData] = useState<PageResponse<SearchInventoryResponse> | null>(null);
@@ -43,9 +44,14 @@ const MaterialInventoryPage: React.FC = () => {
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const { isOpen: isBulkAddOpen, onOpen: onBulkAddOpen, onClose: onBulkAddClose } = useDisclosure();
   const { isOpen: isBulkSubtractOpen, onOpen: onBulkSubtractOpen, onClose: onBulkSubtractClose } = useDisclosure();
+  const { isOpen: isBulkSetOpen, onOpen: onBulkSetOpen, onClose: onBulkSetClose } = useDisclosure();
   
   const toast = useToast();
   const router = useRouter();
+  const { isOwner, isWarehouseStaff } = useUser();
+
+  // Check if user has permission for inventory operations
+  const hasInventoryPermission = () => isOwner() || isWarehouseStaff();
 
   // Fetch autocomplete list only when needed
   const fetchAllMaterialInventory = useCallback(async (search?: string) => {
@@ -117,7 +123,8 @@ const MaterialInventoryPage: React.FC = () => {
   const handleFilter = (filters: MaterialInventoryFilterParams) => {
     setQueryParams((prev: MaterialInventoryQueryParams) => ({
       ...prev,
-      ...filters,
+      groupMaterials: filters.groupMaterials,
+      inventoryStatus: filters.inventoryStatus,
       page: 0,
     }));
   };
@@ -139,6 +146,9 @@ const MaterialInventoryPage: React.FC = () => {
 
   const handleStockUpdate = () => {
     // Refresh the material inventory data after stock update
+    console.log('=== REFRESHING MATERIAL INVENTORY ===');
+    console.log('Current queryParams:', queryParams);
+    console.log('=====================================');
     fetchMaterialInventory(queryParams);
   };
 
@@ -192,15 +202,31 @@ const MaterialInventoryPage: React.FC = () => {
   const handleBulkSubtract = () => {
     if (selectedItems.size === 0) {
       toast({
-        title: 'No Items Selected',
-        description: 'Please select at least one item',
+        title: 'No items selected',
+        description: 'Please select at least one item to subtract stock.',
         status: 'warning',
         duration: 3000,
         isClosable: true,
       });
       return;
     }
+
     onBulkSubtractOpen();
+  };
+
+  const handleBulkSet = () => {
+    if (selectedItems.size === 0) {
+      toast({
+        title: 'No items selected',
+        description: 'Please select at least one item to set stock.',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    onBulkSetOpen();
   };
 
   const handleBulkSuccess = () => {
@@ -243,14 +269,27 @@ const MaterialInventoryPage: React.FC = () => {
               </Box>
               
               <Button
-                leftIcon={<AddIcon />}
-                colorScheme="teal"
-                onClick={handleInitialStock}
-                size="md"
-                flexShrink={0}
+                size="sm"
+                colorScheme="blue"
+                onClick={() => {
+                  console.log('=== FORCE REFRESH ===');
+                  fetchMaterialInventory(queryParams);
+                }}
               >
-                Initial Stock
+                Refresh
               </Button>
+              
+              {hasInventoryPermission() ? (
+                <Button
+                  leftIcon={<AddIcon />}
+                  colorScheme="teal"
+                  onClick={handleInitialStock}
+                  size="md"
+                  flexShrink={0}
+                >
+                  Initial Stock
+                </Button>
+              ) : null}
             </HStack>
           </VStack>
         </Center>
@@ -261,65 +300,76 @@ const MaterialInventoryPage: React.FC = () => {
         />
 
         {/* Bulk Operations Bar */}
-        <HStack spacing={4} justify="center" p={4} bg="gray.50" borderRadius="md">
-          <IconButton
-            aria-label="Toggle selection mode"
-            icon={<CheckIcon />}
-            size="sm"
-            colorScheme={isSelectionMode ? "blue" : "gray"}
-            variant={isSelectionMode ? "solid" : "outline"}
-            onClick={toggleSelectionMode}
-          />
-          <Text fontSize="sm" fontWeight="medium">
-            {isSelectionMode ? "Selection Mode" : "Select Items"}
-          </Text>
-          
-          {isSelectionMode && (
-            <>
-              <IconButton
-                aria-label="Select all"
-                icon={<CheckIcon />}
-                size="sm"
-                colorScheme="blue"
-                variant="outline"
-                onClick={handleSelectAll}
-              />
-              <Text fontSize="sm">Select All</Text>
-              
-              <IconButton
-                aria-label="Cancel selection"
-                icon={<MinusIcon />}
-                size="sm"
-                colorScheme="red"
-                variant="outline"
-                onClick={handleCancelSelection}
-              />
-              <Text fontSize="sm">Cancel</Text>
-              
-              <IconButton
-                aria-label="Bulk add stock"
-                icon={<AddIcon />}
-                size="sm"
-                colorScheme="green"
-                onClick={handleBulkAdd}
-              />
-              <Text fontSize="sm">Add</Text>
-              
-              <IconButton
-                aria-label="Bulk subtract stock"
-                icon={<MinusIcon />}
-                size="sm"
-                colorScheme="red"
-                onClick={handleBulkSubtract}
-              />
-              <Text fontSize="sm">Subtract</Text>
-              
-              <Text fontSize="sm" color="gray.600">
-                ({selectedItems.size} selected)
-              </Text>
-            </>
-          )}
-        </HStack>
+        {hasInventoryPermission() ? (
+          <HStack spacing={4} justify="center" p={4} bg="gray.50" borderRadius="md">
+            <IconButton
+              aria-label="Toggle selection mode"
+              icon={<CheckIcon />}
+              size="sm"
+              colorScheme={isSelectionMode ? "blue" : "gray"}
+              variant={isSelectionMode ? "solid" : "outline"}
+              onClick={toggleSelectionMode}
+            />
+            <Text fontSize="sm" fontWeight="medium">
+              {isSelectionMode ? "Selection Mode" : "Select Items"}
+            </Text>
+            
+            {isSelectionMode && (
+              <>
+                <IconButton
+                  aria-label="Select all"
+                  icon={<CheckIcon />}
+                  size="sm"
+                  colorScheme="blue"
+                  variant="outline"
+                  onClick={handleSelectAll}
+                />
+                <Text fontSize="sm">Select All</Text>
+                
+                <IconButton
+                  aria-label="Cancel selection"
+                  icon={<MinusIcon />}
+                  size="sm"
+                  colorScheme="red"
+                  variant="outline"
+                  onClick={handleCancelSelection}
+                />
+                <Text fontSize="sm">Cancel</Text>
+                
+                <IconButton
+                  aria-label="Bulk add stock"
+                  icon={<AddIcon />}
+                  size="sm"
+                  colorScheme="green"
+                  onClick={handleBulkAdd}
+                />
+                <Text fontSize="sm">Add</Text>
+                
+                <IconButton
+                  aria-label="Bulk subtract stock"
+                  icon={<MinusIcon />}
+                  size="sm"
+                  colorScheme="red"
+                  onClick={handleBulkSubtract}
+                />
+                <Text fontSize="sm">Subtract</Text>
+                
+                <IconButton
+                  aria-label="Bulk set stock"
+                  icon={<SettingsIcon />}
+                  size="sm"
+                  colorScheme="purple"
+                  onClick={handleBulkSet}
+                />
+                <Text fontSize="sm">Set</Text>
+                
+                <Text fontSize="sm" color="gray.600">
+                  ({selectedItems.size} selected)
+                </Text>
+              </>
+            )}
+          </HStack>
+        ) : null}
 
         {/* Results */}
         {loading && (
@@ -383,22 +433,26 @@ const MaterialInventoryPage: React.FC = () => {
       </VStack>
 
       {/* Bulk Add Modal */}
-      <MaterialBulkStockTransactionModal
-        isOpen={isBulkAddOpen}
-        onClose={onBulkAddClose}
-        selectedItems={getSelectedItemsData()}
-        transactionType="add"
-        onSuccess={handleBulkSuccess}
-      />
+      {hasInventoryPermission() ? (
+        <MaterialBulkStockTransactionModal
+          isOpen={isBulkAddOpen}
+          onClose={onBulkAddClose}
+          selectedItems={getSelectedItemsData()}
+          transactionType="add"
+          onSuccess={handleBulkSuccess}
+        />
+      ) : null}
 
       {/* Bulk Subtract Modal */}
-      <MaterialBulkStockTransactionModal
-        isOpen={isBulkSubtractOpen}
-        onClose={onBulkSubtractClose}
-        selectedItems={getSelectedItemsData()}
-        transactionType="subtract"
-        onSuccess={handleBulkSuccess}
-      />
+      {hasInventoryPermission() ? (
+        <MaterialBulkStockTransactionModal
+          isOpen={isBulkSubtractOpen}
+          onClose={onBulkSubtractClose}
+          selectedItems={getSelectedItemsData()}
+          transactionType="subtract"
+          onSuccess={handleBulkSuccess}
+        />
+      ) : null}
     </Box>
   );
 };

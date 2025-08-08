@@ -28,6 +28,7 @@ import SaleFilters from '../../../components/sale/SaleFilters';
 import SaleCard from '../../../components/sale/SaleCard';
 import { getSaleTickets, getSaleAutoComplete } from '../../../services/saleService';
 import { SaleCardResponse, SaleQueryParams, SaleResponse } from '../../../types/sale';
+import { useUser } from '../../../hooks/useUser';
 
 const SalePage: React.FC = () => {
   const [pageData, setPageData] = useState<SaleResponse | null>(null);
@@ -39,6 +40,7 @@ const SalePage: React.FC = () => {
   
   const toast = useToast();
   const router = useRouter();
+  const { isOwner, isSaleStaff } = useUser();
 
   // Fetch autocomplete list only when needed
   const fetchSaleAutocomplete = useCallback(async (search?: string) => {
@@ -103,7 +105,11 @@ const SalePage: React.FC = () => {
   };
 
   const handleFilter = (filters: { ticketStatus?: string[] }) => {
-    setQueryParams(prev => ({ ...prev, ...filters, page: 0 }));
+    setQueryParams(prev => ({ 
+      ...prev, 
+      ticketStatus: filters.ticketStatus,
+      page: 0 
+    }));
   };
 
   const handlePageChange = (newPage: number) => {
@@ -139,13 +145,15 @@ const SalePage: React.FC = () => {
             saleForAutocomplete={saleForAutocomplete}
             onSearchInputChange={handleSearchInputChange}
           />
-          <IconButton
-            aria-label="Create new sale"
-            icon={<AddIcon />}
-            colorScheme="blue"
-            size="lg"
-            onClick={handleCreateSale}
-          />
+          {(isOwner() || isSaleStaff()) && (
+            <IconButton
+              aria-label="Create new sale"
+              icon={<AddIcon />}
+              colorScheme="blue"
+              size="lg"
+              onClick={handleCreateSale}
+            />
+          )}
         </HStack>
       </VStack>
 
