@@ -65,6 +65,9 @@ public class UserServiceImpl implements UserService {
         this.companyService = companyService;
     }
 
+    /*
+     * register new user to the application
+     */
     @Override
     public AuthResponse registerOwner(RegistrationRequest registrationRequest) {
         if (userRepository.findByEmail(registrationRequest.getEmail()).isPresent()) {
@@ -205,6 +208,9 @@ public class UserServiceImpl implements UserService {
         return "valid";
     }
 
+    /*
+     * login
+     */
     @Override
     public AuthResponse login(LoginRequest loginRequest) {
         User user = userRepository.findByEmail(loginRequest.getEmail())

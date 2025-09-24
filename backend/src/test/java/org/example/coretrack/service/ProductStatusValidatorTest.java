@@ -1,6 +1,7 @@
 package org.example.coretrack.service;
 
 import org.example.coretrack.model.product.ProductStatus;
+import org.example.coretrack.service.ProductStatusValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.util.Set;
@@ -79,4 +80,4 @@ public class ProductStatusValidatorTest {
         String nullMessage = validator.getInvalidTransitionMessage(null, ProductStatus.ACTIVE);
         assertTrue(nullMessage.contains("null status provided"));
     }
-} 
+}

@@ -27,13 +27,17 @@ api.interceptors.request.use((config) => {
   console.log('Request method:', config.method);
   console.log('Client instance ID:', config.headers['X-Client-Instance']);
   console.log('Request headers before:', config.headers);
-  
-  if (isClient) {
+
+  // Skip Authorization header for login/register/reset-password
+  const skipAuthHeader = ['/auth/login', '/auth/register', '/auth/reset-password']
+    .some(path => config.url?.endsWith(path));
+
+  if (!skipAuthHeader && isClient) {
     try {
       const token = localStorage.getItem("token");
       console.log('Token found:', !!token);
       console.log('Token value:', token ? token.substring(0, 20) + '...' : 'null');
-      
+
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
         console.log('Authorization header set to:', `Bearer ${token.substring(0, 20)}...`);
@@ -44,9 +48,9 @@ api.interceptors.request.use((config) => {
       console.error('Error setting authorization header:', error);
     }
   } else {
-    console.log('Not client-side - skipping token setup');
+    console.log('Skipping Authorization header for auth endpoint:', config.url);
   }
-  
+
   console.log('Request headers after:', config.headers);
   console.log('=== REQUEST INTERCEPTOR END ===');
   return config;

@@ -50,14 +50,23 @@ public class JwtService {
             UserDetails userDetails,
             long expiration
     ) {
-        return Jwts
-                .builder()
+         Date issuedAt = new Date(System.currentTimeMillis());
+        Date expDate = new Date(System.currentTimeMillis() + expiration * 1000);
+
+        String token = Jwts.builder()
                 .setClaims(extraClaims)
                 .setSubject(userDetails.getUsername())
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .setIssuedAt(issuedAt)
+                .setExpiration(expDate)
                 .signWith(getSignInKey(), SignatureAlgorithm.HS256)
                 .compact();
+
+        // Log để debug
+        System.out.println(">>> [JwtService] Issue at : " + issuedAt);
+        System.out.println(">>> [JwtService] Expire at: " + expDate);
+        System.out.println(">>> [JwtService] Token     : " + token);
+
+        return token;
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {

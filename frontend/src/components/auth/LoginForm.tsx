@@ -18,7 +18,10 @@ export default function LoginForm() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await api.post('/auth/login', { email, password });
+      const res = await api.post('/auth/login', { email, password }, {
+        headers: { Authorization: '' } 
+      });
+
 
       console.log('=== Login Response Debug ===');
       console.log('Full response:', res.data);

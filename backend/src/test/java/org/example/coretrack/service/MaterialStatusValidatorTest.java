@@ -1,6 +1,7 @@
 package org.example.coretrack.service;
 
 import org.example.coretrack.model.material.MaterialStatus;
+import org.example.coretrack.service.MaterialStatusValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -78,4 +79,4 @@ public class MaterialStatusValidatorTest {
         String sameStatusMessage = validator.getInvalidTransitionMessage(MaterialStatus.ACTIVE, MaterialStatus.ACTIVE);
         assertTrue(sameStatusMessage.contains("already in ACTIVE status"));
     }
-} 
+}
