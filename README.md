@@ -1,11 +1,8 @@
-# CoreTrack-business-resource-management-system
+CoreTrack is a lightweight Business Resource Management (BRM) system designed for small-scale manufacturers and independent makers. It replaces complex ERP systems with a simplified, user-friendly platform to manage production, inventory, and sales.
 
-1. Product Inventory Controller (/api/product-inventory)
-TypeEndpointReceiveReturnPurposeGET/init@Body: AddProductInventoryRequestAddProductInventoryResponseInitial the stock for an available productPUT/{variantId}/set@PathVariable: Long variantId 
-@RequestBody:  StockSetRequestInventoryTransactionResponseSet the current stock of a particular variantIdPUT/{variantId}/add@PathVariable:  Long variantId
-@RequestBody:  StockModifyRequestInventoryTransactionResponseAdd a number of stock to the current number of stockPUT/{variantId}/subtract@PathVariable:  Long variantId
-@RequestBody:  StockModifyRequestInventoryTransactionResponseSubstract a numver of stock from current stockGET/filter@RequestParam: search
-@RequestParam: List<String> groupProducts
-@RequestParam: List<String> inventoryStatus
-@PageableDefault: pageable Page<SearchProductInventoryResponse>
-To filter the product inventory dataset and receive the product inventory that meet the requirementGET/autocomplete@RequestParam: searchList<AllSearchProductInventoryResponse>Use the display the product inventory when the user search on the search bar
+📌 Features
+Inventory Management: Real-time tracking of raw materials and finished goods with low-stock alarms.
+Production Planning: Basic Bill of Materials (BOM) management and production ticket tracking.
+Sales & Invoicing: Create manual invoices and monitor online order statuses (e.g., Etsy, Instagram).
+Role-Based Access: Dedicated interfaces for Owners, Warehouse, Production, and Sales staff.
+Supplier Handling: Centralized database for managing supplier info and purchasing tickets.
